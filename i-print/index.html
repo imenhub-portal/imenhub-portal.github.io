@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://script.google.com">
+    <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+    <link rel="dns-prefetch" href="https://script.google.com">
+    <title>Servis Cetak Poster | IMEN UKM</title>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; background-color: #f4f7f6; }
+        #loading-screen { position: fixed; width: 100%; height: 100%; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+        .spinner { border: 8px solid #f3f3f3; border-top: 8px solid #005596; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { margin-top: 20px; font-size: 1.2rem; color: #333; }
+        iframe { width: 100%; height: 100%; border: none; display: none; }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <div class="loading-text">Memuatkan i-Print...</div>
+    </div>
+    <iframe id="app-frame" src="https://script.google.com/macros/s/AKfycbwjO97_YWugdYIRpV6bT3Uv4uTbmM6Ob1axw9ASpk668ugB40O1DAxzBn2jTRp9rLxKTg/exec" sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
+    <script>
+        const frame = document.getElementById('app-frame');
+        const loader = document.getElementById('loading-screen');
+        frame.onload = function() { loader.style.display = 'none'; frame.style.display = 'block'; };
+    </script>
+</body>
+</html>
