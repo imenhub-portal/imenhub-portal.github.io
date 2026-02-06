@@ -1,6 +1,6 @@
 /**
  * BACKEND: SISTEM KAJI SELIDIK IMEN UKM
- * ID Google Sheet: 1mvuTPsthyOFqYsyOKl7a0lQlmRXH-IdSrlDryGpVTbo
+ * Google Sheet ID: 1mvuTPsthyOFqYsyOKl7a0lQlmRXH-IdSrlDryGpVTbo
  */
 
 function doGet() {
