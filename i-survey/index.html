@@ -8,51 +8,49 @@
     <link rel="icon" href="https://www.ukm.my/portal/wp-content/uploads/2019/04/favicon.png" type="image/png">
     
     <style>
-        /* Tetapan supaya iFrame memenuhi skrin 100% tanpa scrollbar ganda */
+        /* CSS ini memastikan iFrame memenuhi 100% skrin tanpa bingkai */
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
             overflow: hidden; /* Hilangkan scrollbar browser utama */
-            background-color: #001a4d; /* Warna background loading */
+            background-color: #001a4d;
         }
         
         iframe {
             display: block;
             width: 100%;
-            height: 100vh; /* Penuhi ketinggian skrin */
+            height: 100%;
             border: none;
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
         }
     </style>
 </head>
 <body>
 
-    <iframe id="app-frame" src="about:blank" allow="camera; microphone; autoplay; encrypted-media; fullscreen"></iframe>
+    <iframe id="survey-frame" src="about:blank" allow="camera; microphone; autoplay; encrypted-media; fullscreen"></iframe>
 
     <script>
         // ============================================================
-        // 1. MASUKKAN LINK GOOGLE SCRIPT ANDA DI BAWAH
+        // LINK GOOGLE APPS SCRIPT ANDA
         // ============================================================
         
         const googleScriptURL = "https://script.google.com/macros/s/AKfycbzob3lrSW6lW3tze_xTX8Meg3PnWBOtywXiqcX1Z4kqyWyP4_xKdUL8-5ekZvaOLgJ6/exec";
 
         // ============================================================
 
-        // Logik Pintar: 
-        // Mengesan jika ada 'request' untuk Dashboard (?page=dashboard)
-        // dan menghantarnya ke dalam iFrame tanpa menukar URL browser.
-        
         window.onload = function() {
-            const queryString = window.location.search; // Ambil bahagian ?page=...
-            const frame = document.getElementById('app-frame');
+            // 1. Dapatkan parameter URL (contoh: ?page=dashboard)
+            const queryString = window.location.search;
             
-            // Gabungkan URL Google + Query String
-            frame.src = googleScriptURL + queryString;
+            // 2. Dapatkan elemen iFrame
+            const iframe = document.getElementById('survey-frame');
+            
+            // 3. Masukkan URL Google ke dalam iFrame (BUKAN window.location)
+            // Ini kuncinya: URL browser kekal, tapi isi dalam berubah.
+            iframe.src = googleScriptURL + queryString;
         };
     </script>
 
