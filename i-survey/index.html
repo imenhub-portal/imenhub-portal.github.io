@@ -3,25 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbzob3lrSW6lW3tze_xTX8Meg3PnWBOtywXiqcX1Z4kqyWyP4_xKdUL8-5ekZvaOLgJ6/exec">
     <title>Sistem Kaji Selidik IMEN UKM</title>
+    <link rel="icon" href="https://www.ukm.my/portal/wp-content/uploads/2019/04/favicon.png" type="image/png">
+    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f8fafc; }
-        .container { text-align: center; background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #800000; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            background-color: #f8fafc; 
+            margin: 0;
+            color: #334155;
+        }
+        .loader-container {
+            text-align: center;
+            background: white;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            max-width: 90%;
+            width: 350px;
+        }
+        .loader { 
+            border: 4px solid #f1f5f9; 
+            border-top: 4px solid #800000; /* UKM Maroon */
+            border-radius: 50%; 
+            width: 50px; 
+            height: 50px; 
+            animation: spin 1s linear infinite; 
+            margin: 0 auto 1.5rem auto; 
+        }
+        h2 { margin: 0 0 0.5rem 0; font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+        p { margin: 0; font-size: 0.875rem; color: #64748b; line-height: 1.5; }
+        .secure-badge {
+            margin-top: 1.5rem;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        p { color: #1e293b; font-weight: 600; }
-        a { color: #800000; text-decoration: none; font-size: 0.8rem; }
     </style>
+    
+    <script>
+        // ============================================================
+        // PAUTAN GOOGLE APPS SCRIPT ANDA (JANGAN UBAH)
+        // ============================================================
+        
+        const googleScriptURL = "https://script.google.com/macros/s/AKfycbzob3lrSW6lW3tze_xTX8Meg3PnWBOtywXiqcX1Z4kqyWyP4_xKdUL8-5ekZvaOLgJ6/exec";
+
+        // ============================================================
+        
+        // Logik Pengarah Pintar (Smart Redirect)
+        window.onload = function() {
+            // Ambil parameter dari URL GitHub (contoh: ?page=dashboard)
+            const queryString = window.location.search;
+            
+            // Lengah masa sikit (800ms) supaya user nampak branding sebelum redirect
+            setTimeout(function() {
+                // Gabungkan dengan Link Google & Redirect
+                window.location.href = googleScriptURL + queryString;
+            }, 800);
+        };
+    </script>
 </head>
 <body>
-    <div class="container">
+    <div class="loader-container">
         <div class="loader"></div>
-        <p>Sedang menghantar anda ke Borang Kajian Kebolehpasaran IMEN...</p>
-        <p><a href="https://script.google.com/macros/s/AKfycbzob3lrSW6lW3tze_xTX8Meg3PnWBOtywXiqcX1Z4kqyWyP4_xKdUL8-5ekZvaOLgJ6/exec">Klik di sini jika halaman tidak berpindah automatik</a></p>
+        <h2>Sistem IMEN UKM</h2>
+        <p>Sedang mewujudkan sambungan selamat ke pangkalan data...</p>
+        
+        <div class="secure-badge">
+            <svg style="width:12px;height:12px" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path></svg>
+            Secure Redirect
+        </div>
     </div>
-    <script>
-        window.location.href = "https://script.google.com/macros/s/AKfycbzob3lrSW6lW3tze_xTX8Meg3PnWBOtywXiqcX1Z4kqyWyP4_xKdUL8-5ekZvaOLgJ6/exec";
-    </script>
 </body>
 </html>
