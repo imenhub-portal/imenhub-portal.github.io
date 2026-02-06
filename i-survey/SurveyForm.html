@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+    .ukm-maroon { background-color: #800000; }
+    .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="min-h-screen py-10 px-4">
+  <div class="max-w-4xl mx-auto shadow-2xl rounded-[2.5rem] overflow-hidden glass-card" x-data="surveyApp()" x-cloak>
+    
+    <div class="w-full bg-gray-100 h-2.5 flex">
+      <div class="ukm-maroon h-full transition-all duration-700 ease-in-out" :style="'width: ' + (step/4)*100 + '%'"></div>
+    </div>
+
+    <div class="p-8 md:p-14">
+      <div x-show="step === 1" x-transition>
+        <div class="text-center mb-10">
+          <h1 class="text-2xl md:text-4xl font-extrabold text-gray-900 leading-tight">Kajian Kebolehpasaran Program Pengajian di Institut Kejuruteraan Mikro dan Nanoelektronik (IMEN), UKM</h1>
+        </div>
+        <div class="space-y-6 text-gray-700 text-justify leading-relaxed text-sm md:text-base">
+          <p class="bg-red-50 p-6 rounded-2xl border-l-8 border-red-800 italic shadow-sm">Borang soal selidik ini bertujuan untuk menilai dan memastikan kebolehpasaran program pengajian yang ditawarkan oleh Institut Kejuruteraan Mikro dan Nanoelektronik (IMEN), UKM.</p>
+          <p>Di samping itu, IMEN ingin memastikan program pengajian yang ditawarkan mematuhi piawaian selari dengan saranan dasar kerajaan yang terkini, keperluan Agensi Kelayakan Malaysia (MQA) dan relevan dengan perkembangan ilmu, teknologi serta pasaran pekerjaan.</p>
+          <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-md">
+            <h3 class="font-bold text-red-900 mb-4 uppercase tracking-wider underline">Pengenalan Program Pengajian IMEN:</h3>
+            <p>Institut Kejuruteraan Mikro dan Nanoelektronik di Universiti Kebangsaan Malaysia menawarkan program pengajian untuk membina tenaga manusia yang berkeupayaan dalam teknologi berkaitan kejuruteraan mikro dan nanoteknologi melalui aktiviti penyelidikan dan pembangunan dalam teknologi MEMS, reka bentuk VLSI, teknologi sensor, bahan termaju, teknologi pakej, fotonik dan sehingga ke peringkat prototaip yang mempunyai nilai pasaran.</p>
+          </div>
+          <p class="font-bold text-red-800">Program yang ditawarkan:</p>
+          <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <li class="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center"><span class="w-3 h-3 bg-red-800 rounded-full mr-3"></span> Doktor Falsafah</li>
+            <li class="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center"><span class="w-3 h-3 bg-red-800 rounded-full mr-3"></span> Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik</li>
+          </ul>
+        </div>
+        <div class="mt-14 flex justify-center">
+          <button @click="step = 2" class="ukm-maroon text-white px-16 py-5 rounded-full font-black text-lg hover:scale-105 transition-all shadow-2xl">Mula Sekarang &rarr;</button>
+        </div>
+      </div>
+
+      <div x-show="step === 2" x-transition>
+        <h2 class="text-2xl font-bold text-gray-800 mb-10 border-b-2 border-red-800 pb-4 inline-block">Maklumat Responden</h2>
+        <div class="space-y-8">
+          <div class="group">
+            <label class="block text-sm font-bold text-gray-700 mb-2 group-focus-within:text-red-800">Sila isi email anda</label>
+            <input type="email" x-model="formData.email" required class="w-full p-5 border-2 rounded-2xl outline-none focus:border-red-800 transition shadow-sm bg-gray-50/50">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Nama anda (Pilihan)</label>
+            <input type="text" x-model="formData.nama" class="w-full p-5 border-2 rounded-2xl outline-none focus:border-red-800 transition shadow-sm bg-gray-50/50">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-4">Kategori umur:</label>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <template x-for="age in ['20-30 tahun', '30-40 tahun', '40-50 tahun', '50-60 tahun']">
+                <label class="cursor-pointer">
+                  <input type="radio" x-model="formData.umur" :value="age" class="sr-only peer">
+                  <div class="p-4 text-center border-2 rounded-2xl peer-checked:bg-red-800 peer-checked:text-white peer-checked:border-red-800 hover:bg-red-50 transition text-sm font-semibold" x-text="age"></div>
+                </label>
+              </template>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-3">Pekerjaan anda</label>
+            <select x-model="formData.pekerjaan" class="w-full p-5 border-2 rounded-2xl outline-none appearance-none bg-gray-50/50 shadow-sm cursor-pointer">
+              <template x-for="job in jobs"><option :value="job" x-text="job"></option></template>
+            </select>
+            <input x-show="formData.pekerjaan === 'Lain-lain (Sila nyatakan):'" type="text" x-model="formData.pekerjaan_lain" placeholder="Sila nyatakan pekerjaan anda" class="mt-4 w-full p-5 border-2 rounded-2xl outline-none border-red-200 bg-white">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-3">Sektor pekerjaan/industri:</label>
+            <select x-model="formData.sektor" class="w-full p-5 border-2 rounded-2xl outline-none appearance-none bg-gray-50/50 shadow-sm cursor-pointer">
+              <template x-for="sector in sectors"><option :value="sector" x-text="sector"></option></template>
+            </select>
+            <input x-show="formData.sektor === 'Lain-lain (Sila nyatakan):'" type="text" x-model="formData.sektor_lain" placeholder="Sila nyatakan sektor anda" class="mt-4 w-full p-5 border-2 rounded-2xl outline-none border-red-200 bg-white">
+          </div>
+        </div>
+        <div class="mt-14 flex justify-between">
+          <button @click="step = 1" class="text-gray-400 font-bold px-8 py-3 hover:text-red-800 transition">Kembali</button>
+          <button @click="step = 3" class="ukm-maroon text-white px-12 py-4 rounded-full font-bold shadow-xl hover:scale-105 transition">Seterusnya &rarr;</button>
+        </div>
+      </div>
+
+      <div x-show="step === 3" x-transition>
+        <div class="mb-10">
+          <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-red-800 pb-4 inline-block">Penilaian Program</h2>
+          <p class="text-sm text-gray-500 mt-4 italic">Sila berikan penilaian anda bagi program Sarjana dan Doktor Falsafah (PhD).</p>
+        </div>
+        <div class="space-y-12">
+          <template x-for="(q, i) in questions" :key="i">
+            <div class="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
+              <p class="font-bold text-gray-800 mb-8 text-lg flex">
+                <span class="mr-3 text-red-800" x-text="(i + 6) + '.'"></span><span x-text="q"></span>
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <template x-for="prog in ['sarjana', 'phd']">
+                  <div class="p-5 border-2 rounded-3xl bg-gray-50/30 border-gray-50">
+                    <span class="text-xs uppercase font-black text-red-800 tracking-widest mb-4 block" x-text="prog === 'sarjana' ? 'Sarjana Sains' : 'Doktor Falsafah'"></span>
+                    <div class="space-y-3">
+                      <template x-for="opt in ratings">
+                        <label class="flex items-center p-4 border-2 rounded-2xl cursor-pointer hover:bg-white bg-white transition shadow-sm group">
+                          <input type="radio" :name="'q' + i + prog" :value="opt" x-model="formData.ratings[i][prog]" class="accent-red-800 w-5 h-5" required>
+                          <span class="ml-4 text-sm font-medium text-gray-600 group-hover:text-red-800" x-text="opt"></span>
+                        </label>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="mt-14 flex justify-between">
+          <button @click="step = 2" class="text-gray-400 font-bold px-8 py-3 hover:text-red-800 transition">Kembali</button>
+          <button @click="step = 4" class="ukm-maroon text-white px-12 py-4 rounded-full font-bold shadow-xl hover:scale-105 transition">Langkah Akhir &rarr;</button>
+        </div>
+      </div>
+
+      <div x-show="step === 4" x-transition>
+        <h2 class="text-2xl font-bold text-gray-800 mb-10 border-b-2 border-red-800 pb-4 inline-block">Syor & Penambahbaikan</h2>
+        <div class="space-y-10">
+          <div class="bg-red-50/50 p-8 rounded-[2.5rem] border border-red-100 shadow-sm">
+            <p class="font-bold mb-8 text-gray-800 leading-relaxed">13. Adakah anda berhasrat untuk mencadangkan program pengajian ini kepada calon pelajar yang berminat untuk meningkatkan kemahiran dalam pekerjaan?</p>
+            <template x-for="prog in ['sarjana', 'phd']">
+              <div class="flex flex-col md:flex-row md:items-center justify-between p-6 bg-white border-2 rounded-2xl mb-4 shadow-sm">
+                <span class="font-black text-red-800 text-sm uppercase" x-text="prog === 'sarjana' ? 'Sarjana Sains' : 'Doktor Falsafah'"></span>
+                <div class="flex gap-6 mt-4 md:mt-0">
+                  <template x-for="ans in ['Ya', 'Tidak', 'Mungkin']">
+                    <label class="flex items-center text-sm font-bold cursor-pointer group">
+                      <input type="radio" :name="'syor'+prog" :value="ans" x-model="formData['syor_'+prog]" class="accent-red-800 w-5 h-5 mr-2" required> 
+                      <span class="group-hover:text-red-800 transition" x-text="ans"></span>
+                    </label>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div>
+            <label class="block font-bold text-gray-800 mb-4 text-lg">14. Apakah penambahbaikkan yang ingin dicadangkan bagi meningkatkan kebolehpasaran program pengajian di IMEN, UKM? (Cadangan terbuka)</label>
+            <textarea x-model="formData.cadangan" class="w-full p-8 border-2 rounded-[2rem] h-48 outline-none focus:border-red-800 shadow-inner bg-gray-50/30 text-lg" placeholder="Taip cadangan anda di sini..."></textarea>
+          </div>
+        </div>
+        <div class="mt-14 flex justify-between items-center">
+          <button @click="step = 3" class="text-gray-400 font-bold px-8 py-3 hover:text-red-800 transition">Kembali</button>
+          <button @click="submitSurvey" :disabled="loading" class="bg-yellow-500 text-red-900 px-16 py-6 rounded-full font-black text-xl shadow-2xl disabled:bg-gray-200 hover:bg-yellow-400 hover:scale-105 transition active:scale-95">
+            <span x-show="!loading">HANTAR RESPONS</span>
+            <span x-show="loading" class="flex items-center">
+              <svg class="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              MENGHANTAR...
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div x-show="submitted" class="text-center py-24" x-transition>
+        <div class="w-28 h-28 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+          <svg class="w-14 h-14 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h2 class="text-4xl font-black text-gray-900 mb-6">Penghantaran Berjaya!</h2>
+        <p class="text-gray-500 max-w-md mx-auto text-lg leading-relaxed">Terima kasih atas sumbangan masa dan maklum balas anda. Maklumat ini sangat berharga untuk penambahbaikan program pengajian di IMEN UKM.</p>
+        <button @click="window.location.reload()" class="mt-12 text-red-800 font-black text-lg underline hover:text-red-600">Hantar Respons Baharu</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function surveyApp() {
+      return {
+        step: 1, loading: false, submitted: false,
+        formData: { email: '', nama: '', umur: '', pekerjaan: 'Kerajaan', pekerjaan_lain: '', sektor: 'Pendidikan', sektor_lain: '', ratings: Array(7).fill().map(() => ({ sarjana: '', phd: '' })), syor_sarjana: '', syor_phd: '', cadangan: '' },
+        jobs: ['Kerajaan', 'Badan berkanun', 'Swasta', 'Perusahaan sendiri', 'Syarikat berkaitan kerajaan (GLC)', 'Pertubuhan bukan kerjaan (NGO)', 'PTPTN dan Agensi Penajaan', 'Pelajar', 'Alumni (UKM)', 'Ibu bapa @ Komuniti', 'Tidak bekerja', 'Lain-lain (Sila nyatakan):'],
+        sectors: ['Pendidikan', 'Tenaga dan utilliti', 'Perkhidmatan', 'Perubatan', 'Penyelidikan, pembangunan dan komersial', 'Pembuatan', 'Keusahawanan', 'Pengangkutan, hospitaliti dan perlancongan', 'Telekomunikasi', 'Kewangan dan perkhidmatan perbankan', 'Automotif', 'Teknologi maklumat, komunikasi dan media', 'Lain-lain (Sila nyatakan):'],
+        ratings: ['Sangat baik', 'Baik', 'Sederhana', 'Lemah'],
+        questions: [
+          'Adakah program pengajian ini merangkumi teoritikal dan pengetahuan asas dalam bidang tersebut?',
+          'Adakah program pengajian ini menambahbaik kemahiran praktikal yang diperlukan untuk pekerjaan?',
+          'Adakah program pengajian ini berkesan dalam membangunkan kemahiran penyelidikan dan analitik?',
+          'Adakah program pengajian ini membangunkan kemahiran insaniah (komunikasi, kerja berkumpulan, kepimpinan, menyelesaikan masalah)?',
+          'Adakah program pengajian ini meningkatkan kebolehans digital dan teknikal yang relevan dengan bidang pekerjaan?',
+          'Adakah program pengajian ini relevan kepada industri terkini atau keperluan pekerjaan?',
+          'Secara keseluruhan, adakah program pengajian ini mampu meningkatkan kebolehpasaran pekerjaan?'
+        ],
+        submitSurvey() {
+          if(!this.formData.email) return alert("Sila pastikan emel telah diisi.");
+          this.loading = true;
+          const sub = { ...this.formData };
+          this.formData.ratings.forEach((r, i) => { 
+            sub['q'+(i+1)+'_sarjana'] = r.sarjana; 
+            sub['q'+(i+1)+'_phd'] = r.phd; 
+          });
+          google.script.run
+            .withSuccessHandler(() => { this.loading = false; this.submitted = true; })
+            .processForm(sub);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
