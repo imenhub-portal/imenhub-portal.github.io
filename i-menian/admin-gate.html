@@ -17,7 +17,7 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-6">
 
-    <div id="gate-container" class="ios-card w-full max-w-sm p-10 text-center animate-ios">
+    <div id="gate-container" class="ios-card w-full max-w-sm p-10 text-center">
         <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <svg class="w-8 h-8 text-[#007aff]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -25,10 +25,10 @@
         </div>
         
         <h1 class="text-2xl font-bold text-[#1c1c1e] mb-2">Restricted Access</h1>
-        <p class="text-sm text-gray-400 mb-8 font-medium uppercase tracking-widest">Admin Authorization Required</p>
+        <p class="text-sm text-gray-400 mb-8 font-medium uppercase tracking-widest">Authorization Required</p>
 
         <div class="space-y-4">
-            <input type="password" id="pinInput" maxlength="6" placeholder="Enter PIN" 
+            <input type="password" id="pinInput" maxlength="6" placeholder="••••••" 
                    class="w-full ios-input p-5 text-center text-3xl tracking-[0.5em] font-mono">
             
             <p id="errorMsg" class="text-xs font-bold text-rose-500 hidden uppercase tracking-wide">Invalid Security PIN</p>
@@ -44,10 +44,10 @@
             const input = document.getElementById('pinInput').value;
             const error = document.getElementById('errorMsg');
             
-            // Matches your code.gs ADMIN_PIN_1 and ADMIN_PIN_2
+            // Authorized PINs verified from your system settings
             if (input === "023775" || input === "013254") {
-                // Redirect to the main portal with staff view enabled
-                window.location.href = "https://script.google.com/macros/s/AKfycbx7kSzb09RIJfuj4hL4t8TzLeAIvv54uuWiaIbLLomt_mN0mNWjV1Zs3nfnG2hK_ebwzg/exec";
+                // Redirects directly to the main portal page (Staff/Admin view)
+                window.location.href = "https://script.google.com/macros/s/AKfycbx7kSzb09RIJfuj4hL4t8TzLeAIvv54uuWiaIbLLomt_mN0mNWjV1Zs3nfnG2hK_ebwzg/exec?role=staff";
             } else {
                 error.classList.remove('hidden');
                 document.getElementById('pinInput').value = "";
@@ -55,7 +55,6 @@
             }
         }
 
-        // Allow pressing Enter key
         document.getElementById("pinInput").addEventListener("keyup", function(event) {
             if (event.key === "Enter") checkPin();
         });
