@@ -1,1 +1,235 @@
-asd
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --p1: #1A6B72;
+      --p2: #29BEB8;
+      --base: #F2FBFB;
+      --text: #0D2E30;
+      --muted: #3D7880;
+      --border: rgba(26,107,114,0.14);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--base);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Geometric background ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 50% at -5% 0%,  rgba(41,190,184,0.14) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 45% at 105% 98%, rgba(26,107,114,0.10) 0%, transparent 55%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Cpath d='M26 3 L49 26 L26 49 L3 26 Z' stroke='%2329BEB8' stroke-width='0.5' fill='none' opacity='0.09'/%3E%3Ccircle cx='26' cy='26' r='1.3' fill='%2329BEB8' opacity='0.13'/%3E%3C/svg%3E");
+    }
+
+    /* ── Thin top bar ── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 48px;
+      background: rgba(242,251,251,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      animation: slideDown 0.5s ease both;
+    }
+    @keyframes slideDown {
+      from { opacity:0; transform: translateY(-100%); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .topbar-left {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .topbar-logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--p1), var(--p2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(26,107,114,0.28);
+      flex-shrink: 0;
+    }
+    .topbar-name {
+      font-size: 12px; font-weight: 700; color: var(--p1);
+      letter-spacing: 0.2px;
+    }
+    .topbar-sep {
+      width: 1px; height: 16px; background: var(--border); margin: 0 2px;
+    }
+    .topbar-sub {
+      font-size: 11px; color: var(--muted); font-weight: 500;
+    }
+
+    .topbar-right {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .badge {
+      font-size: 9px; font-weight: 800; letter-spacing: 1.2px;
+      text-transform: uppercase; padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(26,107,114,0.10);
+      color: var(--p1);
+      border: 1px solid rgba(26,107,114,0.18);
+    }
+    .badge-imen {
+      background: linear-gradient(135deg, rgba(26,107,114,0.12), rgba(41,190,184,0.08));
+      color: var(--p1);
+      border-color: rgba(41,190,184,0.25);
+    }
+    .open-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px;
+      background: linear-gradient(135deg, var(--p1), var(--p2));
+      color: #fff; font-size: 11px; font-weight: 700;
+      border: none; border-radius: 10px; cursor: pointer;
+      box-shadow: 0 2px 10px rgba(26,107,114,0.30);
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .open-btn:hover  { opacity: 0.88; }
+    .open-btn:active { transform: scale(0.96); }
+    .open-btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+    /* ── Iframe wrapper ── */
+    .frame-wrap {
+      position: fixed;
+      top: 48px; left: 0; right: 0; bottom: 0;
+      z-index: 10;
+      animation: fadeIn 0.6s 0.2s ease both;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    iframe {
+      width: 100%; height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* ── Loading overlay (shown until iframe loads) ── */
+    .loading-overlay {
+      position: absolute; inset: 0; z-index: 20;
+      background: var(--base);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 18px;
+      transition: opacity 0.5s ease;
+    }
+    .loading-overlay.hidden {
+      opacity: 0; pointer-events: none;
+    }
+    .loading-icon {
+      width: 64px; height: 64px; border-radius: 20px;
+      background: linear-gradient(135deg, var(--p1), var(--p2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 8px 28px rgba(26,107,114,0.30);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1);    box-shadow: 0 8px 28px rgba(26,107,114,0.30); }
+      50%       { transform: scale(1.06); box-shadow: 0 12px 36px rgba(26,107,114,0.45); }
+    }
+    .loading-title {
+      font-family: 'Fraunces', serif;
+      font-size: 20px; font-weight: 700;
+      color: var(--text);
+    }
+    .loading-sub {
+      font-size: 12px; color: var(--muted);
+      text-align: center; max-width: 260px; line-height: 1.6;
+    }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid rgba(26,107,114,0.15);
+      border-top-color: var(--p2);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Mobile: show open-in-new hint ── */
+    @media (max-width: 480px) {
+      .topbar-sub, .topbar-sep { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">🌊</div>
+      <span class="topbar-name">i-SurveyCafe</span>
+      <div class="topbar-sep"></div>
+      <span class="topbar-sub">Kajian Kafeteria Kompleks Penyelidikan</span>
+    </div>
+    <div class="topbar-right">
+      <span class="badge badge-imen">IMEN · UKM</span>
+      <a class="open-btn"
+         href="https://script.google.com/macros/s/AKfycbxSTJMNk9J1Sqcvn5Flc94yYJ2iloT5lGfL0gvIXGsEcPTe64YtxtgkJhXSVT1lkqGN/exec"
+         target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Buka Penuh
+      </a>
+    </div>
+  </header>
+
+  <!-- IFRAME WRAP -->
+  <div class="frame-wrap">
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loader">
+      <div class="loading-icon">🌊</div>
+      <div>
+        <div class="loading-title">i-SurveyCafe</div>
+        <div class="loading-sub">Memuatkan borang kajian kafeteria IMEN UKM…</div>
+      </div>
+      <div class="spinner"></div>
+    </div>
+
+    <!-- The actual survey iframe -->
+    <iframe
+      id="survey-frame"
+      src="https://script.google.com/macros/s/AKfycbyAnWhs0pxRfkl0u_lvf0mSUxI9sW-L_ylEY5N6u5VbnAk2fLLZJiIPSevfUMDh4X1K/exec"
+      title="i-SurveyCafe — Kajian Kafeteria IMEN UKM"
+      allow="same-origin"
+      onload="hideLoader()"
+    ></iframe>
+
+  </div>
+
+  <script>
+    function hideLoader() {
+      var loader = document.getElementById('loader');
+      if (loader) {
+        loader.classList.add('hidden');
+        // fully remove after fade-out
+        setTimeout(function(){ loader.style.display = 'none'; }, 600);
+      }
+    }
+    // Fallback: hide loader after 12s even if iframe doesn't fire onload
+    setTimeout(hideLoader, 12000);
+  </script>
+
+</body>
+</html>
