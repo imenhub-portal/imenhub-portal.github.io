@@ -6,333 +6,201 @@
 <title>i-Menian — Lab Access Flow</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
-/* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-/* ── BASE ── */
 :root{
-  --bg:          #F2F2F7;
-  --card:        #FFFFFF;
-  --blue:        #007AFF;
-  --green:       #34C759;
-  --orange:      #FF9500;
-  --red:         #FF3B30;
-  --purple:      #5856D6;
-  --violet:      #AF52DE;
-  --indigo:      #5E5CE6;
-  --teal:        #32ADE6;
-  --label:       #1C1C1E;
-  --label2:      #3A3A3C;
-  --label3:      #636366;
-  --label4:      #8E8E93;
-  --separator:   #D1D1D6;
-  --fill:        #F2F2F7;
-  --fill2:       #E5E5EA;
-  --radius-lg:   22px;
-  --radius-md:   14px;
-  --radius-sm:   10px;
-  --shadow-sm:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-md:   0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
+  --bg:#F2F2F7;
+  --card:#FFFFFF;
+  --blue:#007AFF;
+  --green:#34C759;
+  --orange:#FF9500;
+  --red:#FF3B30;
+  --purple:#5856D6;
+  --violet:#AF52DE;
+  --label:#1C1C1E;
+  --label3:#636366;
+  --label4:#8E8E93;
+  --separator:#D1D1D6;
+  --fill:#F2F2F7;
+  --fill2:#E5E5EA;
+  --radius-lg:22px;
+  --radius-md:14px;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 16px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04);
+  --shadow-img:0 8px 32px rgba(0,0,0,.13),0 2px 8px rgba(0,0,0,.06);
 }
 
 body{
   font-family:'Inter',system-ui,-apple-system,sans-serif;
-  background:var(--bg);
-  color:var(--label);
-  min-height:100vh;
-  padding:52px 20px 96px;
+  background:var(--bg);color:var(--label);
+  min-height:100vh;padding:52px 20px 96px;
   -webkit-font-smoothing:antialiased;
 }
 
-/* ── PAGE HEADER ── */
+/* ── LANG TOGGLE ── */
+.lang-bar{position:fixed;top:16px;right:20px;z-index:100}
+.lang-btn{
+  display:flex;align-items:center;gap:6px;
+  background:var(--card);border:1px solid var(--separator);
+  border-radius:100px;padding:7px 16px;
+  font-size:12px;font-weight:700;color:var(--blue);
+  cursor:pointer;box-shadow:var(--shadow-md);
+  transition:all .18s ease;outline:none;letter-spacing:.2px;
+}
+.lang-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.lang-btn:active{transform:scale(.96)}
+
+/* ── HEADER ── */
 .header{text-align:center;margin-bottom:48px}
 .header-eyebrow{
   display:inline-flex;align-items:center;gap:7px;
   background:var(--blue);color:#fff;
   font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
-  padding:5px 14px 5px 11px;border-radius:100px;
-  margin-bottom:16px;
+  padding:5px 14px 5px 11px;border-radius:100px;margin-bottom:16px;
   box-shadow:0 2px 12px rgba(0,122,255,.35);
 }
-.header-eyebrow span{
-  width:6px;height:6px;border-radius:50%;
-  background:rgba(255,255,255,.6);display:block;
-}
-.header h1{
-  font-size:clamp(22px,4vw,30px);
-  font-weight:800;letter-spacing:-.6px;
-  color:var(--label);margin-bottom:8px;line-height:1.2;
-}
-.header-sub{
-  font-size:13px;color:var(--label4);font-weight:400;
-  max-width:360px;margin:0 auto;line-height:1.6;
-}
+.header-eyebrow span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.6);display:block}
+.header h1{font-size:clamp(22px,4vw,30px);font-weight:800;letter-spacing:-.6px;margin-bottom:8px;line-height:1.2}
+.header-sub{font-size:13px;color:var(--label4);font-weight:400;max-width:380px;margin:0 auto;line-height:1.6}
 .spam-notice{
-  display:inline-flex;align-items:center;gap:7px;
-  margin-top:14px;
-  background:var(--card);
-  border:1px solid var(--separator);
-  border-radius:100px;
-  padding:6px 16px;
-  font-size:11px;font-weight:500;color:var(--label3);
-  box-shadow:var(--shadow-sm);
+  display:inline-flex;align-items:center;gap:7px;margin-top:14px;
+  background:var(--card);border:1px solid var(--separator);
+  border-radius:100px;padding:6px 16px;
+  font-size:11px;font-weight:500;color:var(--label3);box-shadow:var(--shadow-sm);
 }
 .spam-notice strong{color:var(--orange)}
 
 /* ── PIPELINE ── */
-.pipeline{
-  max-width:600px;margin:0 auto;
-  display:flex;flex-direction:column;
-  position:relative;
-}
-
-/* ── SPINE ── */
+.pipeline{max-width:640px;margin:0 auto;display:flex;flex-direction:column;position:relative}
 .spine{
-  position:absolute;
-  left:30px;top:0;bottom:0;
-  width:1.5px;
-  background:linear-gradient(to bottom,
-    transparent 0%,
-    var(--separator) 5%,
-    var(--separator) 95%,
-    transparent 100%);
+  position:absolute;left:30px;top:0;bottom:0;width:1.5px;
+  background:linear-gradient(to bottom,transparent 0%,var(--separator) 5%,var(--separator) 95%,transparent 100%);
   z-index:0;
 }
 
 /* ── STEP ── */
-.step{
-  display:grid;
-  grid-template-columns:60px 1fr;
-  gap:0;
-  position:relative;
-  z-index:1;
-  padding-bottom:8px;
-}
+.step{display:grid;grid-template-columns:60px 1fr;gap:0;position:relative;z-index:1;padding-bottom:8px}
 .step:last-child{padding-bottom:0}
 
 /* ── ICON COL ── */
-.step-icon-col{
-  display:flex;flex-direction:column;
-  align-items:center;
-  padding-top:16px;
-  gap:0;
-}
+.step-icon-col{display:flex;flex-direction:column;align-items:center;padding-top:16px;gap:0}
 .step-icon{
-  width:48px;height:48px;
-  border-radius:15px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:20px;
-  box-shadow:var(--shadow-md);
-  position:relative;z-index:2;
-  flex-shrink:0;
+  width:48px;height:48px;border-radius:15px;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  box-shadow:var(--shadow-md);position:relative;z-index:2;flex-shrink:0;
 }
-.step-name{
-  font-size:8px;font-weight:700;letter-spacing:.8px;
-  text-transform:uppercase;color:var(--label4);
-  margin-top:6px;text-align:center;
-  line-height:1.4;max-width:52px;
-}
+.step-name{font-size:8px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--label4);margin-top:6px;text-align:center;line-height:1.4;max-width:52px}
 
 /* ── BODY COL ── */
-.step-body{
-  padding:16px 0 32px 16px;
-  display:flex;flex-direction:column;gap:8px;
-}
+.step-body{padding:16px 0 32px 16px;display:flex;flex-direction:column;gap:10px}
 
-/* ── STEP TITLE CARD ── */
-.title-card{
-  background:var(--card);
-  border-radius:var(--radius-lg);
-  padding:16px 18px;
-  box-shadow:var(--shadow-md);
-}
-.title-card h2{
-  font-size:15px;font-weight:700;
-  color:var(--label);margin-bottom:4px;
-  letter-spacing:-.2px;line-height:1.3;
-}
-.title-card p{
-  font-size:12px;color:var(--label3);
-  font-weight:400;line-height:1.6;
-}
+/* ── TITLE CARD ── */
+.title-card{background:var(--card);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-md)}
+.title-card h2{font-size:15px;font-weight:700;color:var(--label);margin-bottom:4px;letter-spacing:-.2px;line-height:1.3}
+.title-card p{font-size:12px;color:var(--label3);font-weight:400;line-height:1.6}
 
-/* ── SECTION HEADER (iOS style) ── */
-.section-hdr{
-  font-size:10px;font-weight:600;letter-spacing:.4px;
-  text-transform:uppercase;color:var(--label4);
-  padding:0 4px;margin-top:4px;
-}
+/* ── SECTION HDR ── */
+.section-hdr{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--label4);padding:0 4px;margin-top:2px}
 
-/* ── EMAIL GROUP (iOS list style) ── */
-.email-group{
-  background:var(--card);
-  border-radius:var(--radius-lg);
-  overflow:hidden;
-  box-shadow:var(--shadow-sm);
-}
-.email-item{
-  display:flex;align-items:flex-start;
-  gap:12px;padding:13px 16px;
-  position:relative;
-}
-.email-item:not(:last-child)::after{
-  content:'';position:absolute;
-  left:44px;right:0;bottom:0;
-  height:1px;background:var(--separator);
-  opacity:.6;
-}
-.email-dot{
-  width:28px;height:28px;border-radius:9px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:13px;flex-shrink:0;margin-top:1px;
-}
+/* ── EMAIL GROUP ── */
+.email-group{background:var(--card);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm)}
+.email-item{display:flex;align-items:flex-start;gap:12px;padding:13px 16px;position:relative}
+.email-item:not(:last-child)::after{content:'';position:absolute;left:44px;right:0;bottom:0;height:1px;background:var(--separator);opacity:.6}
+.email-dot{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:1px}
 .email-text{flex:1}
-.email-badge{
-  font-size:8px;font-weight:700;letter-spacing:1px;
-  text-transform:uppercase;
-  padding:2px 8px;border-radius:100px;
-  display:inline-block;margin-bottom:3px;
-}
-.email-subject{
-  font-size:12px;font-weight:600;
-  color:var(--label);line-height:1.4;
-}
-.email-desc{
-  font-size:11px;color:var(--label4);
-  margin-top:2px;line-height:1.5;font-weight:400;
-}
+.email-badge{font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:100px;display:inline-block;margin-bottom:3px}
+.email-subject{font-size:12px;font-weight:600;color:var(--label);line-height:1.4}
+.email-desc{font-size:11px;color:var(--label4);margin-top:2px;line-height:1.5;font-weight:400}
 
-/* ── REJECT BANNER ── */
-.reject-banner{
-  background:#FFF2F2;
-  border-radius:var(--radius-md);
-  padding:11px 14px;
-  display:flex;align-items:flex-start;gap:9px;
-}
-.reject-banner-icon{font-size:15px;flex-shrink:0;margin-top:1px}
-.reject-banner-text{
-  font-size:12px;font-weight:500;
-  color:#C0392B;line-height:1.5;
-}
-
-/* ── APPROVE BANNER ── */
-.approve-banner{
-  background:#F0FDF4;
-  border-radius:var(--radius-md);
-  padding:11px 14px;
-  display:flex;align-items:flex-start;gap:9px;
-}
-.approve-banner-icon{font-size:15px;flex-shrink:0;margin-top:1px}
-.approve-banner-text{
-  font-size:12px;font-weight:500;
-  color:#166534;line-height:1.5;
-}
+/* ── BANNERS ── */
+.reject-banner,.approve-banner{border-radius:var(--radius-md);padding:11px 14px;display:flex;align-items:flex-start;gap:9px}
+.reject-banner{background:#FFF2F2}
+.approve-banner{background:#F0FDF4}
+.banner-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.reject-banner .banner-text{font-size:12px;font-weight:500;color:#C0392B;line-height:1.5}
+.approve-banner .banner-text{font-size:12px;font-weight:500;color:#166534;line-height:1.5}
 
 /* ── SPLIT GRID ── */
 .split-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:480px){.split-grid{grid-template-columns:1fr}}
-
-.split-card{
-  background:var(--card);
-  border-radius:var(--radius-md);
-  padding:14px 14px;
-  box-shadow:var(--shadow-sm);
-  display:flex;flex-direction:column;gap:8px;
-}
-.split-pill{
-  font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  padding:3px 9px;border-radius:100px;
-  display:inline-block;width:fit-content;
-}
+.split-card{background:var(--card);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:8px}
+.split-pill{font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:100px;display:inline-block;width:fit-content}
 .split-title{font-size:12px;font-weight:700;color:var(--label);line-height:1.3}
 .split-desc{font-size:11px;color:var(--label4);line-height:1.5}
 
 /* ── INFO PILL ── */
-.info-pill{
-  border-radius:var(--radius-md);
-  padding:10px 14px;
-  display:flex;align-items:flex-start;gap:9px;
-  font-size:12px;font-weight:400;line-height:1.6;
-}
+.info-pill{border-radius:var(--radius-md);padding:10px 14px;display:flex;align-items:flex-start;gap:9px;font-size:12px;font-weight:400;line-height:1.6}
 .info-pill-icon{font-size:15px;flex-shrink:0;margin-top:1px}
 
 /* ── POPUP PREVIEW ── */
-.popup-wrap{
-  background:var(--fill);
-  border-radius:var(--radius-lg);
-  padding:10px;
-  display:flex;flex-direction:column;gap:8px;
-}
-.popup-case{
-  background:var(--card);
-  border-radius:var(--radius-md);
-  padding:13px 14px;
-  box-shadow:var(--shadow-sm);
-}
-.popup-case-label{
-  font-size:9px;font-weight:700;letter-spacing:.8px;
-  text-transform:uppercase;color:var(--label4);
-  margin-bottom:10px;
-}
+.popup-wrap{background:var(--fill);border-radius:var(--radius-lg);padding:10px;display:flex;flex-direction:column;gap:8px}
+.popup-case{background:var(--card);border-radius:var(--radius-md);padding:13px 14px;box-shadow:var(--shadow-sm)}
+.popup-case-label{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--label4);margin-bottom:10px}
 .popup-btns{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
-.pbtn{
-  font-size:11px;font-weight:600;
-  padding:7px 16px;border-radius:100px;
-  display:inline-block;letter-spacing:-.1px;
-}
-.popup-divider{height:1px;background:var(--separator);margin:6px 0;opacity:.5}
+.pbtn{font-size:11px;font-weight:600;padding:7px 16px;border-radius:100px;display:inline-block;letter-spacing:-.1px}
 
-/* ── FINAL CARD ── */
+/* ── SCREENSHOT FRAME ── */
+.screenshot-wrap{position:relative}
+.screenshot-frame{
+  border-radius:16px;overflow:hidden;
+  box-shadow:var(--shadow-img);
+  border:1px solid rgba(0,0,0,.06);
+  background:#fff;
+}
+.screenshot-bar{
+  height:28px;background:#f5f5f7;
+  display:flex;align-items:center;gap:5px;
+  padding:0 12px;border-bottom:1px solid rgba(0,0,0,.06);
+  flex-shrink:0;
+}
+.dot{width:9px;height:9px;border-radius:50%}
+.screenshot-frame img{width:100%;display:block;object-fit:cover}
+
+/* ── TWO-IMG ROW ── */
+.img-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:400px){.img-pair{grid-template-columns:1fr}}
+
+/* ── SCREENSHOT CAPTION ── */
+.img-caption{
+  text-align:center;margin-top:6px;
+  font-size:10px;font-weight:600;color:var(--label4);letter-spacing:.3px;
+}
+
+/* ── FINAL ── */
 .final-card{
   background:linear-gradient(145deg,#F0FFF5,#E6F9EE);
-  border-radius:var(--radius-lg);
-  padding:20px;
+  border-radius:var(--radius-lg);padding:20px;
   box-shadow:0 4px 20px rgba(52,199,89,.18);
   display:flex;align-items:center;gap:14px;
   border:1px solid rgba(52,199,89,.25);
 }
 .final-icon{
-  width:52px;height:52px;border-radius:16px;
-  background:var(--green);
-  display:flex;align-items:center;justify-content:center;
-  font-size:24px;flex-shrink:0;
+  width:52px;height:52px;border-radius:16px;background:var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;
   box-shadow:0 4px 12px rgba(52,199,89,.4);
 }
-.final-text h2{
-  font-size:15px;font-weight:700;
-  color:#155724;letter-spacing:-.2px;margin-bottom:3px;
-}
+.final-text h2{font-size:15px;font-weight:700;color:#155724;letter-spacing:-.2px;margin-bottom:3px}
 .final-text p{font-size:12px;color:#2d8a50;font-weight:400;line-height:1.5}
+.final-img-wrap{margin-top:14px}
 
-/* ── COLOURS ── */
-.icon-blue   {background:linear-gradient(145deg,#1C86FF,#0060E6);color:#fff}
-.icon-orange {background:linear-gradient(145deg,#FFB340,#E07800);color:#fff}
-.icon-purple {background:linear-gradient(145deg,#7D7AFF,#4947C8);color:#fff}
-.icon-violet {background:linear-gradient(145deg,#CF6EF0,#9626C7);color:#fff}
-.icon-green  {background:linear-gradient(145deg,#4CD96A,#28A745);color:#fff}
+/* ── ICON COLOURS ── */
+.icon-blue  {background:linear-gradient(145deg,#1C86FF,#0060E6);color:#fff}
+.icon-orange{background:linear-gradient(145deg,#FFB340,#E07800);color:#fff}
+.icon-purple{background:linear-gradient(145deg,#7D7AFF,#4947C8);color:#fff}
+.icon-violet{background:linear-gradient(145deg,#CF6EF0,#9626C7);color:#fff}
+.icon-green {background:linear-gradient(145deg,#4CD96A,#28A745);color:#fff}
 
-.badge-blue  {background:#EBF5FF;color:#0060E6}
-.badge-orange{background:#FFF4E0;color:#C05C00}
-.badge-purple{background:#EEEEFF;color:#4947C8}
-.badge-violet{background:#F9EEFF;color:#8B24B0}
-.badge-green {background:#EDFAF1;color:#1A7A35}
-.badge-gray  {background:#F2F2F7;color:#636366}
-.badge-officer{background:#FFFBE6;color:#7A5500}
+.badge-blue   {background:#EBF5FF;color:#0060E6}
+.badge-orange {background:#FFF4E0;color:#C05C00}
+.badge-violet {background:#F9EEFF;color:#8B24B0}
+.badge-green  {background:#EDFAF1;color:#1A7A35}
+.badge-gray   {background:#F2F2F7;color:#636366}
 
-.dot-blue   {background:#EBF5FF}
-.dot-orange {background:#FFF4E0}
-.dot-purple {background:#EEEEFF}
-.dot-violet {background:#F9EEFF}
-.dot-green  {background:#EDFAF1}
-.dot-gray   {background:#F2F2F7}
-.dot-officer{background:#FFFBE6}
-
-.t-blue  {color:var(--blue)}
-.t-orange{color:var(--orange)}
-.t-purple{color:var(--purple)}
-.t-violet{color:var(--violet)}
-.t-green {color:var(--green)}
+.dot-blue  {background:#EBF5FF}
+.dot-orange{background:#FFF4E0}
+.dot-violet{background:#F9EEFF}
+.dot-green {background:#EDFAF1}
+.dot-gray  {background:#F2F2F7}
 
 .split-orange{background:#FFF4E0;color:#C05C00}
 .split-purple{background:#EEEEFF;color:#4947C8}
@@ -346,265 +214,474 @@ body{
 </head>
 <body>
 
-<!-- HEADER -->
-<div class="header">
-  <div class="header-eyebrow"><span></span>i-Menian System</div>
-  <h1>How to Apply for Lab Access</h1>
-  <p class="header-sub">Follow these steps to get your lab access approved — from form to final confirmation.</p>
-  <div class="spam-notice">
-    📬 Emails may land in your <strong>Spam / Junk</strong> folder — always check there too
-  </div>
+<!-- LANG TOGGLE -->
+<div class="lang-bar">
+  <button class="lang-btn" onclick="toggleLang()" id="langBtn">
+    <span class="lang-flag">🇲🇾</span>
+    <span id="langBtnLabel">BM</span>
+  </button>
 </div>
 
-<!-- PIPELINE -->
+<!-- HEADER -->
+<div class="header">
+  <div class="header-eyebrow"><span></span><span data-i18n="eyebrow">i-Menian System</span></div>
+  <h1 data-i18n="title">How to Apply for Lab Access</h1>
+  <p class="header-sub" data-i18n="subtitle">Follow these steps to get your lab access approved — from form to final confirmation.</p>
+  <div class="spam-notice">📬 <span data-i18n="spam">Emails may land in your <strong>Spam / Junk</strong> folder — always check there too</span></div>
+</div>
+
 <div class="pipeline">
   <div class="spine"></div>
 
-  <!-- ══════════════════════ STEP 1 — APPLICANT -->
+  <!-- ══ STEP 1 — SUBMIT ══ -->
   <div class="step">
     <div class="step-icon-col">
       <div class="step-icon icon-blue">📋</div>
-      <div class="step-name">You</div>
+      <div class="step-name" data-i18n="s1_who">You</div>
     </div>
     <div class="step-body">
-
       <div class="title-card">
-        <h2>Submit Your Application</h2>
-        <p>Fill in the online form with your details — name, student ID, email, lab, category, and supervisor. Then hit submit.</p>
+        <h2 data-i18n="s1_title">Submit Your Application</h2>
+        <p data-i18n="s1_desc">Fill in the online form with your details — name, student ID, email, lab, category, and supervisor. Then hit submit.</p>
       </div>
 
-      <div class="section-hdr">Email notifications sent</div>
+      <!-- Screenshot 1 — form -->
+      <div class="screenshot-wrap">
+        <div class="screenshot-frame">
+          <div class="screenshot-bar">
+            <div class="dot" style="background:#FF5F57"></div>
+            <div class="dot" style="background:#FFBD2E"></div>
+            <div class="dot" style="background:#28C840"></div>
+          </div>
+          <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/1.jpg" alt="Application Form" style="max-height:280px;object-fit:cover;object-position:top"/>
+        </div>
+        <div class="img-caption" data-i18n="s1_img_cap">i-Menian Portal — Lab Entry Registration Form</div>
+      </div>
+
+      <div class="section-hdr" data-i18n="s1_section">Email notifications sent</div>
       <div class="email-group">
         <div class="email-item">
           <div class="email-dot dot-blue">📨</div>
           <div class="email-text">
-            <span class="email-badge badge-blue">Email Notification</span>
-            <div class="email-subject">Application Received</div>
-            <div class="email-desc">Your form has been submitted and sent to the lab officer for review.</div>
+            <span class="email-badge badge-blue" data-i18n="s1_e1_badge">Email Notification</span>
+            <div class="email-subject" data-i18n="s1_e1_subj">Application Received</div>
+            <div class="email-desc" data-i18n="s1_e1_desc">Your form has been submitted and sent to the lab officer for review.</div>
           </div>
         </div>
         <div class="email-item">
           <div class="email-dot dot-orange">📨</div>
           <div class="email-text">
-            <span class="email-badge badge-orange">To: Lab Officer</span>
-            <div class="email-subject">New Application to Review</div>
-            <div class="email-desc">Lab officer is notified with your details and a link to approve.</div>
+            <span class="email-badge badge-orange" data-i18n="s1_e2_badge">To: PIC</span>
+            <div class="email-subject" data-i18n="s1_e2_subj">New Application to Review</div>
+            <div class="email-desc" data-i18n="s1_e2_desc">PIC is notified with your details and a link to approve.</div>
           </div>
         </div>
         <div class="email-item">
           <div class="email-dot dot-gray">📨</div>
           <div class="email-text">
-            <span class="email-badge badge-gray">To: Supervisor</span>
-            <div class="email-subject">For Your Information</div>
-            <div class="email-desc">Supervisor is informed. No action needed from them.</div>
+            <span class="email-badge badge-gray" data-i18n="s1_e3_badge">To: Supervisor</span>
+            <div class="email-subject" data-i18n="s1_e3_subj">For Your Information</div>
+            <div class="email-desc" data-i18n="s1_e3_desc">Supervisor is informed. No action needed from them.</div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- ══════════════════════ STEP 2 — PIC -->
+  <!-- ══ STEP 2 — PIC REVIEW ══ -->
   <div class="step">
     <div class="step-icon-col">
-      <div class="step-icon icon-orange">👨‍💼</div>
-      <div class="step-name">Lab Officer (PIC)</div>
+      <div class="step-icon icon-orange">✅</div>
+      <div class="step-name" data-i18n="s2_who">PIC Review</div>
     </div>
     <div class="step-body">
-
       <div class="title-card">
-        <h2>Lab Officer Reviews Your Application</h2>
-        <p>The lab officer receives the email, logs in to i-Menian, and checks your application details.</p>
+        <h2 data-i18n="s2_title">PIC Reviews Your Application</h2>
+        <p data-i18n="s2_desc">The PIC receives the email, logs in to i-Menian, reviews your application and approves or rejects.</p>
+      </div>
+
+      <!-- Screenshot 2 — PIC card -->
+      <div class="screenshot-wrap" style="display:flex;justify-content:center">
+        <div style="width:260px">
+          <div class="screenshot-frame">
+            <div class="screenshot-bar">
+              <div class="dot" style="background:#FF5F57"></div>
+              <div class="dot" style="background:#FFBD2E"></div>
+              <div class="dot" style="background:#28C840"></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/2.jpg" alt="PIC Review"/>
+          </div>
+          <div class="img-caption" data-i18n="s2_img_cap">PIC sees your card with Approve / Reject options</div>
+        </div>
       </div>
 
       <div class="reject-banner">
-        <div class="reject-banner-icon">✕</div>
-        <div class="reject-banner-text"><strong>Not approved?</strong> You will receive an email with the reason. The process stops here.</div>
+        <div class="banner-icon">✕</div>
+        <div class="banner-text" data-i18n="s2_reject"><strong>Not approved?</strong> You will receive an email with the reason. The process stops here.</div>
       </div>
-
       <div class="approve-banner">
-        <div class="approve-banner-icon">✓</div>
-        <div class="approve-banner-text"><strong>If approved</strong> — you will receive an email notifying you of the next step.</div>
+        <div class="banner-icon">✓</div>
+        <div class="banner-text" data-i18n="s2_approve"><strong>If approved</strong> — you will receive an email notifying you of the next step.</div>
       </div>
       <div class="email-group">
         <div class="email-item">
           <div class="email-dot dot-blue">📨</div>
           <div class="email-text">
-            <span class="email-badge badge-blue">Email Notification</span>
-            <div class="email-subject">Lab Officer Approved — One More Step to Go</div>
-            <div class="email-desc">Now waiting for the Head of Lab to give the final confirmation.</div>
+            <span class="email-badge badge-blue" data-i18n="s2_e1_badge">Email Notification</span>
+            <div class="email-subject" data-i18n="s2_e1_subj">PIC Approved — One More Step to Go</div>
+            <div class="email-desc" data-i18n="s2_e1_desc">Now waiting for the Head of Lab to give the final confirmation.</div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- ══════════════════════ STEP 3 — HOL -->
+  <!-- ══ STEP 3 — HEAD OF LAB ══ -->
   <div class="step">
     <div class="step-icon-col">
       <div class="step-icon icon-purple">🏛️</div>
-      <div class="step-name">Head of Lab</div>
+      <div class="step-name" data-i18n="s3_who">Head of Lab</div>
     </div>
     <div class="step-body">
-
       <div class="title-card">
-        <h2>Head of Lab Gives Final Approval</h2>
-        <p>The Head of Lab reviews the application and gives the final institutional go-ahead.</p>
+        <h2 data-i18n="s3_title">Head of Lab Gives Final Approval</h2>
+        <p data-i18n="s3_desc">The Head of Lab reviews the application and gives the final institutional go-ahead.</p>
+      </div>
+
+      <!-- Screenshot 3 — Coordinator card -->
+      <div class="screenshot-wrap" style="display:flex;justify-content:center">
+        <div style="width:260px">
+          <div class="screenshot-frame">
+            <div class="screenshot-bar">
+              <div class="dot" style="background:#FF5F57"></div>
+              <div class="dot" style="background:#FFBD2E"></div>
+              <div class="dot" style="background:#28C840"></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/3.jpg" alt="Head of Lab Review"/>
+          </div>
+          <div class="img-caption" data-i18n="s3_img_cap">Head of Lab sees your card with Approve / Reject options</div>
+        </div>
       </div>
 
       <div class="reject-banner">
-        <div class="reject-banner-icon">✕</div>
-        <div class="reject-banner-text"><strong>Not approved?</strong> You will receive an email with the reason. The process stops here.</div>
+        <div class="banner-icon">✕</div>
+        <div class="banner-text" data-i18n="s3_reject"><strong>Not approved?</strong> You will receive an email with the reason. The process stops here.</div>
       </div>
-
       <div class="approve-banner">
-        <div class="approve-banner-icon">✓</div>
-        <div class="approve-banner-text"><strong>If approved</strong> — what happens next depends on your category.</div>
+        <div class="banner-icon">✓</div>
+        <div class="banner-text" data-i18n="s3_approve"><strong>If approved</strong> — what happens next depends on your category.</div>
       </div>
       <div class="split-grid">
-
         <div class="split-card">
-          <span class="split-pill split-orange">👷 Staff</span>
-          <div class="split-title">No test required</div>
-          <div class="split-desc">Skips straight to final registration with the IMEN Officer.</div>
+          <span class="split-pill split-orange" data-i18n="s3_staff_pill">👷 Staff</span>
+          <div class="split-title" data-i18n="s3_staff_title">No assessment needed</div>
+          <div class="split-desc" data-i18n="s3_staff_desc">Skips straight to final registration with the IMEN Officer.</div>
           <div style="height:1px;background:var(--separator);opacity:.5"></div>
           <div class="email-text">
-            <span class="email-badge badge-blue" style="font-size:7px">Email Notification</span>
-            <div class="email-subject" style="font-size:11px">Approved — Sent to IMEN Officer</div>
+            <span class="email-badge badge-blue" style="font-size:7px" data-i18n="s3_staff_badge">Email Notification</span>
+            <div class="email-subject" style="font-size:11px" data-i18n="s3_staff_subj">Approved — Sent to IMEN Officer</div>
           </div>
         </div>
-
         <div class="split-card">
-          <span class="split-pill split-purple">🎓 Student / Others</span>
-          <div class="split-title">Safety test required</div>
-          <div class="split-desc">You will receive a link to complete the online safety test.</div>
+          <span class="split-pill split-purple" data-i18n="s3_student_pill">🎓 Student / Others</span>
+          <div class="split-title" data-i18n="s3_student_title">Assessment required</div>
+          <div class="split-desc" data-i18n="s3_student_desc">You will receive a link to complete the online safety assessment.</div>
           <div style="height:1px;background:var(--separator);opacity:.5"></div>
           <div class="email-text">
-            <span class="email-badge badge-blue" style="font-size:7px">Email Notification</span>
-            <div class="email-subject" style="font-size:11px">Please Complete Your Safety Test</div>
+            <span class="email-badge badge-blue" style="font-size:7px" data-i18n="s3_student_badge">Email Notification</span>
+            <div class="email-subject" style="font-size:11px" data-i18n="s3_student_subj">Please Complete Your Safety Assessment</div>
           </div>
         </div>
-
       </div>
-
     </div>
   </div>
 
-  <!-- ══════════════════════ STEP 4 — ASSESSMENT -->
+  <!-- ══ STEP 4 — ASSESSMENT ══ -->
   <div class="step">
     <div class="step-icon-col">
       <div class="step-icon icon-violet">🧪</div>
-      <div class="step-name">Safety Test</div>
+      <div class="step-name" data-i18n="s4_who">Assessment</div>
     </div>
     <div class="step-body">
-
       <div class="title-card">
-        <h2>Complete the Online Safety Test</h2>
-        <p>Click the link in your email and answer all lab safety questions. A <strong>perfect score</strong> is required to move forward. You may retake if needed.</p>
+        <h2 data-i18n="s4_title">Complete the Safety Assessment</h2>
+        <p data-i18n="s4_desc">Click the link in your email and answer all lab safety questions. A <strong>perfect score</strong> is required to move forward. You may retake if needed.</p>
+      </div>
+
+      <!-- Screenshots 4 + 5 side by side -->
+      <div class="img-pair">
+        <div class="screenshot-wrap">
+          <div class="screenshot-frame">
+            <div class="screenshot-bar">
+              <div class="dot" style="background:#FF5F57"></div>
+              <div class="dot" style="background:#FFBD2E"></div>
+              <div class="dot" style="background:#28C840"></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/4.jpg" alt="Assessment Questions" style="max-height:220px;object-fit:cover;object-position:top"/>
+          </div>
+          <div class="img-caption" data-i18n="s4_img1_cap">Answer all safety questions</div>
+        </div>
+        <div class="screenshot-wrap">
+          <div class="screenshot-frame">
+            <div class="screenshot-bar">
+              <div class="dot" style="background:#FF5F57"></div>
+              <div class="dot" style="background:#FFBD2E"></div>
+              <div class="dot" style="background:#28C840"></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/5.jpg" alt="Assessment Passed" style="max-height:220px;object-fit:cover;object-position:center"/>
+          </div>
+          <div class="img-caption" data-i18n="s4_img2_cap">Assessment passed ✓</div>
+        </div>
       </div>
 
       <div class="info-pill" style="background:#F0FDF4;color:#166534">
         <div class="info-pill-icon">💡</div>
-        <div>If you have applied for a different lab before, the system will recognise you automatically — no extra steps needed.</div>
+        <div data-i18n="s4_info">If you have applied for a different lab before, the system will recognise you automatically — no extra steps needed.</div>
       </div>
-
-      <div class="section-hdr">Once you pass</div>
+      <div class="section-hdr" data-i18n="s4_section">Once you pass</div>
       <div class="email-group">
         <div class="email-item">
           <div class="email-dot dot-violet">📨</div>
           <div class="email-text">
-            <span class="email-badge badge-violet">Email Notification</span>
-            <div class="email-subject">Safety Test Passed — Official Record</div>
-            <div class="email-desc">Your score and answers are saved as your official lab safety record. Keep this email.</div>
+            <span class="email-badge badge-violet" data-i18n="s4_e1_badge">Email Notification</span>
+            <div class="email-subject" data-i18n="s4_e1_subj">Assessment Passed — Official Record</div>
+            <div class="email-desc" data-i18n="s4_e1_desc">Your score and answers are saved as your official lab safety record. Keep this email.</div>
           </div>
         </div>
       </div>
-
       <div class="info-pill" style="background:var(--fill);color:var(--label3)">
         <div class="info-pill-icon">⏳</div>
-        <div>The IMEN Officer will be notified. <strong>Sit tight</strong> — you will receive another email shortly with your next step.</div>
+        <div data-i18n="s4_wait">The IMEN Officer will be notified. <strong>Sit tight</strong> — you will receive another email shortly with your next step.</div>
       </div>
-
     </div>
   </div>
 
-  <!-- ══════════════════════ STEP 5 — IMEN OFFICER -->
+  <!-- ══ STEP 5 — IMEN OFFICER ══ -->
   <div class="step">
     <div class="step-icon-col">
       <div class="step-icon icon-green">🔐</div>
-      <div class="step-name">IMEN Officer</div>
+      <div class="step-name" data-i18n="s5_who">IMEN Officer</div>
     </div>
     <div class="step-body">
-
       <div class="title-card">
-        <h2>IMEN Officer Completes Your Registration</h2>
-        <p>The officer reviews your approved application and activates your lab access. Two possible outcomes:</p>
+        <h2 data-i18n="s5_title">IMEN Officer Completes Your Registration</h2>
+        <p data-i18n="s5_desc">The officer reviews your approved application and activates your lab access. Two possible outcomes:</p>
+      </div>
+
+      <!-- Screenshot 6 — Security Queue card -->
+      <div class="screenshot-wrap" style="display:flex;justify-content:center">
+        <div style="width:260px">
+          <div class="screenshot-frame">
+            <div class="screenshot-bar">
+              <div class="dot" style="background:#FF5F57"></div>
+              <div class="dot" style="background:#FFBD2E"></div>
+              <div class="dot" style="background:#28C840"></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/6.jpg" alt="IMEN Officer Registration"/>
+          </div>
+          <div class="img-caption" data-i18n="s5_img_cap">Officer sees your card — ready for final registration</div>
+        </div>
       </div>
 
       <div class="popup-wrap">
-
         <!-- first time -->
         <div class="popup-case">
-          <div class="popup-case-label">🆕 First time registering</div>
+          <div class="popup-case-label" data-i18n="s5_new_label">🆕 First time registering</div>
           <div class="popup-btns">
-            <span class="pbtn" style="background:var(--blue);color:#fff">Confirm</span>
-            <span class="pbtn" style="background:var(--fill2);color:var(--label4)">Cancel</span>
+            <span class="pbtn" style="background:var(--blue);color:#fff" data-i18n="s5_new_confirm">Confirm</span>
+            <span class="pbtn" style="background:var(--fill2);color:var(--label4)" data-i18n="s5_new_cancel">Cancel</span>
           </div>
           <div style="height:1px;background:var(--separator);opacity:.5;margin-bottom:10px"></div>
           <div class="email-text">
-            <span class="email-badge badge-blue">Email Notification</span>
-            <div class="email-subject" style="font-size:12px">📍 Please Visit IMEN Office — Level 4</div>
-            <div class="email-desc">Come in person to complete your identity and access registration. Contact via WhatsApp to arrange a time.</div>
+            <span class="email-badge badge-blue" data-i18n="s5_new_badge">Email Notification</span>
+            <div class="email-subject" style="font-size:12px" data-i18n="s5_new_subj">📍 Please Visit IMEN Office — Level 4</div>
+            <div class="email-desc" data-i18n="s5_new_desc">Come in person to complete your identity and access registration. Contact via WhatsApp to arrange a time.</div>
           </div>
         </div>
-
         <!-- returning -->
         <div class="popup-case" style="background:#FFFCF0">
-          <div class="popup-case-label">🔁 Already registered at another lab before</div>
+          <div class="popup-case-label" data-i18n="s5_ret_label">🔁 Already registered at another lab before</div>
           <div class="popup-btns">
-            <span class="pbtn" style="background:var(--blue);color:#fff">Confirm</span>
-            <span class="pbtn" style="background:var(--green);color:#fff">✓ No Visit Needed</span>
-            <span class="pbtn" style="background:var(--fill2);color:var(--label4)">Cancel</span>
+            <span class="pbtn" style="background:var(--blue);color:#fff" data-i18n="s5_ret_confirm">Confirm</span>
+            <span class="pbtn" style="background:var(--green);color:#fff" data-i18n="s5_ret_novisit">✓ No Visit Needed</span>
+            <span class="pbtn" style="background:var(--fill2);color:var(--label4)" data-i18n="s5_ret_cancel">Cancel</span>
           </div>
           <div style="height:1px;background:var(--separator);opacity:.5;margin-bottom:10px"></div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <div class="email-text">
-              <span class="email-badge badge-blue">Confirm →</span>
-              <div class="email-subject" style="font-size:11px">Please Visit IMEN Office — Level 4</div>
+              <span class="email-badge badge-blue" data-i18n="s5_ret_b1_badge">Confirm →</span>
+              <div class="email-subject" style="font-size:11px" data-i18n="s5_ret_b1_subj">Please Visit IMEN Office — Level 4</div>
             </div>
             <div style="height:1px;background:var(--separator);opacity:.4"></div>
             <div class="email-text">
-              <span class="email-badge badge-green">No Visit →</span>
-              <div class="email-subject" style="font-size:11px">✅ Your Access Has Been Activated</div>
-              <div class="email-desc">Your details are already on record. No need to come in — your lab access is ready.</div>
+              <span class="email-badge badge-green" data-i18n="s5_ret_b2_badge">No Visit →</span>
+              <div class="email-subject" style="font-size:11px" data-i18n="s5_ret_b2_subj">✅ Your Access Has Been Activated</div>
+              <div class="email-desc" data-i18n="s5_ret_b2_desc">Your details are already on record. No need to come in — your lab access is ready.</div>
             </div>
           </div>
         </div>
-
       </div>
-
     </div>
   </div>
 
-  <!-- ══════════════════════ DONE -->
+  <!-- ══ DONE ══ -->
   <div class="step">
     <div class="step-icon-col">
       <div class="step-icon icon-green" style="font-size:22px">🎉</div>
-      <div class="step-name">Done</div>
+      <div class="step-name" data-i18n="done_who">Done</div>
     </div>
     <div class="step-body" style="padding-bottom:0">
       <div class="final-card">
         <div class="final-icon">✓</div>
         <div class="final-text">
-          <h2>Welcome — Your Lab Access is Active!</h2>
-          <p>You are now registered. Your lab access has been granted. Welcome aboard.</p>
+          <h2 data-i18n="done_title">Welcome — Your Lab Access is Active!</h2>
+          <p data-i18n="done_desc">You are now registered. Your lab access has been granted. Welcome aboard.</p>
+        </div>
+      </div>
+      <!-- Screenshot 7 — Authorized card -->
+      <div class="final-img-wrap" style="display:flex;justify-content:center">
+        <div style="width:260px">
+          <div class="screenshot-frame">
+            <div class="screenshot-bar">
+              <div class="dot" style="background:#FF5F57"></div>
+              <div class="dot" style="background:#FFBD2E"></div>
+              <div class="dot" style="background:#28C840"></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-menian/7.jpg" alt="Authorized"/>
+          </div>
+          <div class="img-caption" data-i18n="done_img_cap">Your card is now marked Authorized ✓</div>
         </div>
       </div>
     </div>
   </div>
 
-</div><!-- /pipeline -->
+</div>
 
+<script>
+const T = {
+  en:{
+    eyebrow:'i-Menian System',title:'How to Apply for Lab Access',
+    subtitle:'Follow these steps to get your lab access approved — from form to final confirmation.',
+    spam:'Emails may land in your <strong>Spam / Junk</strong> folder — always check there too',
+    s1_who:'You',s1_title:'Submit Your Application',
+    s1_desc:'Fill in the online form with your details — name, student ID, email, lab, category, and supervisor. Then hit submit.',
+    s1_img_cap:'i-Menian Portal — Lab Entry Registration Form',
+    s1_section:'Email notifications sent',
+    s1_e1_badge:'Email Notification',s1_e1_subj:'Application Received',
+    s1_e1_desc:'Your form has been submitted and sent to the lab officer for review.',
+    s1_e2_badge:'To: PIC',s1_e2_subj:'New Application to Review',
+    s1_e2_desc:'PIC is notified with your details and a link to approve.',
+    s1_e3_badge:'To: Supervisor',s1_e3_subj:'For Your Information',
+    s1_e3_desc:'Supervisor is informed. No action needed from them.',
+    s2_who:'PIC\nReview',s2_title:'PIC Reviews Your Application',
+    s2_desc:'The PIC receives the email, logs in to i-Menian, reviews your application and approves or rejects.',
+    s2_img_cap:'PIC sees your card with Approve / Reject options',
+    s2_reject:'<strong>Not approved?</strong> You will receive an email with the reason. The process stops here.',
+    s2_approve:'<strong>If approved</strong> — you will receive an email notifying you of the next step.',
+    s2_e1_badge:'Email Notification',s2_e1_subj:'PIC Approved — One More Step to Go',
+    s2_e1_desc:'Now waiting for the Head of Lab to give the final confirmation.',
+    s3_who:'Head of\nLab',s3_title:'Head of Lab Gives Final Approval',
+    s3_desc:'The Head of Lab reviews the application and gives the final institutional go-ahead.',
+    s3_img_cap:'Head of Lab sees your card with Approve / Reject options',
+    s3_reject:'<strong>Not approved?</strong> You will receive an email with the reason. The process stops here.',
+    s3_approve:'<strong>If approved</strong> — what happens next depends on your category.',
+    s3_staff_pill:'👷 Staff',s3_staff_title:'No assessment needed',
+    s3_staff_desc:'Skips straight to final registration with the IMEN Officer.',
+    s3_staff_badge:'Email Notification',s3_staff_subj:'Approved — Sent to IMEN Officer',
+    s3_student_pill:'🎓 Student / Others',s3_student_title:'Assessment required',
+    s3_student_desc:'You will receive a link to complete the online safety assessment.',
+    s3_student_badge:'Email Notification',s3_student_subj:'Please Complete Your Safety Assessment',
+    s4_who:'Assessment',s4_title:'Complete the Safety Assessment',
+    s4_desc:'Click the link in your email and answer all lab safety questions. A <strong>perfect score</strong> is required to move forward. You may retake if needed.',
+    s4_img1_cap:'Answer all safety questions',s4_img2_cap:'Assessment passed ✓',
+    s4_info:'If you have applied for a different lab before, the system will recognise you automatically — no extra steps needed.',
+    s4_section:'Once you pass',
+    s4_e1_badge:'Email Notification',s4_e1_subj:'Assessment Passed — Official Record',
+    s4_e1_desc:'Your score and answers are saved as your official lab safety record. Keep this email.',
+    s4_wait:'The IMEN Officer will be notified. <strong>Sit tight</strong> — you will receive another email shortly with your next step.',
+    s5_who:'IMEN\nOfficer',s5_title:'IMEN Officer Completes Your Registration',
+    s5_desc:'The officer reviews your approved application and activates your lab access. Two possible outcomes:',
+    s5_img_cap:'Officer sees your card — ready for final registration',
+    s5_new_label:'🆕 First time registering',s5_new_confirm:'Confirm',s5_new_cancel:'Cancel',
+    s5_new_badge:'Email Notification',s5_new_subj:'📍 Please Visit IMEN Office — Level 4',
+    s5_new_desc:'Come in person to complete your identity and access registration. Contact via WhatsApp to arrange a time.',
+    s5_ret_label:'🔁 Already registered at another lab before',
+    s5_ret_confirm:'Confirm',s5_ret_novisit:'✓ No Visit Needed',s5_ret_cancel:'Cancel',
+    s5_ret_b1_badge:'Confirm →',s5_ret_b1_subj:'Please Visit IMEN Office — Level 4',
+    s5_ret_b2_badge:'No Visit →',s5_ret_b2_subj:'✅ Your Access Has Been Activated',
+    s5_ret_b2_desc:'Your details are already on record. No need to come in — your lab access is ready.',
+    done_who:'Done',done_title:'Welcome — Your Lab Access is Active!',
+    done_desc:'You are now registered. Your lab access has been granted. Welcome aboard.',
+    done_img_cap:'Your card is now marked Authorized ✓',
+  },
+  bm:{
+    eyebrow:'Sistem i-Menian',title:'Cara Memohon Akses Makmal',
+    subtitle:'Ikuti langkah-langkah ini untuk mendapatkan kelulusan akses makmal anda — dari borang hingga pengesahan akhir.',
+    spam:'E-mel mungkin tersimpan dalam folder <strong>Spam / Sampah</strong> anda — sila semak di sana juga',
+    s1_who:'Anda',s1_title:'Hantar Permohonan Anda',
+    s1_desc:'Isi borang dalam talian dengan maklumat anda — nama, nombor matrik, e-mel, makmal, kategori, dan penyelia. Kemudian tekan hantar.',
+    s1_img_cap:'Portal i-Menian — Borang Pendaftaran Kemasukan Makmal',
+    s1_section:'Notifikasi e-mel dihantar',
+    s1_e1_badge:'Notifikasi E-mel',s1_e1_subj:'Permohonan Diterima',
+    s1_e1_desc:'Borang anda telah dihantar dan dikemukakan kepada PIC untuk semakan.',
+    s1_e2_badge:'Kepada: PIC',s1_e2_subj:'Permohonan Baharu untuk Disemak',
+    s1_e2_desc:'PIC dimaklumkan dengan butiran anda dan pautan untuk meluluskan.',
+    s1_e3_badge:'Kepada: Penyelia',s1_e3_subj:'Untuk Makluman Anda',
+    s1_e3_desc:'Penyelia dimaklumkan. Tiada tindakan diperlukan daripada mereka.',
+    s2_who:'Semakan\nPIC',s2_title:'PIC Menyemak Permohonan Anda',
+    s2_desc:'PIC menerima e-mel, log masuk ke i-Menian, menyemak permohonan anda dan meluluskan atau menolak.',
+    s2_img_cap:'PIC melihat kad anda dengan pilihan Luluskan / Tolak',
+    s2_reject:'<strong>Tidak diluluskan?</strong> Anda akan menerima e-mel dengan sebabnya. Proses terhenti di sini.',
+    s2_approve:'<strong>Jika diluluskan</strong> — anda akan menerima e-mel memaklumkan langkah seterusnya.',
+    s2_e1_badge:'Notifikasi E-mel',s2_e1_subj:'PIC Meluluskan — Satu Langkah Lagi',
+    s2_e1_desc:'Kini menunggu Ketua Makmal untuk memberikan pengesahan akhir.',
+    s3_who:'Ketua\nMakmal',s3_title:'Ketua Makmal Memberi Kelulusan Akhir',
+    s3_desc:'Ketua Makmal menyemak permohonan dan memberikan kelulusan institusi yang terakhir.',
+    s3_img_cap:'Ketua Makmal melihat kad anda dengan pilihan Luluskan / Tolak',
+    s3_reject:'<strong>Tidak diluluskan?</strong> Anda akan menerima e-mel dengan sebabnya. Proses terhenti di sini.',
+    s3_approve:'<strong>Jika diluluskan</strong> — apa yang berlaku seterusnya bergantung kepada kategori anda.',
+    s3_staff_pill:'👷 Kakitangan',s3_staff_title:'Tiada penilaian diperlukan',
+    s3_staff_desc:'Terus ke pendaftaran akhir bersama Pegawai IMEN.',
+    s3_staff_badge:'Notifikasi E-mel',s3_staff_subj:'Diluluskan — Dihantar kepada Pegawai IMEN',
+    s3_student_pill:'🎓 Pelajar / Lain-lain',s3_student_title:'Penilaian diperlukan',
+    s3_student_desc:'Anda akan menerima pautan untuk melengkapkan penilaian keselamatan dalam talian.',
+    s3_student_badge:'Notifikasi E-mel',s3_student_subj:'Sila Lengkapkan Penilaian Keselamatan Anda',
+    s4_who:'Penilaian',s4_title:'Lengkapkan Penilaian Keselamatan',
+    s4_desc:'Klik pautan dalam e-mel anda dan jawab semua soalan keselamatan makmal. <strong>Markah penuh</strong> diperlukan untuk meneruskan. Anda boleh menduduki semula jika perlu.',
+    s4_img1_cap:'Jawab semua soalan keselamatan',s4_img2_cap:'Penilaian lulus ✓',
+    s4_info:'Jika anda pernah memohon untuk makmal lain sebelum ini, sistem akan mengenali anda secara automatik — tiada langkah tambahan diperlukan.',
+    s4_section:'Setelah lulus',
+    s4_e1_badge:'Notifikasi E-mel',s4_e1_subj:'Penilaian Lulus — Rekod Rasmi',
+    s4_e1_desc:'Markah dan jawapan anda disimpan sebagai rekod keselamatan makmal rasmi anda. Simpan e-mel ini.',
+    s4_wait:'Pegawai IMEN akan dimaklumkan. <strong>Bersabar sebentar</strong> — anda akan menerima e-mel lain tidak lama lagi dengan langkah seterusnya.',
+    s5_who:'Pegawai\nIMEN',s5_title:'Pegawai IMEN Melengkapkan Pendaftaran Anda',
+    s5_desc:'Pegawai menyemak permohonan anda yang diluluskan dan mengaktifkan akses makmal anda. Dua kemungkinan hasil:',
+    s5_img_cap:'Pegawai melihat kad anda — sedia untuk pendaftaran akhir',
+    s5_new_label:'🆕 Pendaftaran kali pertama',s5_new_confirm:'Sahkan',s5_new_cancel:'Batal',
+    s5_new_badge:'Notifikasi E-mel',s5_new_subj:'📍 Sila Datang ke Pejabat IMEN — Aras 4',
+    s5_new_desc:'Datang secara peribadi untuk melengkapkan pendaftaran identiti dan akses anda. Hubungi melalui WhatsApp untuk membuat temujanji.',
+    s5_ret_label:'🔁 Pernah mendaftar di makmal lain sebelum ini',
+    s5_ret_confirm:'Sahkan',s5_ret_novisit:'✓ Tidak Perlu Datang',s5_ret_cancel:'Batal',
+    s5_ret_b1_badge:'Sahkan →',s5_ret_b1_subj:'Sila Datang ke Pejabat IMEN — Aras 4',
+    s5_ret_b2_badge:'Tidak Perlu Datang →',s5_ret_b2_subj:'✅ Akses Anda Telah Diaktifkan',
+    s5_ret_b2_desc:'Maklumat anda sudah ada dalam rekod. Tidak perlu datang — akses makmal anda sudah sedia.',
+    done_who:'Selesai',done_title:'Selamat Datang — Akses Makmal Anda Aktif!',
+    done_desc:'Anda kini telah didaftarkan. Akses makmal anda telah diberikan. Selamat bergabung.',
+    done_img_cap:'Kad anda kini ditanda Dibenarkan ✓',
+  }
+};
+
+let lang='en';
+function applyLang(l){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k=el.getAttribute('data-i18n');
+    if(T[l][k]!==undefined) el.innerHTML=T[l][k];
+  });
+  document.getElementById('langBtnLabel').textContent=l==='en'?'BM':'EN';
+  document.querySelector('.lang-flag').textContent=l==='en'?'🇲🇾':'🇬🇧';
+  document.documentElement.lang=l==='bm'?'ms':'en';
+}
+function toggleLang(){lang=lang==='en'?'bm':'en';applyLang(lang);}
+</script>
 </body>
 </html>
