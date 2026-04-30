@@ -33,12 +33,12 @@
 body{
   font-family:'Inter',system-ui,-apple-system,sans-serif;
   background:var(--bg);color:var(--label);
-  min-height:100vh;padding:52px 20px 96px;
+  min-height:100vh;padding:80px 20px 96px;
   -webkit-font-smoothing:antialiased;
 }
 
 /* ── LANG TOGGLE ── */
-.lang-bar{position:fixed;top:16px;right:20px;z-index:100}
+.lang-bar{position:fixed;top:20px;right:20px;z-index:200}
 .lang-btn{
   display:flex;align-items:center;gap:6px;
   background:var(--card);border:1px solid var(--separator);
@@ -51,7 +51,8 @@ body{
 .lang-btn:active{transform:scale(.96)}
 
 /* ── HEADER ── */
-.header{text-align:center;margin-bottom:48px}
+.header{text-align:center;margin-bottom:48px;padding-right:80px;padding-left:80px}
+@media(max-width:480px){.header{padding-right:20px;padding-left:20px}}
 .header-eyebrow{
   display:inline-flex;align-items:center;gap:7px;
   background:var(--blue);color:#fff;
