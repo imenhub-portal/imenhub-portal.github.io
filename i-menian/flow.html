@@ -3,278 +3,486 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>i-Menian — Application Flow</title>
+<title>i-Menian — Lab Access Flow</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-body{
-  font-family:'Inter',sans-serif;
-  background:#f7f7f8;
-  color:#111;
-  min-height:100vh;
-  padding:48px 20px 80px;
+/* ── BASE ── */
+:root{
+  --bg:          #F2F2F7;
+  --card:        #FFFFFF;
+  --blue:        #007AFF;
+  --green:       #34C759;
+  --orange:      #FF9500;
+  --red:         #FF3B30;
+  --purple:      #5856D6;
+  --violet:      #AF52DE;
+  --indigo:      #5E5CE6;
+  --teal:        #32ADE6;
+  --label:       #1C1C1E;
+  --label2:      #3A3A3C;
+  --label3:      #636366;
+  --label4:      #8E8E93;
+  --separator:   #D1D1D6;
+  --fill:        #F2F2F7;
+  --fill2:       #E5E5EA;
+  --radius-lg:   22px;
+  --radius-md:   14px;
+  --radius-sm:   10px;
+  --shadow-sm:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:   0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
 }
 
-/* ── HEADER ── */
-.page-head{text-align:center;margin-bottom:52px}
-.page-head .brand{
-  display:inline-block;background:#111;color:#fff;
-  font-size:9px;font-weight:800;letter-spacing:3px;text-transform:uppercase;
-  padding:5px 14px;border-radius:100px;margin-bottom:14px;
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--label);
+  min-height:100vh;
+  padding:52px 20px 96px;
+  -webkit-font-smoothing:antialiased;
 }
-.page-head h1{font-size:clamp(20px,3.5vw,28px);font-weight:900;letter-spacing:-0.5px;margin-bottom:6px}
-.page-head p{font-size:12px;color:#999}
+
+/* ── PAGE HEADER ── */
+.header{text-align:center;margin-bottom:48px}
+.header-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--blue);color:#fff;
+  font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  padding:5px 14px 5px 11px;border-radius:100px;
+  margin-bottom:16px;
+  box-shadow:0 2px 12px rgba(0,122,255,.35);
+}
+.header-eyebrow span{
+  width:6px;height:6px;border-radius:50%;
+  background:rgba(255,255,255,.6);display:block;
+}
+.header h1{
+  font-size:clamp(22px,4vw,30px);
+  font-weight:800;letter-spacing:-.6px;
+  color:var(--label);margin-bottom:8px;line-height:1.2;
+}
+.header-sub{
+  font-size:13px;color:var(--label4);font-weight:400;
+  max-width:360px;margin:0 auto;line-height:1.6;
+}
+.spam-notice{
+  display:inline-flex;align-items:center;gap:7px;
+  margin-top:14px;
+  background:var(--card);
+  border:1px solid var(--separator);
+  border-radius:100px;
+  padding:6px 16px;
+  font-size:11px;font-weight:500;color:var(--label3);
+  box-shadow:var(--shadow-sm);
+}
+.spam-notice strong{color:var(--orange)}
 
 /* ── PIPELINE ── */
-.pipeline{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:0}
-
-/* ── ROW ── */
-.row{display:grid;grid-template-columns:100px 1fr;gap:0;position:relative}
-
-/* spine line between rows */
-.row:not(:last-child) .actor::after{
-  content:'';position:absolute;
-  left:49px;top:68px;bottom:-1px;
-  width:2px;background:#e2e2e2;z-index:0;
+.pipeline{
+  max-width:600px;margin:0 auto;
+  display:flex;flex-direction:column;
+  position:relative;
 }
 
-/* ── ACTOR ── */
-.actor{
-  display:flex;flex-direction:column;align-items:center;
-  padding-top:20px;position:relative;gap:7px;
+/* ── SPINE ── */
+.spine{
+  position:absolute;
+  left:30px;top:0;bottom:0;
+  width:1.5px;
+  background:linear-gradient(to bottom,
+    transparent 0%,
+    var(--separator) 5%,
+    var(--separator) 95%,
+    transparent 100%);
+  z-index:0;
 }
-.actor-bubble{
-  width:52px;height:52px;border-radius:16px;
+
+/* ── STEP ── */
+.step{
+  display:grid;
+  grid-template-columns:60px 1fr;
+  gap:0;
+  position:relative;
+  z-index:1;
+  padding-bottom:8px;
+}
+.step:last-child{padding-bottom:0}
+
+/* ── ICON COL ── */
+.step-icon-col{
+  display:flex;flex-direction:column;
+  align-items:center;
+  padding-top:16px;
+  gap:0;
+}
+.step-icon{
+  width:48px;height:48px;
+  border-radius:15px;
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;
-  border:2px solid transparent;
-  box-shadow:0 2px 10px rgba(0,0,0,.10);
-  position:relative;z-index:1;flex-shrink:0;
+  font-size:20px;
+  box-shadow:var(--shadow-md);
+  position:relative;z-index:2;
+  flex-shrink:0;
 }
-.actor-name{
-  font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-  text-align:center;line-height:1.4;max-width:80px;color:#555;
-}
-
-/* ── CONTENT ── */
-.content{padding:20px 0 28px 18px;display:flex;flex-direction:column;gap:10px}
-
-/* ── CARD ── */
-.card{
-  background:#fff;border-radius:14px;
-  border:1.5px solid #ebebeb;padding:14px 16px;
-  box-shadow:0 1px 6px rgba(0,0,0,.05);
-}
-.card-title{font-size:14px;font-weight:800;margin-bottom:3px;line-height:1.3}
-.card-desc{font-size:12px;color:#888;font-weight:400;line-height:1.6}
-
-/* ── SECTION LABEL ── */
-.section-label{
-  font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
-  color:#ccc;display:flex;align-items:center;gap:8px;
-}
-.section-label::after{content:'';flex:1;height:1px;background:#ebebeb}
-
-/* ── EMAIL ROW ── */
-.email-row{
-  display:flex;align-items:flex-start;gap:10px;
-  background:#f9f9f9;border:1px solid #ebebeb;
-  border-radius:12px;padding:10px 12px;
-}
-.email-info{flex:1}
-.email-to{
-  font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-  padding:2px 8px;border-radius:100px;display:inline-block;margin-bottom:3px;
-}
-.email-subject{font-size:12px;font-weight:600;color:#222;line-height:1.4}
-.email-note{font-size:11px;color:#aaa;margin-top:2px;line-height:1.4}
-
-/* ── REJECT ── */
-.reject-strip{
-  background:#fff5f5;border:1px solid #fecaca;
-  border-radius:10px;padding:9px 13px;
-  font-size:12px;color:#b91c1c;
-  display:flex;align-items:center;gap:8px;line-height:1.5;
+.step-name{
+  font-size:8px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--label4);
+  margin-top:6px;text-align:center;
+  line-height:1.4;max-width:52px;
 }
 
-/* ── SPLIT ── */
-.split-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:520px){.split-wrap{grid-template-columns:1fr}}
+/* ── BODY COL ── */
+.step-body{
+  padding:16px 0 32px 16px;
+  display:flex;flex-direction:column;gap:8px;
+}
+
+/* ── STEP TITLE CARD ── */
+.title-card{
+  background:var(--card);
+  border-radius:var(--radius-lg);
+  padding:16px 18px;
+  box-shadow:var(--shadow-md);
+}
+.title-card h2{
+  font-size:15px;font-weight:700;
+  color:var(--label);margin-bottom:4px;
+  letter-spacing:-.2px;line-height:1.3;
+}
+.title-card p{
+  font-size:12px;color:var(--label3);
+  font-weight:400;line-height:1.6;
+}
+
+/* ── SECTION HEADER (iOS style) ── */
+.section-hdr{
+  font-size:10px;font-weight:600;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--label4);
+  padding:0 4px;margin-top:4px;
+}
+
+/* ── EMAIL GROUP (iOS list style) ── */
+.email-group{
+  background:var(--card);
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  box-shadow:var(--shadow-sm);
+}
+.email-item{
+  display:flex;align-items:flex-start;
+  gap:12px;padding:13px 16px;
+  position:relative;
+}
+.email-item:not(:last-child)::after{
+  content:'';position:absolute;
+  left:44px;right:0;bottom:0;
+  height:1px;background:var(--separator);
+  opacity:.6;
+}
+.email-dot{
+  width:28px;height:28px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;margin-top:1px;
+}
+.email-text{flex:1}
+.email-badge{
+  font-size:8px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;
+  padding:2px 8px;border-radius:100px;
+  display:inline-block;margin-bottom:3px;
+}
+.email-subject{
+  font-size:12px;font-weight:600;
+  color:var(--label);line-height:1.4;
+}
+.email-desc{
+  font-size:11px;color:var(--label4);
+  margin-top:2px;line-height:1.5;font-weight:400;
+}
+
+/* ── REJECT BANNER ── */
+.reject-banner{
+  background:#FFF2F2;
+  border-radius:var(--radius-md);
+  padding:11px 14px;
+  display:flex;align-items:flex-start;gap:9px;
+}
+.reject-banner-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.reject-banner-text{
+  font-size:12px;font-weight:500;
+  color:#C0392B;line-height:1.5;
+}
+
+/* ── APPROVE BANNER ── */
+.approve-banner{
+  background:#F0FDF4;
+  border-radius:var(--radius-md);
+  padding:11px 14px;
+  display:flex;align-items:flex-start;gap:9px;
+}
+.approve-banner-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.approve-banner-text{
+  font-size:12px;font-weight:500;
+  color:#166534;line-height:1.5;
+}
+
+/* ── SPLIT GRID ── */
+.split-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:480px){.split-grid{grid-template-columns:1fr}}
 
 .split-card{
-  border-radius:12px;border:1.5px solid #ebebeb;
-  padding:12px 14px;background:#fff;
+  background:var(--card);
+  border-radius:var(--radius-md);
+  padding:14px 14px;
+  box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;gap:8px;
 }
-.split-tag{
-  font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-  display:inline-block;padding:3px 9px;border-radius:100px;margin-bottom:8px;
+.split-pill{
+  font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  padding:3px 9px;border-radius:100px;
+  display:inline-block;width:fit-content;
 }
-.split-title{font-size:12px;font-weight:700;margin-bottom:3px}
-.split-desc{font-size:11px;color:#999;line-height:1.5;margin-bottom:8px}
+.split-title{font-size:12px;font-weight:700;color:var(--label);line-height:1.3}
+.split-desc{font-size:11px;color:var(--label4);line-height:1.5}
 
-/* ── INFO BOX ── */
-.info-box{
-  border-radius:10px;padding:9px 13px;
-  font-size:12px;font-weight:500;
-  display:flex;align-items:flex-start;gap:8px;line-height:1.5;
+/* ── INFO PILL ── */
+.info-pill{
+  border-radius:var(--radius-md);
+  padding:10px 14px;
+  display:flex;align-items:flex-start;gap:9px;
+  font-size:12px;font-weight:400;line-height:1.6;
 }
+.info-pill-icon{font-size:15px;flex-shrink:0;margin-top:1px}
 
 /* ── POPUP PREVIEW ── */
 .popup-wrap{
-  background:#f4f4f6;border-radius:14px;
-  padding:12px;display:flex;flex-direction:column;gap:8px;
+  background:var(--fill);
+  border-radius:var(--radius-lg);
+  padding:10px;
+  display:flex;flex-direction:column;gap:8px;
 }
 .popup-case{
-  background:#fff;border-radius:10px;
-  padding:11px 13px;border:1.5px solid #ebebeb;
+  background:var(--card);
+  border-radius:var(--radius-md);
+  padding:13px 14px;
+  box-shadow:var(--shadow-sm);
 }
-.popup-label{
-  font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-  color:#aaa;margin-bottom:8px;
+.popup-case-label{
+  font-size:9px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--label4);
+  margin-bottom:10px;
 }
-.popup-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.popup-btns{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
 .pbtn{
-  font-size:10px;font-weight:700;
-  padding:6px 13px;border-radius:8px;display:inline-block;
+  font-size:11px;font-weight:600;
+  padding:7px 16px;border-radius:100px;
+  display:inline-block;letter-spacing:-.1px;
 }
+.popup-divider{height:1px;background:var(--separator);margin:6px 0;opacity:.5}
 
-/* ── FINAL ── */
+/* ── FINAL CARD ── */
 .final-card{
-  background:linear-gradient(135deg,#f0fff4,#e8f9ee);
-  border:2px solid #34c759 !important;
+  background:linear-gradient(145deg,#F0FFF5,#E6F9EE);
+  border-radius:var(--radius-lg);
+  padding:20px;
+  box-shadow:0 4px 20px rgba(52,199,89,.18);
+  display:flex;align-items:center;gap:14px;
+  border:1px solid rgba(52,199,89,.25);
 }
+.final-icon{
+  width:52px;height:52px;border-radius:16px;
+  background:var(--green);
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;flex-shrink:0;
+  box-shadow:0 4px 12px rgba(52,199,89,.4);
+}
+.final-text h2{
+  font-size:15px;font-weight:700;
+  color:#155724;letter-spacing:-.2px;margin-bottom:3px;
+}
+.final-text p{font-size:12px;color:#2d8a50;font-weight:400;line-height:1.5}
 
 /* ── COLOURS ── */
-.bg-blue  {background:#eff6ff} .t-blue  {color:#2563eb}
-.bg-amber {background:#fffbeb} .t-amber {color:#b45309}
-.bg-purple{background:#f5f3ff} .t-purple{color:#6d28d9}
-.bg-violet{background:#fdf4ff} .t-violet{color:#7e22ce}
-.bg-green {background:#f0fdf4} .t-green {color:#15803d}
+.icon-blue   {background:linear-gradient(145deg,#1C86FF,#0060E6);color:#fff}
+.icon-orange {background:linear-gradient(145deg,#FFB340,#E07800);color:#fff}
+.icon-purple {background:linear-gradient(145deg,#7D7AFF,#4947C8);color:#fff}
+.icon-violet {background:linear-gradient(145deg,#CF6EF0,#9626C7);color:#fff}
+.icon-green  {background:linear-gradient(145deg,#4CD96A,#28A745);color:#fff}
 
-.pill-blue  {background:#dbeafe;color:#1d4ed8}
-.pill-amber {background:#fef3c7;color:#92400e}
-.pill-purple{background:#ede9fe;color:#5b21b6}
-.pill-violet{background:#fae8ff;color:#7e22ce}
-.pill-green {background:#dcfce7;color:#15803d}
-.pill-gray  {background:#f3f4f6;color:#6b7280}
-.pill-officer{background:#fef9c3;color:#78350f}
+.badge-blue  {background:#EBF5FF;color:#0060E6}
+.badge-orange{background:#FFF4E0;color:#C05C00}
+.badge-purple{background:#EEEEFF;color:#4947C8}
+.badge-violet{background:#F9EEFF;color:#8B24B0}
+.badge-green {background:#EDFAF1;color:#1A7A35}
+.badge-gray  {background:#F2F2F7;color:#636366}
+.badge-officer{background:#FFFBE6;color:#7A5500}
 
-@media(max-width:480px){
-  .row{grid-template-columns:72px 1fr}
-  .actor-bubble{width:44px;height:44px;font-size:18px}
-  .row:not(:last-child) .actor::after{left:35px}
+.dot-blue   {background:#EBF5FF}
+.dot-orange {background:#FFF4E0}
+.dot-purple {background:#EEEEFF}
+.dot-violet {background:#F9EEFF}
+.dot-green  {background:#EDFAF1}
+.dot-gray   {background:#F2F2F7}
+.dot-officer{background:#FFFBE6}
+
+.t-blue  {color:var(--blue)}
+.t-orange{color:var(--orange)}
+.t-purple{color:var(--purple)}
+.t-violet{color:var(--violet)}
+.t-green {color:var(--green)}
+
+.split-orange{background:#FFF4E0;color:#C05C00}
+.split-purple{background:#EEEEFF;color:#4947C8}
+
+@media(max-width:420px){
+  .step{grid-template-columns:48px 1fr}
+  .step-icon{width:38px;height:38px;font-size:16px;border-radius:12px}
+  .spine{left:23px}
 }
 </style>
 </head>
 <body>
 
-<div class="page-head">
-  <div class="brand">i-Menian</div>
+<!-- HEADER -->
+<div class="header">
+  <div class="header-eyebrow"><span></span>i-Menian System</div>
   <h1>How to Apply for Lab Access</h1>
-  <p>A simple guide — from submitting your form to getting access</p>
-  <p style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;background:#fffbeb;border:1px solid #fcd34d;border-radius:100px;padding:5px 14px;font-size:11px;font-weight:600;color:#92400e;">
-    📬 Email notifications may land in your <strong>Spam / Junk</strong> folder — please check there too
-  </p>
+  <p class="header-sub">Follow these steps to get your lab access approved — from form to final confirmation.</p>
+  <div class="spam-notice">
+    📬 Emails may land in your <strong>Spam / Junk</strong> folder — always check there too
+  </div>
 </div>
 
+<!-- PIPELINE -->
 <div class="pipeline">
+  <div class="spine"></div>
 
-  <!-- ══════════ STEP 1 — APPLICANT ══════════ -->
-  <div class="row">
-    <div class="actor">
-      <div class="actor-bubble bg-blue" style="border-color:#bfdbfe">📋</div>
-      <div class="actor-name t-blue">You<br>(Applicant)</div>
+  <!-- ══════════════════════ STEP 1 — APPLICANT -->
+  <div class="step">
+    <div class="step-icon-col">
+      <div class="step-icon icon-blue">📋</div>
+      <div class="step-name">You</div>
     </div>
-    <div class="content">
+    <div class="step-body">
 
-      <div class="card">
-        <div class="card-title">Submit Your Application</div>
-        <div class="card-desc">Fill in the online form with your personal details, choose your lab, category, and supervisor. Hit submit.</div>
+      <div class="title-card">
+        <h2>Submit Your Application</h2>
+        <p>Fill in the online form with your details — name, student ID, email, lab, category, and supervisor. Then hit submit.</p>
       </div>
 
-      <div class="section-label">You will receive</div>
-      <div class="email-row">
-        <div class="email-info">
-          <span class="email-to pill-blue">Email Notification</span>
-          <div class="email-subject">✅ Application Received</div>
-          <div class="email-note">Your form has been submitted and sent to the lab officer for review.</div>
+      <div class="section-hdr">Email notifications sent</div>
+      <div class="email-group">
+        <div class="email-item">
+          <div class="email-dot dot-blue">📨</div>
+          <div class="email-text">
+            <span class="email-badge badge-blue">Email Notification</span>
+            <div class="email-subject">Application Received</div>
+            <div class="email-desc">Your form has been submitted and sent to the lab officer for review.</div>
+          </div>
+        </div>
+        <div class="email-item">
+          <div class="email-dot dot-orange">📨</div>
+          <div class="email-text">
+            <span class="email-badge badge-orange">To: Lab Officer</span>
+            <div class="email-subject">New Application to Review</div>
+            <div class="email-desc">Lab officer is notified with your details and a link to approve.</div>
+          </div>
+        </div>
+        <div class="email-item">
+          <div class="email-dot dot-gray">📨</div>
+          <div class="email-text">
+            <span class="email-badge badge-gray">To: Supervisor</span>
+            <div class="email-subject">For Your Information</div>
+            <div class="email-desc">Supervisor is informed. No action needed from them.</div>
+          </div>
         </div>
       </div>
 
     </div>
   </div>
 
-  <!-- ══════════ STEP 2 — PIC ══════════ -->
-  <div class="row">
-    <div class="actor">
-      <div class="actor-bubble bg-amber" style="border-color:#fcd34d">👨‍💼</div>
-      <div class="actor-name t-amber">Lab Officer<br>(PIC)</div>
+  <!-- ══════════════════════ STEP 2 — PIC -->
+  <div class="step">
+    <div class="step-icon-col">
+      <div class="step-icon icon-orange">👨‍💼</div>
+      <div class="step-name">Lab Officer (PIC)</div>
     </div>
-    <div class="content">
+    <div class="step-body">
 
-      <div class="card">
-        <div class="card-title">Lab Officer Reviews Your Form</div>
-        <div class="card-desc">The lab officer gets an email, logs in, and checks your application.</div>
+      <div class="title-card">
+        <h2>Lab Officer Reviews Your Application</h2>
+        <p>The lab officer receives the email, logs in to i-Menian, and checks your application details.</p>
       </div>
 
-      <div class="reject-strip">
-        ❌ <strong>Not approved?</strong> You'll get an email explaining why. The process ends here.
+      <div class="reject-banner">
+        <div class="reject-banner-icon">✕</div>
+        <div class="reject-banner-text"><strong>Not approved?</strong> You will receive an email with the reason. The process stops here.</div>
       </div>
 
-      <div class="section-label">If approved</div>
-      <div class="email-row">
-        <div class="email-info">
-          <span class="email-to pill-blue">Email Notification</span>
-          <div class="email-subject">👍 Lab Officer Approved — One More Step</div>
-          <div class="email-note">Approved by the lab officer. Now waiting for the Head of Lab to confirm.</div>
+      <div class="approve-banner">
+        <div class="approve-banner-icon">✓</div>
+        <div class="approve-banner-text"><strong>If approved</strong> — you will receive an email notifying you of the next step.</div>
+      </div>
+      <div class="email-group">
+        <div class="email-item">
+          <div class="email-dot dot-blue">📨</div>
+          <div class="email-text">
+            <span class="email-badge badge-blue">Email Notification</span>
+            <div class="email-subject">Lab Officer Approved — One More Step to Go</div>
+            <div class="email-desc">Now waiting for the Head of Lab to give the final confirmation.</div>
+          </div>
         </div>
       </div>
 
     </div>
   </div>
 
-  <!-- ══════════ STEP 3 — HOL ══════════ -->
-  <div class="row">
-    <div class="actor">
-      <div class="actor-bubble bg-purple" style="border-color:#c4b5fd">🏛️</div>
-      <div class="actor-name t-purple">Head of<br>Lab</div>
+  <!-- ══════════════════════ STEP 3 — HOL -->
+  <div class="step">
+    <div class="step-icon-col">
+      <div class="step-icon icon-purple">🏛️</div>
+      <div class="step-name">Head of Lab</div>
     </div>
-    <div class="content">
+    <div class="step-body">
 
-      <div class="card">
-        <div class="card-title">Head of Lab Gives Final Approval</div>
-        <div class="card-desc">The Head of Lab reviews and gives the final go-ahead.</div>
+      <div class="title-card">
+        <h2>Head of Lab Gives Final Approval</h2>
+        <p>The Head of Lab reviews the application and gives the final institutional go-ahead.</p>
       </div>
 
-      <div class="reject-strip">
-        ❌ <strong>Not approved?</strong> You'll get an email explaining why. The process ends here.
+      <div class="reject-banner">
+        <div class="reject-banner-icon">✕</div>
+        <div class="reject-banner-text"><strong>Not approved?</strong> You will receive an email with the reason. The process stops here.</div>
       </div>
 
-      <div class="section-label">If approved — what happens next depends on who you are</div>
-      <div class="split-wrap">
+      <div class="approve-banner">
+        <div class="approve-banner-icon">✓</div>
+        <div class="approve-banner-text"><strong>If approved</strong> — what happens next depends on your category.</div>
+      </div>
+      <div class="split-grid">
 
-        <div class="split-card" style="border-color:#fcd34d">
-          <span class="split-tag" style="background:#fffbeb;color:#b45309">👷 Staff</span>
-          <div class="split-title">No test needed</div>
-          <div class="split-desc">Skips straight to final registration.</div>
-          <div class="email-row" style="padding:7px 10px">
-            <div class="email-info">
-              <span class="email-to pill-blue" style="font-size:7px">Email Notification</span>
-              <div class="email-subject" style="font-size:11px">Approved — Sent to IMEN Officer</div>
-            </div>
+        <div class="split-card">
+          <span class="split-pill split-orange">👷 Staff</span>
+          <div class="split-title">No test required</div>
+          <div class="split-desc">Skips straight to final registration with the IMEN Officer.</div>
+          <div style="height:1px;background:var(--separator);opacity:.5"></div>
+          <div class="email-text">
+            <span class="email-badge badge-blue" style="font-size:7px">Email Notification</span>
+            <div class="email-subject" style="font-size:11px">Approved — Sent to IMEN Officer</div>
           </div>
         </div>
 
-        <div class="split-card" style="border-color:#c4b5fd">
-          <span class="split-tag" style="background:#f5f3ff;color:#6d28d9">🎓 Student / Others</span>
+        <div class="split-card">
+          <span class="split-pill split-purple">🎓 Student / Others</span>
           <div class="split-title">Safety test required</div>
-          <div class="split-desc">You'll receive a link to take the online safety test.</div>
-          <div class="email-row" style="padding:7px 10px">
-            <div class="email-info">
-              <span class="email-to pill-blue" style="font-size:7px">Email Notification</span>
-              <div class="email-subject" style="font-size:11px">Please Complete Your Safety Test</div>
-            </div>
+          <div class="split-desc">You will receive a link to complete the online safety test.</div>
+          <div style="height:1px;background:var(--separator);opacity:.5"></div>
+          <div class="email-text">
+            <span class="email-badge badge-blue" style="font-size:7px">Email Notification</span>
+            <div class="email-subject" style="font-size:11px">Please Complete Your Safety Test</div>
           </div>
         </div>
 
@@ -283,94 +491,93 @@ body{
     </div>
   </div>
 
-  <!-- ══════════ STEP 4 — SAFETY TEST ══════════ -->
-  <div class="row">
-    <div class="actor">
-      <div class="actor-bubble bg-violet" style="border-color:#d8b4fe">🧪</div>
-      <div class="actor-name t-violet">Safety<br>Test</div>
+  <!-- ══════════════════════ STEP 4 — ASSESSMENT -->
+  <div class="step">
+    <div class="step-icon-col">
+      <div class="step-icon icon-violet">🧪</div>
+      <div class="step-name">Safety Test</div>
     </div>
-    <div class="content">
+    <div class="step-body">
 
-      <div class="card">
-        <div class="card-title">Complete the Online Safety Test</div>
-        <div class="card-desc">Click the link in your email and answer all the lab safety questions. You need a <strong>perfect score</strong> to move forward. Don't worry — you can retake it if needed.</div>
+      <div class="title-card">
+        <h2>Complete the Online Safety Test</h2>
+        <p>Click the link in your email and answer all lab safety questions. A <strong>perfect score</strong> is required to move forward. You may retake if needed.</p>
       </div>
 
-      <div class="info-box" style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534">
-        💡 <span>If you have applied to a different lab before, the system will recognise you automatically — no extra steps needed.</span>
+      <div class="info-pill" style="background:#F0FDF4;color:#166534">
+        <div class="info-pill-icon">💡</div>
+        <div>If you have applied for a different lab before, the system will recognise you automatically — no extra steps needed.</div>
       </div>
 
-      <div class="section-label">Once you pass</div>
-
-      <div class="email-row">
-        <div class="email-info">
-          <span class="email-to pill-violet">Email Notification</span>
-          <div class="email-subject">🎓 Safety Test Passed — Official Record</div>
-          <div class="email-note">Your score and answers are saved as your official lab safety record. Keep this email for your reference.</div>
+      <div class="section-hdr">Once you pass</div>
+      <div class="email-group">
+        <div class="email-item">
+          <div class="email-dot dot-violet">📨</div>
+          <div class="email-text">
+            <span class="email-badge badge-violet">Email Notification</span>
+            <div class="email-subject">Safety Test Passed — Official Record</div>
+            <div class="email-desc">Your score and answers are saved as your official lab safety record. Keep this email.</div>
+          </div>
         </div>
       </div>
 
-      <div class="info-box" style="background:#fafafa;border:1px solid #e5e5e5;color:#555;font-size:11px">
-        ⏳ <span>After passing, the IMEN Officer will be notified. <strong>Sit tight</strong> — you'll receive another email soon with your next step.</span>
+      <div class="info-pill" style="background:var(--fill);color:var(--label3)">
+        <div class="info-pill-icon">⏳</div>
+        <div>The IMEN Officer will be notified. <strong>Sit tight</strong> — you will receive another email shortly with your next step.</div>
       </div>
 
     </div>
   </div>
 
-  <!-- ══════════ STEP 5 — IMEN OFFICER ══════════ -->
-  <div class="row">
-    <div class="actor">
-      <div class="actor-bubble bg-green" style="border-color:#86efac">🔐</div>
-      <div class="actor-name t-green">IMEN<br>Officer</div>
+  <!-- ══════════════════════ STEP 5 — IMEN OFFICER -->
+  <div class="step">
+    <div class="step-icon-col">
+      <div class="step-icon icon-green">🔐</div>
+      <div class="step-name">IMEN Officer</div>
     </div>
-    <div class="content">
+    <div class="step-body">
 
-      <div class="card">
-        <div class="card-title">IMEN Officer Completes Your Registration</div>
-        <div class="card-desc">The officer reviews your approved application and activates your lab access.</div>
+      <div class="title-card">
+        <h2>IMEN Officer Completes Your Registration</h2>
+        <p>The officer reviews your approved application and activates your lab access. Two possible outcomes:</p>
       </div>
-
-      <div class="section-label">Two possible outcomes</div>
 
       <div class="popup-wrap">
 
         <!-- first time -->
         <div class="popup-case">
-          <div class="popup-label">First time registering</div>
+          <div class="popup-case-label">🆕 First time registering</div>
           <div class="popup-btns">
-            <span class="pbtn" style="background:#2563eb;color:#fff">Confirm</span>
-            <span class="pbtn" style="background:#e5e7eb;color:#6b7280">Cancel</span>
+            <span class="pbtn" style="background:var(--blue);color:#fff">Confirm</span>
+            <span class="pbtn" style="background:var(--fill2);color:var(--label4)">Cancel</span>
           </div>
-          <div class="email-row" style="padding:8px 10px">
-            <div class="email-info">
-              <span class="email-to pill-blue">Email Notification</span>
-              <div class="email-subject" style="font-size:12px">📍 Please Visit IMEN Office — Level 4</div>
-              <div class="email-note">Come in person to complete your identity and access registration. Contact via WhatsApp to arrange.</div>
-            </div>
+          <div style="height:1px;background:var(--separator);opacity:.5;margin-bottom:10px"></div>
+          <div class="email-text">
+            <span class="email-badge badge-blue">Email Notification</span>
+            <div class="email-subject" style="font-size:12px">📍 Please Visit IMEN Office — Level 4</div>
+            <div class="email-desc">Come in person to complete your identity and access registration. Contact via WhatsApp to arrange a time.</div>
           </div>
         </div>
 
         <!-- returning -->
-        <div class="popup-case" style="border-color:#fde68a;background:#fefdf5">
-          <div class="popup-label">Already registered before at another lab</div>
+        <div class="popup-case" style="background:#FFFCF0">
+          <div class="popup-case-label">🔁 Already registered at another lab before</div>
           <div class="popup-btns">
-            <span class="pbtn" style="background:#2563eb;color:#fff">Confirm</span>
-            <span class="pbtn" style="background:#16a34a;color:#fff">✓ No Visit Needed</span>
-            <span class="pbtn" style="background:#e5e7eb;color:#6b7280">Cancel</span>
+            <span class="pbtn" style="background:var(--blue);color:#fff">Confirm</span>
+            <span class="pbtn" style="background:var(--green);color:#fff">✓ No Visit Needed</span>
+            <span class="pbtn" style="background:var(--fill2);color:var(--label4)">Cancel</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <div class="email-row" style="padding:8px 10px">
-              <div class="email-info">
-                <span class="email-to pill-blue">Confirm →</span>
-                <div class="email-subject" style="font-size:11px">Please visit IMEN Office — Level 4</div>
-              </div>
+          <div style="height:1px;background:var(--separator);opacity:.5;margin-bottom:10px"></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="email-text">
+              <span class="email-badge badge-blue">Confirm →</span>
+              <div class="email-subject" style="font-size:11px">Please Visit IMEN Office — Level 4</div>
             </div>
-            <div class="email-row" style="padding:8px 10px;background:#f0fdf4;border-color:#bbf7d0">
-              <div class="email-info">
-                <span class="email-to pill-green">No Visit →</span>
-                <div class="email-subject" style="font-size:11px">✅ Your Access Has Been Activated</div>
-                <div class="email-note">Your details are already on record. No need to come in — your access is ready.</div>
-              </div>
+            <div style="height:1px;background:var(--separator);opacity:.4"></div>
+            <div class="email-text">
+              <span class="email-badge badge-green">No Visit →</span>
+              <div class="email-subject" style="font-size:11px">✅ Your Access Has Been Activated</div>
+              <div class="email-desc">Your details are already on record. No need to come in — your lab access is ready.</div>
             </div>
           </div>
         </div>
@@ -380,21 +587,24 @@ body{
     </div>
   </div>
 
-  <!-- ══════════ DONE ══════════ -->
-  <div class="row">
-    <div class="actor">
-      <div class="actor-bubble" style="background:#f0fdf4;border-color:#34c759;font-size:22px">🎉</div>
-      <div class="actor-name t-green">All Done</div>
+  <!-- ══════════════════════ DONE -->
+  <div class="step">
+    <div class="step-icon-col">
+      <div class="step-icon icon-green" style="font-size:22px">🎉</div>
+      <div class="step-name">Done</div>
     </div>
-    <div class="content">
-      <div class="card final-card">
-        <div class="card-title t-green">Welcome — Your Lab Access is Active!</div>
-        <div class="card-desc" style="margin-top:4px">You are now registered. Your lab access has been granted. Welcome aboard!</div>
+    <div class="step-body" style="padding-bottom:0">
+      <div class="final-card">
+        <div class="final-icon">✓</div>
+        <div class="final-text">
+          <h2>Welcome — Your Lab Access is Active!</h2>
+          <p>You are now registered. Your lab access has been granted. Welcome aboard.</p>
+        </div>
       </div>
     </div>
   </div>
 
-</div>
+</div><!-- /pipeline -->
 
 </body>
 </html>
