@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>i-Nstrumen — Workflow Guide</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root { --u: #2563eb; --p: #9333ea; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; scroll-behavior: smooth; }
+
+  /* Role tabs */
+  .tab { transition: all .3s; }
+  .tab.on-u { background: linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; box-shadow:0 4px 20px #2563eb44; }
+  .tab.on-p { background: linear-gradient(135deg,#9333ea,#7e22ce); color:#fff; box-shadow:0 4px 20px #9333ea44; }
+
+  /* Section toggle */
+  .sec-u,.sec-p { display:none; }
+  .show-u .sec-u { display:block; }
+  .show-p .sec-p { display:block; }
+
+  /* Step card */
+  .scard { border-left:4px solid var(--u); transition:.2s; }
+  .scard:hover { transform:translateX(4px); box-shadow:0 8px 30px #0001; }
+  .scard.pic { border-left-color:var(--p); }
+
+  /* Accordion */
+  .acc-body { max-height:0; overflow:hidden; transition:max-height .4s ease; }
+  .acc-body.open { max-height:1600px; }
+  .acc-chevron { transition:transform .3s; }
+  .acc-open .acc-chevron { transform:rotate(180deg); }
+
+  /* Callouts */
+  .tip  { border-left:4px solid #10b981; background:#ecfdf5; }
+  .warn { border-left:4px solid #f59e0b; background:#fffbeb; }
+  .info { border-left:4px solid #3b82f6; background:#eff6ff; }
+  .picc { border-left:4px solid #9333ea; background:#faf5ff; }
+
+  /* Chip */
+  .chip { display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700; }
+
+  /* Sidebar */
+  #sidebar { position:sticky; top:72px; max-height:calc(100vh - 90px); overflow-y:auto; }
+  #sidebar::-webkit-scrollbar { width:3px; }
+  #sidebar::-webkit-scrollbar-thumb { background:#cbd5e1;border-radius:2px; }
+  .nl { display:block;padding:5px 12px;border-radius:6px;font-size:12px;color:#64748b;transition:.2s;border-left:2px solid transparent; }
+  .nl:hover,.nl.act { background:#f1f5f9;color:#1e293b;border-left-color:var(--u); }
+  .nl.p:hover,.nl.p.act { border-left-color:var(--p);background:#faf5ff;color:#6b21a8; }
+
+  /* Dot */
+  .dot { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0; }
+
+  /* Timeline */
+  .tl { position:relative;padding-left:28px; }
+  .tl::before { content:'';position:absolute;left:8px;top:22px;bottom:-6px;width:2px;background:#e2e8f0; }
+  .tl:last-child::before { display:none; }
+  .tl-dot { position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700; }
+
+  /* Screen mock */
+  .mock { background:#1e293b;border-radius:12px;overflow:hidden;box-shadow:0 16px 48px #0005; }
+  .mock .tb { background:#334155;padding:8px 14px;display:flex;gap:5px;align-items:center; }
+  .mock .dot2 { width:10px;height:10px;border-radius:50%; }
+
+  /* Fade */
+  .fi { animation:fi .4s ease; }
+  @keyframes fi { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Pulse */
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+  .pulse { animation:pulse 2s infinite; }
+
+  /* ─── POSTER / INFOGRAPHIC styles ─── */
+  .poster { font-family:'Segoe UI',system-ui,sans-serif; }
+  .poster-step { position:relative; }
+  .poster-step:not(:last-child)::after {
+    content:''; position:absolute; left:22px; top:46px; width:2px;
+    height:calc(100% - 12px); background:#e2e8f0;
+  }
+  .flow-arrow { text-align:center; color:#94a3b8; font-size:20px; line-height:1; margin:2px 0; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800" id="app">
+
+<!-- ═══ HEADER ═══ -->
+<header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center text-white font-black text-xs shadow">iN</div>
+      <div>
+        <div class="font-bold text-slate-900 text-sm leading-tight">i-Nstrumen</div>
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Workflow Guide · IMEN Lab Manager</div>
+      </div>
+    </div>
+
+    <div class="flex bg-slate-100 rounded-xl p-1 gap-1">
+      <button onclick="setRole('u')" id="tab-u" class="tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 on-u">👤 User</button>
+      <button onclick="setRole('p')" id="tab-p" class="tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600">🔬 Lab PIC</button>
+    </div>
+
+    <a href="https://script.google.com/macros/s/AKfycbw1PrhjSzHsd__rxbEcXZp4iyF4v9e41pVYg1j7ewo6ocnPNw3CsdTt-j7UFb0NM-0l/exec"
+       target="_blank" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow">Open App ↗</a>
+  </div>
+  <div id="role-bar" class="h-0.5 bg-gradient-to-r from-blue-400 to-indigo-600 transition-all"></div>
+</header>
+
+<!-- ═══ HERO ═══ -->
+<section class="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white py-12 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <div class="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-xs mb-5 border border-white/20">
+      <span class="pulse w-2 h-2 bg-green-400 rounded-full"></span>
+      i-Nstrumen v2.0 · IMEN Lab Management System
+    </div>
+    <h1 class="text-3xl md:text-4xl font-black mb-3">Complete Usage Handbook</h1>
+    <p class="text-slate-300 max-w-xl mx-auto text-sm">Step-by-step guide for every action — from booking equipment as a researcher to managing the full lab as a coordinator.</p>
+    <div class="flex flex-wrap justify-center gap-3 mt-7">
+      <div class="bg-white/10 rounded-xl px-4 py-2.5 border border-white/20 text-center"><div class="font-black text-lg">13</div><div class="text-slate-400 text-[10px]">Labs</div></div>
+      <div class="bg-white/10 rounded-xl px-4 py-2.5 border border-white/20 text-center"><div class="font-black text-lg">3</div><div class="text-slate-400 text-[10px]">User Actions</div></div>
+      <div class="bg-white/10 rounded-xl px-4 py-2.5 border border-white/20 text-center"><div class="font-black text-lg">2</div><div class="text-slate-400 text-[10px]">Roles</div></div>
+      <div class="bg-white/10 rounded-xl px-4 py-2.5 border border-white/20 text-center"><div class="font-black text-lg">📧</div><div class="text-slate-400 text-[10px]">Email Alerts</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MAIN ═══ -->
+<div class="max-w-7xl mx-auto px-4 py-8 flex gap-8 items-start">
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar" class="w-52 shrink-0 hidden lg:block">
+    <div id="nav-u">
+      <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">User Workflows</div>
+      <a href="#u-poster" class="nl">🖼 Quick-Start Poster</a>
+      <a href="#u1" class="nl">1. Browse Equipment</a>
+      <a href="#u2" class="nl">2. Walk-in Usage</a>
+      <a href="#u3" class="nl">3. Book in Advance</a>
+      <a href="#u4" class="nl">4. Check-in on Booking Day</a>
+      <a href="#u5" class="nl">5. Report an Issue</a>
+      <a href="#u6" class="nl">6. Email Notifications</a>
+    </div>
+    <div id="nav-p" class="hidden">
+      <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Lab PIC Workflows</div>
+      <a href="#p-poster" class="nl p">🖼 Quick-Start Poster</a>
+      <a href="#p1" class="nl p">1. Access Admin Panel</a>
+      <a href="#p2" class="nl p">2. Approve / Reject Bookings</a>
+      <a href="#p3" class="nl p">3. Booking History</a>
+      <a href="#p4" class="nl p">4. Register Equipment</a>
+      <a href="#p5" class="nl p">5. Manage Equipment</a>
+      <a href="#p6" class="nl p">6. Lab Management</a>
+      <a href="#p7" class="nl p">7. Coordinator & Staff</a>
+      <a href="#p8" class="nl p">8. Analytics</a>
+      <a href="#p9" class="nl p">9. Maintenance Panel</a>
+      <a href="#p10" class="nl p">10. PIC Privileges</a>
+    </div>
+  </nav>
+
+  <!-- CONTENT -->
+  <main class="flex-1 min-w-0 show-u fi" id="content">
+
+    <!-- ══════════ USER SECTIONS ══════════ -->
+    <div class="sec-u space-y-10">
+
+      <!-- POSTER -->
+      <section id="u-poster">
+        <div class="poster rounded-2xl overflow-hidden border border-blue-100 shadow-lg">
+
+          <!-- Poster header -->
+          <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-8 py-6 flex items-center justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-widest text-blue-200 mb-1">i-Nstrumen · IMEN Lab Manager</div>
+              <h2 class="text-2xl font-black">How to Use the Lab System</h2>
+              <p class="text-blue-100 text-xs mt-1">3 simple actions — no account needed</p>
+            </div>
+            <div class="text-6xl opacity-30">🔬</div>
+          </div>
+
+          <!-- 3 big action blocks -->
+          <div class="bg-white grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+
+            <!-- Action 1: Walk-in -->
+            <div class="p-6">
+              <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-xl mb-4 shadow">▶</div>
+              <div class="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">Action 1</div>
+              <h3 class="text-lg font-black text-slate-900 mb-3">Walk-in Usage</h3>
+              <div class="space-y-2.5">
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">1</div>
+                  <p class="text-xs text-slate-600 pt-1">Go to <strong>The Lab</strong> → select your lab → find equipment</p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">2</div>
+                  <p class="text-xs text-slate-600 pt-1">Click <strong>Start</strong> on an Active equipment card</p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">3</div>
+                  <p class="text-xs text-slate-600 pt-1">Fill in: <strong>Name, Phone, Affiliation</strong></p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">4</div>
+                  <p class="text-xs text-slate-600 pt-1">Select <strong>duration</strong> + enter <strong>samples</strong> & <strong>material</strong></p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div>
+                  <p class="text-xs text-slate-600 pt-1"><strong>Start Log</strong> → session recorded!</p>
+                </div>
+              </div>
+              <div class="mt-4 text-[10px] text-blue-600 bg-blue-50 rounded-lg p-2 font-medium">For Walk-in or Hybrid equipment only</div>
+            </div>
+
+            <!-- Action 2: Book -->
+            <div class="p-6">
+              <div class="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-xl mb-4 shadow">📅</div>
+              <div class="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Action 2</div>
+              <h3 class="text-lg font-black text-slate-900 mb-3">Book in Advance</h3>
+              <div class="space-y-2.5">
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-indigo-100 text-indigo-700 shrink-0 text-[10px]">1</div>
+                  <p class="text-xs text-slate-600 pt-1">Find equipment → click <strong>Book</strong></p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-indigo-100 text-indigo-700 shrink-0 text-[10px]">2</div>
+                  <p class="text-xs text-slate-600 pt-1">Pick a date <strong>≥ 2 days ahead</strong> + choose time slot</p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-indigo-100 text-indigo-700 shrink-0 text-[10px]">3</div>
+                  <p class="text-xs text-slate-600 pt-1">Fill in <strong>personal details</strong> + supervisor</p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-indigo-100 text-indigo-700 shrink-0 text-[10px]">4</div>
+                  <p class="text-xs text-slate-600 pt-1">Select <strong>payment method</strong> (Grant / Cash / Others)</p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div>
+                  <p class="text-xs text-slate-600 pt-1"><strong>Send Request</strong> → await coordinator approval</p>
+                </div>
+              </div>
+              <div class="mt-4 text-[10px] text-indigo-600 bg-indigo-50 rounded-lg p-2 font-medium">Confirmation email sent to you automatically</div>
+            </div>
+
+            <!-- Action 3: Report -->
+            <div class="p-6">
+              <div class="w-12 h-12 rounded-2xl bg-red-600 flex items-center justify-center text-white text-xl mb-4 shadow">🚨</div>
+              <div class="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Action 3</div>
+              <h3 class="text-lg font-black text-slate-900 mb-3">Report an Issue</h3>
+              <div class="space-y-2.5">
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">1</div>
+                  <p class="text-xs text-slate-600 pt-1">Find equipment → click <strong>Report Issue</strong></p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">2</div>
+                  <p class="text-xs text-slate-600 pt-1">Enter your <strong>Name</strong> + <strong>Email</strong></p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">3</div>
+                  <p class="text-xs text-slate-600 pt-1">Select: <strong>Breakdown</strong> or <strong>Misconduct</strong></p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">4</div>
+                  <p class="text-xs text-slate-600 pt-1">Describe the issue in the text box</p>
+                </div>
+                <div class="poster-step flex items-start gap-3">
+                  <div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div>
+                  <p class="text-xs text-slate-600 pt-1"><strong>Submit</strong> → team notified instantly</p>
+                </div>
+              </div>
+              <div class="mt-4 text-[10px] text-red-600 bg-red-50 rounded-lg p-2 font-medium">Equipment status updated automatically</div>
+            </div>
+
+          </div>
+
+          <!-- Status badge legend -->
+          <div class="bg-slate-50 px-8 py-4 flex flex-wrap gap-3 items-center border-t border-slate-100">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Equipment Status:</span>
+            <span class="chip bg-emerald-100 text-emerald-700">🟢 Active — ready</span>
+            <span class="chip bg-yellow-100 text-yellow-700">🟡 In Use — wait</span>
+            <span class="chip bg-red-100 text-red-700">🔴 Maintenance — down</span>
+            <span class="chip bg-orange-100 text-orange-700">🟠 Attention — needs check</span>
+          </div>
+
+          <!-- Tips strip -->
+          <div class="bg-blue-700 text-white px-8 py-3 text-xs flex flex-wrap gap-6">
+            <span>💡 <strong>No login needed</strong> — just your name, phone & ID</span>
+            <span>📧 <strong>Check your email</strong> for booking updates</span>
+            <span>📡 Use <strong>Live Status</strong> to see who's using equipment now</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- U1 Browse Equipment -->
+      <section id="u1">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-blue-500 text-white">1</span>Browsing Lab Equipment</h2>
+        <div class="scard bg-white rounded-xl p-5 shadow-sm mb-4">
+          <div class="space-y-3">
+            <div class="tl"><div class="tl-dot bg-blue-100 text-blue-700">→</div><p class="text-sm text-slate-600">From the home page click <strong>The Lab</strong>. A lab selector appears — choose from the 13 IMEN labs.</p></div>
+            <div class="tl"><div class="tl-dot bg-blue-100 text-blue-700">→</div><p class="text-sm text-slate-600">Equipment cards appear. Use the <strong>search bar</strong> to filter by name.</p></div>
+            <div class="tl"><div class="tl-dot bg-blue-100 text-blue-700">→</div><p class="text-sm text-slate-600">Each card shows: image, asset ID, status badge, and action buttons based on the equipment's access mode.</p></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 mb-4">
+          <h4 class="font-semibold text-sm mb-3">Access Modes — what buttons appear</h4>
+          <div class="space-y-2">
+            <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-lg text-xs"><span class="chip bg-sky-100 text-sky-700">Walk-in</span><p class="text-slate-600">Shows <strong>Start</strong> button only. No advance booking required.</p></div>
+            <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-lg text-xs"><span class="chip bg-purple-100 text-purple-700">Pre-Booking</span><p class="text-slate-600">Shows <strong>Book</strong> button only. You must book first; on booking day, "Start" becomes "Check-in".</p></div>
+            <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-lg text-xs"><span class="chip bg-indigo-100 text-indigo-700">Hybrid</span><p class="text-slate-600">Shows both <strong>Start</strong> and <strong>Book</strong>. Walk-ins and pre-bookings both supported.</p></div>
+          </div>
+        </div>
+        <div class="tip p-3 rounded-r-xl text-sm"><strong>💡 Live Status</strong> — before heading to the lab, click <strong>Live Status</strong> on the home page to check which equipment is in use right now and estimate wait time from the progress bar.</div>
+      </section>
+
+      <!-- U2 Walk-in -->
+      <section id="u2">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-blue-500 text-white">2</span>Walk-in Equipment Usage</h2>
+        <div class="info p-3 rounded-r-xl text-sm mb-4">For equipment with <strong>Walk-in</strong> or <strong>Hybrid</strong> access mode. No advance booking required.</div>
+        <div class="scard bg-white rounded-xl p-5 shadow-sm mb-4">
+          <div class="space-y-3">
+            <div class="flex gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div class="dot bg-blue-500 text-white shrink-0 text-[10px]">1</div>
+              <div><p class="font-semibold text-sm text-blue-900">Click <strong>Start</strong> on an Active equipment card</p><p class="text-xs text-slate-500 mt-0.5">If the card shows "In Use", wait for the session to end or contact your coordinator.</p></div>
+            </div>
+            <div class="flex gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div class="dot bg-blue-500 text-white shrink-0 text-[10px]">2</div>
+              <div>
+                <p class="font-semibold text-sm text-blue-900">Fill in your details</p>
+                <div class="grid grid-cols-2 gap-1.5 mt-2">
+                  <div class="bg-white p-2 rounded text-xs border"><strong>Name</strong> · required</div>
+                  <div class="bg-white p-2 rounded text-xs border"><strong>Phone</strong> · required</div>
+                  <div class="bg-white p-2 rounded text-xs border"><strong>Student/Staff ID</strong> · optional</div>
+                  <div class="bg-white p-2 rounded text-xs border"><strong>Affiliation</strong> · required</div>
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div class="dot bg-blue-500 text-white shrink-0 text-[10px]">3</div>
+              <div><p class="font-semibold text-sm text-blue-900">Select duration</p><div class="flex flex-wrap gap-1.5 mt-1"><span class="chip bg-slate-100 text-slate-700">1 Hour</span><span class="chip bg-slate-100 text-slate-700">2 Hours</span><span class="chip bg-slate-100 text-slate-700">4 Hours</span><span class="chip bg-slate-100 text-slate-700">Full Day (8 hrs)</span></div></div>
+            </div>
+            <div class="flex gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div class="dot bg-blue-500 text-white shrink-0 text-[10px]">4</div>
+              <div><p class="font-semibold text-sm text-blue-900">Enter sample quantity + material</p><p class="text-xs text-slate-500 mt-0.5">The quantity label changes per equipment (pcs / mg / g / hours). Select material from dropdown if presets exist, or type your own.</p></div>
+            </div>
+            <div class="flex gap-3 p-3 bg-green-50 rounded-xl border border-green-100">
+              <div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div>
+              <div><p class="font-semibold text-sm text-green-900">Click <strong>Start Log</strong></p><p class="text-xs text-slate-500 mt-0.5">Equipment flips to "In Use". Your session appears on the Live Status screen in real time.</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="warn p-3 rounded-r-xl text-sm"><strong>⚠ Use accurate details.</strong> Your phone and affiliation are used for usage tracking and billing. Inconsistent info may affect lab access.</div>
+      </section>
+
+      <!-- U3 Book in Advance -->
+      <section id="u3">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-blue-500 text-white">3</span>Booking Equipment in Advance</h2>
+        <div class="info p-3 rounded-r-xl text-sm mb-4"><strong>Minimum 2 days in advance.</strong> The date picker blocks dates within 48 hours. Lab coordinators can bypass this limit.</div>
+
+        <div class="scard bg-white rounded-xl p-5 shadow-sm mb-4 space-y-2">
+
+          <div class="acc-item border border-slate-200 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-slate-50" onclick="acc(this)">
+              <span class="flex items-center gap-2"><span class="dot bg-blue-500 text-white text-[10px]">1</span>Click <strong>Book</strong> on the equipment card</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600">The <strong>Request Booking</strong> form opens. Only equipment with Pre-Booking or Hybrid access mode shows this button.</div></div>
+          </div>
+
+          <div class="acc-item border border-slate-200 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-slate-50" onclick="acc(this)">
+              <span class="flex items-center gap-2"><span class="dot bg-blue-500 text-white text-[10px]">2</span>Pick a date &amp; time slot</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-2">
+              <p>Use the date picker (min 2 days ahead). Click <strong>Check Availability</strong> to see a monthly calendar where already-booked dates are highlighted red.</p>
+              <div class="grid grid-cols-2 gap-1.5">
+                <div class="p-2 bg-sky-50 rounded border border-sky-100"><strong class="block text-sky-800">Morning</strong>8am – 1pm</div>
+                <div class="p-2 bg-sky-50 rounded border border-sky-100"><strong class="block text-sky-800">Afternoon</strong>2pm – 5pm</div>
+                <div class="p-2 bg-sky-50 rounded border border-sky-100"><strong class="block text-sky-800">Full Day</strong>8am – 5pm (1 Day)</div>
+                <div class="p-2 bg-sky-50 rounded border border-sky-100"><strong class="block text-sky-800">2 Days</strong>Full day × 2 consecutive days</div>
+              </div>
+              <p class="text-slate-500">Smart conflict detection prevents double-booking. A Full Day booking blocks Morning and Afternoon slots on the same day.</p>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-slate-200 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-slate-50" onclick="acc(this)">
+              <span class="flex items-center gap-2"><span class="dot bg-blue-500 text-white text-[10px]">3</span>Select process (if available)</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-2">
+              <p>Some equipment shows a 3-level process selector:</p>
+              <div class="flex items-center gap-2 flex-wrap"><div class="bg-purple-100 text-purple-800 px-2 py-1 rounded font-mono">Process</div><span>→</span><div class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-mono">Variant</div><span>→</span><div class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">Specifics</div></div>
+              <p>Processes under maintenance are shown as disabled with a 🔧 badge — you cannot select them.</p>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-slate-200 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-slate-50" onclick="acc(this)">
+              <span class="flex items-center gap-2"><span class="dot bg-blue-500 text-white text-[10px]">4</span>Fill personal details</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600">
+              <div class="grid grid-cols-2 gap-1.5">
+                <div class="p-2 bg-slate-50 rounded border"><strong>Name *</strong></div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Phone *</strong></div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Email *</strong> — for notifications</div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Student/Staff ID *</strong></div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Affiliation *</strong> — department</div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Supervisor *</strong></div>
+              </div>
+              <p class="mt-2 text-slate-500">If you are a lab coordinator (PIC), entering your registered email unlocks same-day booking automatically — a green badge appears.</p>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-slate-200 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-slate-50" onclick="acc(this)">
+              <span class="flex items-center gap-2"><span class="dot bg-blue-500 text-white text-[10px]">5</span>Samples, materials &amp; payment</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-2">
+              <p><strong>Samples:</strong> Enter the quantity in the unit shown (pcs / mg / g / hours).</p>
+              <p><strong>Materials:</strong> Choose from the preset dropdown or type your own.</p>
+              <p><strong>Payment method — choose one:</strong></p>
+              <div class="space-y-1">
+                <div class="p-2 bg-green-50 rounded border border-green-100"><span class="chip bg-green-100 text-green-700 mr-2">Grant</span>Enter your grant reference number (e.g. GUP-2024-001)</div>
+                <div class="p-2 bg-blue-50 rounded border border-blue-100"><span class="chip bg-blue-100 text-blue-700 mr-2">Cash</span>Enter your receipt or bank transfer reference number</div>
+                <div class="p-2 bg-slate-50 rounded border"><span class="chip bg-slate-100 text-slate-600 mr-2">Others</span>No reference number required — coordinator will follow up</div>
+              </div>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-green-200 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-green-50" onclick="acc(this)">
+              <span class="flex items-center gap-2"><span class="dot bg-green-500 text-white text-[10px]">✓</span>Send Request → await approval</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-1">
+              <p>📧 Coordinator receives a notification email with your full request.</p>
+              <p>📧 You receive a confirmation email — status is <strong>Pending</strong> until the coordinator acts.</p>
+              <div class="warn p-2 rounded-r mt-2">Watch for the approval or rejection email before heading to the lab.</div>
+            </div></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- U4 Check-in on booking day -->
+      <section id="u4">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-blue-500 text-white">4</span>Check-in on Your Booking Day</h2>
+        <div class="info p-3 rounded-r-xl text-sm mb-4">On the day of your approved booking, you must check in to log the actual usage session. The booking is the reservation; the check-in is the record.</div>
+        <div class="scard bg-white rounded-xl p-5 shadow-sm mb-4 space-y-3">
+          <div class="flex gap-3">
+            <div class="dot bg-blue-100 text-blue-700 shrink-0">1</div>
+            <p class="text-sm">Go to <strong>The Lab</strong> → select your lab → find your booked equipment → click <strong>Start / Check-in</strong></p>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-blue-100 text-blue-700 shrink-0">2</div>
+            <div>
+              <p class="text-sm font-semibold">Identity verification prompt appears</p>
+              <p class="text-xs text-slate-500 mt-1">The system found an approved booking for today. It shows the booked user's name and time slot, then asks you to enter your <strong>phone number</strong> to verify identity.</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-blue-100 text-blue-700 shrink-0">3</div>
+            <div>
+              <p class="text-sm font-semibold">Enter your phone number → click <strong>Verify Identity</strong></p>
+              <p class="text-xs text-slate-500 mt-1">If matched, the check-in form opens with your details pre-filled from the booking. The duration is locked to your booked slot.</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-green-100 text-green-700 shrink-0">✓</div>
+            <p class="text-sm">Click <strong>Confirm Check-in</strong> → session logged, equipment shows "In Use"</p>
+          </div>
+        </div>
+        <div class="warn p-3 rounded-r-xl text-sm"><strong>⚠ Phone mismatch?</strong> If your number doesn't match the booking, contact your lab coordinator to update the booking details.</div>
+      </section>
+
+      <!-- U5 Report Issue -->
+      <section id="u5">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-blue-500 text-white">5</span>Reporting Equipment Issues</h2>
+        <div class="warn p-3 rounded-r-xl text-sm mb-4">Report immediately if you find any equipment problem. This protects other users and helps the lab maintain equipment health.</div>
+        <div class="scard bg-white rounded-xl p-5 shadow-sm mb-4 space-y-3">
+          <div class="flex gap-3">
+            <div class="dot bg-red-100 text-red-700 shrink-0">1</div>
+            <p class="text-sm">Find the equipment → click <strong>Report Issue</strong> (bottom of the card)</p>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-red-100 text-red-700 shrink-0">2</div>
+            <p class="text-sm">Enter your <strong>Name</strong> and <strong>Email</strong> (for follow-up and receipt)</p>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-red-100 text-red-700 shrink-0">3</div>
+            <div>
+              <p class="text-sm font-semibold">Select issue type:</p>
+              <div class="mt-2 space-y-2">
+                <div class="flex items-start gap-2 p-2 bg-red-50 rounded-lg text-xs"><span class="chip bg-red-100 text-red-700">Breakdown</span><p>Equipment broken / not functioning → status set to <strong>Maintenance</strong></p></div>
+                <div class="flex items-start gap-2 p-2 bg-orange-50 rounded-lg text-xs"><span class="chip bg-orange-100 text-orange-700">Misconduct</span><p>Left in bad condition / misused → status set to <strong>Attention Required</strong></p></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-red-100 text-red-700 shrink-0">4</div>
+            <div>
+              <p class="text-sm font-semibold">For multi-process equipment — select affected processes</p>
+              <p class="text-xs text-slate-500 mt-1">If the equipment supports multiple processes, checkboxes appear to select which ones are affected. Unaffected processes remain bookable — this creates a <em>partial maintenance</em> flag.</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-red-100 text-red-700 shrink-0">5</div>
+            <p class="text-sm">Describe the issue in the text box (be specific!)</p>
+          </div>
+          <div class="flex gap-3">
+            <div class="dot bg-green-100 text-green-700 shrink-0">✓</div>
+            <div class="text-sm space-y-0.5">
+              <p>Click <strong>Submit Report</strong> — automatic notifications sent to:</p>
+              <div class="text-xs text-slate-500 ml-3 space-y-0.5">
+                <p>📧 Lab coordinator (PIC)</p>
+                <p>📧 All technical staff members</p>
+                <p>📧 You — confirmation receipt</p>
+                <p>🔴 Equipment status updated instantly on all screens</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U6 Emails -->
+      <section id="u6">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-blue-500 text-white">6</span>Email Notifications You Will Receive</h2>
+        <div class="scard bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="flex gap-4 items-start p-3 border border-slate-100 rounded-xl bg-slate-50">
+            <div class="text-xl">📩</div>
+            <div><div class="font-semibold text-sm">Booking Submitted</div><p class="text-xs text-slate-500">Sent immediately after you submit. Contains your full booking details; status is Pending.</p></div>
+          </div>
+          <div class="flex gap-4 items-start p-3 border border-green-100 rounded-xl bg-green-50">
+            <div class="text-xl">✅</div>
+            <div><div class="font-semibold text-sm text-green-800">Booking Approved</div><p class="text-xs text-slate-500">Sent when coordinator approves. Includes next-step instructions. You're confirmed — go!</p></div>
+          </div>
+          <div class="flex gap-4 items-start p-3 border border-red-100 rounded-xl bg-red-50">
+            <div class="text-xl">❌</div>
+            <div><div class="font-semibold text-sm text-red-800">Booking Rejected</div><p class="text-xs text-slate-500">Sent with coordinator's reason in the remarks. Rebook or contact the coordinator.</p></div>
+          </div>
+          <div class="flex gap-4 items-start p-3 border border-orange-100 rounded-xl bg-orange-50">
+            <div class="text-xl">🚨</div>
+            <div><div class="font-semibold text-sm text-orange-800">Issue Report Receipt</div><p class="text-xs text-slate-500">Sent after you submit an issue report. Confirms the team has been notified.</p></div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- end sec-u -->
+
+    <!-- ══════════ PIC SECTIONS ══════════ -->
+    <div class="sec-p space-y-10">
+
+      <!-- PIC POSTER -->
+      <section id="p-poster">
+        <div class="poster rounded-2xl overflow-hidden border border-purple-100 shadow-lg">
+
+          <!-- Header -->
+          <div class="bg-gradient-to-r from-purple-700 to-fuchsia-700 text-white px-8 py-6 flex items-center justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-widest text-purple-200 mb-1">i-Nstrumen · Lab PIC Guide</div>
+              <h2 class="text-2xl font-black">Lab Coordinator Handbook</h2>
+              <p class="text-purple-100 text-xs mt-1">Manage equipment, bookings &amp; staff — all from one panel</p>
+            </div>
+            <div class="text-6xl opacity-30">⚙️</div>
+          </div>
+
+          <!-- 4 PIC workflows -->
+          <div class="bg-white grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+
+            <!-- Access -->
+            <div class="p-6">
+              <div class="w-11 h-11 rounded-2xl bg-purple-700 flex items-center justify-center text-white text-lg mb-3 shadow">🔐</div>
+              <h3 class="text-base font-black text-slate-900 mb-3">Access Admin Panel</h3>
+              <div class="space-y-2">
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-purple-100 text-purple-700 shrink-0 text-[10px]">1</div><p class="text-xs text-slate-600 pt-1">Click <strong>Control</strong> on the home dashboard</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-purple-100 text-purple-700 shrink-0 text-[10px]">2</div><p class="text-xs text-slate-600 pt-1">Enter your <strong>PIC email address</strong></p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div><p class="text-xs text-slate-600 pt-1">Admin panel unlocks for <strong>your lab only</strong></p></div>
+              </div>
+              <div class="mt-3 text-[10px] text-purple-600 bg-purple-50 rounded-lg p-2 font-medium">Your email must be registered as a coordinator by the system admin</div>
+            </div>
+
+            <!-- Approve booking -->
+            <div class="p-6">
+              <div class="w-11 h-11 rounded-2xl bg-green-600 flex items-center justify-center text-white text-lg mb-3 shadow">✅</div>
+              <h3 class="text-base font-black text-slate-900 mb-3">Approve / Reject Bookings</h3>
+              <div class="space-y-2">
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-green-100 text-green-700 shrink-0 text-[10px]">1</div><p class="text-xs text-slate-600 pt-1">Admin Panel → <strong>Pending Bookings</strong> tab</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-green-100 text-green-700 shrink-0 text-[10px]">2</div><p class="text-xs text-slate-600 pt-1">Review: user, date, equipment, process, payment</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-green-100 text-green-700 shrink-0 text-[10px]">3</div><p class="text-xs text-slate-600 pt-1">Add remarks (required for rejection)</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div><p class="text-xs text-slate-600 pt-1">Click <strong>Approve</strong> or <strong>Reject</strong> → user emailed</p></div>
+              </div>
+            </div>
+
+            <!-- Register equipment -->
+            <div class="p-6 border-t border-slate-100">
+              <div class="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-lg mb-3 shadow">🔬</div>
+              <h3 class="text-base font-black text-slate-900 mb-3">Register New Equipment</h3>
+              <div class="space-y-2">
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">1</div><p class="text-xs text-slate-600 pt-1">Admin Panel → <strong>Equipment</strong> tab → Add Equipment</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">2</div><p class="text-xs text-slate-600 pt-1">Set: name, asset ID, lab, image URL, description</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">3</div><p class="text-xs text-slate-600 pt-1">Configure: access mode, tracking unit, calibration date</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-blue-100 text-blue-700 shrink-0 text-[10px]">4</div><p class="text-xs text-slate-600 pt-1">Add process capabilities + material presets</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-green-500 text-white shrink-0 text-[10px]">✓</div><p class="text-xs text-slate-600 pt-1">Save → appears in lab view immediately</p></div>
+              </div>
+            </div>
+
+            <!-- Status & alerts -->
+            <div class="p-6 border-t border-slate-100">
+              <div class="w-11 h-11 rounded-2xl bg-red-600 flex items-center justify-center text-white text-lg mb-3 shadow">🚨</div>
+              <h3 class="text-base font-black text-slate-900 mb-3">Handle Equipment Alerts</h3>
+              <div class="space-y-2">
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">→</div><p class="text-xs text-slate-600 pt-1"><strong>Email alert</strong> arrives when a user reports any issue in your lab</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">→</div><p class="text-xs text-slate-600 pt-1">Equipment status is <strong>already updated</strong> automatically</p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">→</div><p class="text-xs text-slate-600 pt-1">After repair: Edit equipment → set Status back to <strong>Active</strong></p></div>
+                <div class="poster-step flex items-start gap-3"><div class="dot bg-red-100 text-red-700 shrink-0 text-[10px]">→</div><p class="text-xs text-slate-600 pt-1">Update <strong>calibration date</strong> if serviced</p></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- PIC Privileges strip -->
+          <div class="bg-slate-50 px-8 py-4 flex flex-wrap gap-4 border-t border-slate-100 text-xs">
+            <span class="font-bold text-slate-500 uppercase tracking-wider w-full">PIC Privileges:</span>
+            <span class="chip bg-purple-100 text-purple-700">⚡ Same-day booking</span>
+            <span class="chip bg-blue-100 text-blue-700">🔄 Revoke any booking</span>
+            <span class="chip bg-red-100 text-red-700">🔧 Override equipment status</span>
+            <span class="chip bg-green-100 text-green-700">📊 Analytics access</span>
+            <span class="chip bg-slate-200 text-slate-700">🗄 Archive logs</span>
+          </div>
+
+          <!-- Tips strip -->
+          <div class="bg-purple-700 text-white px-8 py-3 text-xs flex flex-wrap gap-6">
+            <span>🔑 <strong>Analytics &amp; Maintenance</strong> are restricted panels — credentials issued separately</span>
+            <span>📧 <strong>You are auto-notified</strong> of all equipment issues in your lab</span>
+            <span>📤 <strong>Export CSV</strong> any time from the Equipment or Analytics tab</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- P1 Access Admin -->
+      <section id="p1">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">1</span>Accessing the Admin Panel</h2>
+        <div class="picc p-3 rounded-r-xl text-sm mb-4">You are identified by email — no separate login or password. Your email must be in the coordinator list for your assigned lab.</div>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
+            <div class="dot bg-purple-500 text-white shrink-0 text-[10px]">A</div>
+            <div><p class="font-semibold text-sm">From home page → click <strong>Control</strong></p><p class="text-xs text-slate-500">Enter your PIC email when prompted. Only emails in the coordinator list are accepted.</p></div>
+          </div>
+          <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
+            <div class="dot bg-purple-500 text-white shrink-0 text-[10px]">B</div>
+            <div><p class="font-semibold text-sm">Or via URL parameter</p><p class="text-xs text-slate-500">Append <code class="bg-white px-1 py-0.5 rounded border text-xs">?lab=YourLabName&view=admin</code> to the app URL to open admin pre-filtered to your lab.</p></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-purple-100 mt-4">
+          <h4 class="font-semibold text-sm mb-3">Admin Panel Tabs</h4>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+            <div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><span>📋</span><strong>Pending Bookings</strong></div>
+            <div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><span>📜</span><strong>Booking History</strong></div>
+            <div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><span>🔬</span><strong>Equipment</strong></div>
+            <div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><span>🏢</span><strong>Labs</strong></div>
+            <div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><span>👤</span><strong>Coordinators</strong></div>
+            <div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><span>🛠</span><strong>Technical Staff</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P2 Bookings -->
+      <section id="p2">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">2</span>Approving &amp; Rejecting Bookings</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm mb-4">
+          <div class="overflow-x-auto mb-4">
+            <table class="w-full text-xs border-collapse">
+              <thead><tr class="bg-purple-50"><th class="p-2 text-left border border-purple-100 font-bold">Field to review</th><th class="p-2 text-left border border-purple-100">What to check</th></tr></thead>
+              <tbody>
+                <tr class="border border-purple-50"><td class="p-2 font-semibold">Name / Email / ID</td><td class="p-2 text-slate-600">Valid IMEN student or researcher?</td></tr>
+                <tr class="bg-purple-50/30 border border-purple-50"><td class="p-2 font-semibold">Date &amp; Slot</td><td class="p-2 text-slate-600">Slot still available? (system checks, but verify)</td></tr>
+                <tr class="border border-purple-50"><td class="p-2 font-semibold">Process / Materials</td><td class="p-2 text-slate-600">Appropriate for this equipment?</td></tr>
+                <tr class="bg-purple-50/30 border border-purple-50"><td class="p-2 font-semibold">Payment method</td><td class="p-2 text-slate-600">Grant ref or receipt number valid?</td></tr>
+                <tr class="border border-purple-50"><td class="p-2 font-semibold">Supervisor</td><td class="p-2 text-slate-600">Is the supervisor aware?</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="p-4 bg-green-50 rounded-xl border border-green-200 text-xs">
+              <h4 class="font-bold text-green-800 mb-2">✅ Approve</h4>
+              <ol class="space-y-1 text-slate-600"><li>1. Review details</li><li>2. Add remarks (optional)</li><li>3. Click <strong>Approve</strong></li><li>4. User emailed immediately</li></ol>
+            </div>
+            <div class="p-4 bg-red-50 rounded-xl border border-red-200 text-xs">
+              <h4 class="font-bold text-red-800 mb-2">❌ Reject</h4>
+              <ol class="space-y-1 text-slate-600"><li>1. Review details</li><li>2. <strong>Enter rejection reason in remarks</strong></li><li>3. Click <strong>Reject</strong></li><li>4. User emailed with your reason</li></ol>
+            </div>
+          </div>
+        </div>
+        <div class="tip p-3 rounded-r-xl text-sm"><strong>💡 Always add remarks</strong> when rejecting. It tells the user what went wrong and reduces follow-up emails.</div>
+      </section>
+
+      <!-- P3 History -->
+      <section id="p3">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">3</span>Booking History</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="flex gap-3 p-3 bg-slate-50 rounded-lg text-sm"><span class="text-xl">🔍</span><div><p class="font-semibold">Filter by Status</p><p class="text-xs text-slate-500">All / Approved / Rejected — see only what you need.</p></div></div>
+          <div class="flex gap-3 p-3 bg-slate-50 rounded-lg text-sm"><span class="text-xl">📅</span><div><p class="font-semibold">Filter by Month</p><p class="text-xs text-slate-500">Select a specific month for period reporting.</p></div></div>
+          <div class="flex gap-3 p-3 bg-slate-50 rounded-lg text-sm"><span class="text-xl">🔄</span><div><p class="font-semibold">Revoke a Booking</p><p class="text-xs text-slate-500">If circumstances change (e.g. equipment breaks down), revoke any approved booking. Returns it to Pending. User is notified.</p></div></div>
+        </div>
+      </section>
+
+      <!-- P4 Register Equipment -->
+      <section id="p4">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">4</span>Registering New Equipment</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm mb-4 space-y-2">
+
+          <div class="acc-item border border-purple-100 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-purple-50" onclick="acc(this)">
+              <span>Basic Information</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600">
+              <div class="grid grid-cols-2 gap-1.5 mt-1">
+                <div class="p-2 bg-slate-50 rounded border"><strong>Equipment Name *</strong><p class="text-slate-500">Full descriptive name</p></div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Asset ID *</strong><p class="text-slate-500">Official university tag</p></div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Lab *</strong><p class="text-slate-500">Select from dropdown</p></div>
+                <div class="p-2 bg-slate-50 rounded border"><strong>Image URL</strong><p class="text-slate-500">Direct link to photo</p></div>
+                <div class="p-2 bg-slate-50 rounded border col-span-2"><strong>Description</strong><p class="text-slate-500">Specs, usage instructions, safety notes</p></div>
+              </div>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-purple-100 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-purple-50" onclick="acc(this)">
+              <span>Status, Access Mode &amp; Tracking</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-3">
+              <div><p class="font-semibold mb-1">Status:</p><div class="flex flex-wrap gap-1.5"><span class="chip bg-green-100 text-green-700">Active</span><span class="chip bg-red-100 text-red-700">Maintenance</span><span class="chip bg-orange-100 text-orange-700">Attention</span></div></div>
+              <div><p class="font-semibold mb-1">Access Mode:</p>
+                <div class="space-y-1">
+                  <div class="p-2 bg-slate-50 rounded"><strong>direct (Walk-in)</strong> — no booking required</div>
+                  <div class="p-2 bg-slate-50 rounded"><strong>booking (Pre-Booking)</strong> — advance booking + coordinator approval</div>
+                  <div class="p-2 bg-slate-50 rounded"><strong>both (Hybrid)</strong> — walk-ins + pre-bookings allowed</div>
+                </div>
+              </div>
+              <div><p class="font-semibold mb-1">Tracking Unit (determines the label on the sample quantity field):</p><div class="flex flex-wrap gap-1.5"><span class="chip bg-slate-100 text-slate-700">Hour</span><span class="chip bg-slate-100 text-slate-700">Quantity (pcs)</span><span class="chip bg-slate-100 text-slate-700">Weight (mg)</span><span class="chip bg-slate-100 text-slate-700">Weight (g)</span></div></div>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-purple-100 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-purple-50" onclick="acc(this)">
+              <span>Calibration Due Date</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-1">
+              <p>Set the next calibration/service date. A colour-coded indicator shows on the equipment card:</p>
+              <div class="flex items-center gap-2 p-1.5 bg-green-50 rounded"><span class="w-3 h-3 bg-green-500 rounded-full inline-block"></span>Green: &gt; 30 days</div>
+              <div class="flex items-center gap-2 p-1.5 bg-amber-50 rounded"><span class="w-3 h-3 bg-amber-500 rounded-full inline-block"></span>Amber: &lt; 30 days</div>
+              <div class="flex items-center gap-2 p-1.5 bg-red-50 rounded"><span class="w-3 h-3 bg-red-500 rounded-full inline-block"></span>Red: Expired</div>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-purple-100 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-purple-50" onclick="acc(this)">
+              <span>Process Capabilities — 3-Level Hierarchy</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600 space-y-2">
+              <p>Defines what processes the equipment can perform. Creates the cascading dropdowns users see when booking.</p>
+              <div class="bg-purple-50 rounded-xl p-3 space-y-1">
+                <div class="flex items-center gap-2"><div class="bg-purple-200 text-purple-800 px-2 py-0.5 rounded font-mono">Process</div><span>e.g. "Deposition"</span></div>
+                <div class="ml-4 flex items-center gap-2"><div class="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded font-mono">└─ Variant</div><span>e.g. "PECVD", "Sputtering"</span></div>
+                <div class="ml-8 flex items-center gap-2"><div class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded font-mono">└─ Specifics</div><span>e.g. "SiO₂", "Si₃N₄"</span></div>
+              </div>
+              <p>Each process can be individually flagged as under maintenance — allowing partial maintenance where some processes remain bookable.</p>
+            </div></div>
+          </div>
+
+          <div class="acc-item border border-purple-100 rounded-xl overflow-hidden">
+            <button class="acc-trigger w-full text-left px-4 py-3 flex justify-between items-center font-semibold text-sm hover:bg-purple-50" onclick="acc(this)">
+              <span>Material Preset Options</span>
+              <svg class="acc-chevron w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="acc-body"><div class="px-4 pb-4 text-xs text-slate-600">
+              <p>Define a list of pre-approved materials. Users see these as a dropdown during booking/usage. They can also type custom materials not on the list — the preset is a convenience, not a restriction.</p>
+              <div class="flex flex-wrap gap-1 mt-2"><span class="bg-white border rounded px-2 py-0.5 text-[10px]">Silicon wafer</span><span class="bg-white border rounded px-2 py-0.5 text-[10px]">Glass substrate</span><span class="bg-white border rounded px-2 py-0.5 text-[10px]">Polymer film</span><span class="bg-white border rounded px-2 py-0.5 text-[10px]">Other</span></div>
+            </div></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- P5 Manage Equipment -->
+      <section id="p5">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">5</span>Managing Existing Equipment</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="p-3 border border-purple-100 rounded-xl text-sm"><h4 class="font-semibold mb-1">✏️ Edit Equipment</h4><p class="text-xs text-slate-600">Equipment tab → Edit icon → same form as Add, pre-filled → Save. Changes are instant across all views.</p></div>
+          <div class="p-3 border border-red-100 bg-red-50 rounded-xl text-sm">
+            <h4 class="font-semibold mb-1 text-red-800">🔄 Change Status (e.g. after repair)</h4>
+            <p class="text-xs text-slate-600">Edit equipment → set Status to <strong>Active</strong> → clear maintenance reason → update calibration date → Save.</p>
+          </div>
+          <div class="p-3 border border-slate-200 rounded-xl text-sm"><h4 class="font-semibold mb-1">📤 Export Inventory CSV</h4><p class="text-xs text-slate-600">Click the <strong>Export CSV</strong> button in the Equipment tab. Downloads a spreadsheet of all equipment in the current view.</p></div>
+          <div class="p-3 border border-red-200 bg-red-50 rounded-xl text-sm">
+            <h4 class="font-semibold mb-1 text-red-800">🗑 Delete Equipment</h4>
+            <div class="warn p-2 rounded-r text-xs mb-1">Caution: Equipment is removed permanently from the UI. Historical logs remain in the database.</div>
+            <p class="text-xs text-slate-600">Delete icon → confirm in dialog.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- P6 Lab Management -->
+      <section id="p6">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">6</span>Lab Management</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="p-3 border border-purple-100 rounded-xl text-sm"><h4 class="font-semibold mb-1">➕ Add Lab</h4><p class="text-xs text-slate-600">Labs tab → Add Lab → enter name → Save. Appears in all lab dropdowns immediately.</p></div>
+          <div class="p-3 border border-purple-100 rounded-xl text-sm"><h4 class="font-semibold mb-1">✏️ Rename Lab</h4><div class="warn p-2 rounded-r text-xs mb-1">Rename cascades to ALL equipment, bookings, and logs automatically.</div><p class="text-xs text-slate-600">Click lab → Edit icon → new name → Save.</p></div>
+          <div class="p-3 border border-red-100 bg-red-50 rounded-xl text-sm"><h4 class="font-semibold mb-1 text-red-800">🗑 Delete Lab</h4><p class="text-xs text-slate-600">Removes the lab from the selector. Reassign all equipment first.</p></div>
+        </div>
+      </section>
+
+      <!-- P7 Coordinator & Staff -->
+      <section id="p7">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">7</span>Coordinator &amp; Technical Staff</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-4">
+          <div>
+            <h4 class="font-semibold text-sm mb-2">👤 Coordinators (Lab PIC)</h4>
+            <div class="picc p-3 rounded-r-xl text-xs mb-2">Identity by email — adding an email here grants that person PIC privileges for the assigned lab. No account setup needed.</div>
+            <div class="text-xs text-slate-600 space-y-1">
+              <p><strong>Add:</strong> Coordinators tab → Add Coordinator → name, email, lab → Save</p>
+              <p><strong>Edit:</strong> Edit icon → change name / email / lab assignment → Save</p>
+              <p><strong>Remove:</strong> Delete icon → PIC loses admin access immediately</p>
+            </div>
+          </div>
+          <div>
+            <h4 class="font-semibold text-sm mb-2">🛠 Technical Staff (Global)</h4>
+            <p class="text-xs text-slate-600 mb-1">Not lab-specific. Receive email alerts for <strong>all</strong> equipment issues across all labs.</p>
+            <div class="text-xs text-slate-600 space-y-1">
+              <p><strong>Add:</strong> Technical Staff tab → Add Staff → name, email → Save</p>
+              <p><strong>Edit / Remove:</strong> Same as coordinators</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P8 Analytics -->
+      <section id="p8">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">8</span>Analytics &amp; Reports</h2>
+        <div class="picc p-3 rounded-r-xl text-sm mb-4"><strong>🔐 Restricted access</strong> — Analytics is a protected panel. Credentials are issued separately by the system administrator.</div>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-purple-50 rounded-xl border border-purple-100"><h4 class="font-semibold mb-1 text-purple-900">📊 Charts</h4><ul class="space-y-0.5 text-slate-600"><li>• Equipment usage hours (bar chart)</li><li>• Material consumption tracking</li><li>• Top 5 materials used</li><li>• Equipment health status breakdown</li></ul></div>
+            <div class="p-3 bg-purple-50 rounded-xl border border-purple-100"><h4 class="font-semibold mb-1 text-purple-900">🔍 Filters</h4><ul class="space-y-0.5 text-slate-600"><li>• Select lab</li><li>• Select equipment</li><li>• Filter by month</li><li>• Filter by booking status</li></ul></div>
+          </div>
+          <div class="p-3 border border-purple-100 rounded-xl text-xs"><h4 class="font-semibold mb-1">📤 Export Data</h4><p class="text-slate-600">Click Export to download a timestamped CSV combining all logs and bookings for the selected filters.</p></div>
+        </div>
+      </section>
+
+      <!-- P9 Maintenance -->
+      <section id="p9">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">9</span>Maintenance Panel — System Archiving</h2>
+        <div class="warn p-3 rounded-r-xl text-sm mb-4"><strong>⚠ Restricted access.</strong> Credentials are issued separately by the system administrator.</div>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="text-sm space-y-3">
+            <div class="p-3 bg-slate-50 rounded-xl border"><h4 class="font-semibold mb-1">🗄 Archiving (do this periodically)</h4>
+              <ol class="text-xs text-slate-600 space-y-1"><li>1. Home → Maintenance → unlock with credentials</li><li>2. Click Archive</li><li>3. Current logs are copied to a timestamped archive sheet in Google Sheets</li><li>4. Active logs sheet is cleared for fresh data</li></ol>
+              <div class="warn p-2 rounded-r text-xs mt-2"><strong>Export your data first!</strong> The archive is accessible in Google Sheets directly, not via the app UI.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P10 PIC Privileges -->
+      <section id="p10">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="dot bg-purple-500 text-white">10</span>PIC Privileges Summary</h2>
+        <div class="scard pic bg-white rounded-xl p-5 shadow-sm space-y-3">
+          <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100"><span class="text-xl">⚡</span><div><h4 class="font-semibold text-sm">Same-Day Booking</h4><p class="text-xs text-slate-600">Enter your PIC email in the booking form — the 2-day minimum is lifted instantly. A green badge confirms priority access.</p></div></div>
+          <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100"><span class="text-xl">📧</span><div><h4 class="font-semibold text-sm">Auto Issue Notifications</h4><p class="text-xs text-slate-600">Every equipment issue in your lab is emailed to you automatically. No manual checking needed.</p></div></div>
+          <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100"><span class="text-xl">🔄</span><div><h4 class="font-semibold text-sm">Revoke Bookings</h4><p class="text-xs text-slate-600">Revoke any approved or rejected booking from Booking History. Returns to Pending; user is notified.</p></div></div>
+          <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100"><span class="text-xl">🔧</span><div><h4 class="font-semibold text-sm">Equipment Status Override</h4><p class="text-xs text-slate-600">Set equipment to Maintenance, Active, or Attention any time via the Edit Equipment form.</p></div></div>
+        </div>
+
+        <!-- Daily/weekly quick ref -->
+        <div class="bg-gradient-to-br from-purple-900 to-fuchsia-900 text-white rounded-2xl p-6 mt-6">
+          <h3 class="font-bold text-base mb-4">🔬 PIC Routine Checklist</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div><div class="font-bold text-purple-200 mb-1.5">Daily</div><ul class="space-y-1 text-white/80"><li>✓ Check Pending Bookings</li><li>✓ Monitor Live Status</li><li>✓ Clear Attention-flagged equipment</li></ul></div>
+            <div><div class="font-bold text-purple-200 mb-1.5">Weekly</div><ul class="space-y-1 text-white/80"><li>✓ Review Booking History</li><li>✓ Check calibration due dates</li><li>✓ Update equipment statuses</li></ul></div>
+            <div><div class="font-bold text-purple-200 mb-1.5">Periodic</div><ul class="space-y-1 text-white/80"><li>✓ Export analytics data</li><li>✓ Archive logs</li><li>✓ Review coordinator/staff list</li></ul></div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- end sec-p -->
+  </main>
+</div><!-- end main layout -->
+
+<!-- ═══ QUICK REF STRIPS ═══ -->
+<div id="qr-u" class="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white py-10 px-4">
+  <div class="max-w-4xl mx-auto">
+    <h2 class="text-xl font-black mb-5 text-center">👤 User — 60-Second Cheat Sheet</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white/10 rounded-2xl p-4 border border-white/20 text-xs space-y-1"><div class="text-base font-black mb-2">▶ Walk-in</div><ol class="space-y-0.5 text-white/80"><li>1. The Lab → choose lab</li><li>2. Find equipment → <strong>Start</strong></li><li>3. Name, Phone, Affiliation</li><li>4. Duration + Samples + Material</li><li>5. <strong>Start Log ✓</strong></li></ol></div>
+      <div class="bg-white/10 rounded-2xl p-4 border border-white/20 text-xs space-y-1"><div class="text-base font-black mb-2">📅 Book</div><ol class="space-y-0.5 text-white/80"><li>1. Find equipment → <strong>Book</strong></li><li>2. Date (≥ 2 days ahead) + slot</li><li>3. Process → Variant → Specifics</li><li>4. Personal details + Supervisor</li><li>5. Samples + Material</li><li>6. Payment method + ref</li><li>7. <strong>Send Request ✓</strong></li></ol></div>
+      <div class="bg-white/10 rounded-2xl p-4 border border-white/20 text-xs space-y-1"><div class="text-base font-black mb-2">🚨 Report Issue</div><ol class="space-y-0.5 text-white/80"><li>1. Find equipment → <strong>Report Issue</strong></li><li>2. Your Name + Email</li><li>3. Type: Breakdown / Misconduct</li><li>4. (Multi-process) select affected</li><li>5. Describe the problem</li><li>6. <strong>Submit Report ✓</strong></li></ol></div>
+    </div>
+  </div>
+</div>
+
+<div id="qr-p" class="bg-gradient-to-br from-purple-900 via-fuchsia-900 to-slate-900 text-white py-10 px-4" style="display:none">
+  <div class="max-w-4xl mx-auto">
+    <h2 class="text-xl font-black mb-5 text-center">🔬 Lab PIC — 60-Second Cheat Sheet</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white/10 rounded-2xl p-4 border border-white/20 text-xs"><div class="text-base font-black mb-2">✅ Approve Booking</div><ol class="space-y-0.5 text-white/80"><li>1. Control → enter PIC email</li><li>2. Pending Bookings tab</li><li>3. Review all fields</li><li>4. Add remarks if needed</li><li>5. Approve or Reject → user emailed ✓</li></ol></div>
+      <div class="bg-white/10 rounded-2xl p-4 border border-white/20 text-xs"><div class="text-base font-black mb-2">🔬 Register Equipment</div><ol class="space-y-0.5 text-white/80"><li>1. Control → Equipment → Add</li><li>2. Name, Asset ID, Lab, Image</li><li>3. Status + Access Mode + Unit</li><li>4. Calibration date</li><li>5. Process capabilities</li><li>6. Material presets</li><li>7. Save ✓</li></ol></div>
+      <div class="bg-white/10 rounded-2xl p-4 border border-white/20 text-xs"><div class="text-base font-black mb-2">⚡ Key Shortcuts</div><ul class="space-y-0.5 text-white/80"><li>• Same-day book: enter PIC email</li><li>• After repair: Edit → Active</li><li>• Analytics: Home → unlock</li><li>• Archive: Home → Maintenance → unlock</li><li>• Revoke: Booking History → Revoke</li></ul><div class="mt-2 text-white/50 text-[10px]">Restricted panels — credentials issued separately</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="bg-slate-900 text-slate-400 py-6 px-4 text-center text-xs">
+  <div class="font-bold text-white text-sm mb-1">i-Nstrumen · IMEN Lab Management System</div>
+  <div>Institute of Microengineering and Nanoelectronics (IMEN) · Universiti Kebangsaan Malaysia</div>
+  <div class="mt-3">
+    <a href="https://script.google.com/macros/s/AKfycbw1PrhjSzHsd__rxbEcXZp4iyF4v9e41pVYg1j7ewo6ocnPNw3CsdTt-j7UFb0NM-0l/exec" target="_blank" class="inline-block px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition text-xs">Open i-Nstrumen ↗</a>
+  </div>
+</footer>
+
+<script>
+function setRole(r) {
+  const cu = document.getElementById('tab-u'), cp = document.getElementById('tab-p');
+  const rb = document.getElementById('role-bar');
+  const nu = document.getElementById('nav-u'), np = document.getElementById('nav-p');
+  const qru = document.getElementById('qr-u'), qrp = document.getElementById('qr-p');
+  const mc = document.getElementById('content');
+
+  if (r === 'u') {
+    cu.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold on-u';
+    cp.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600';
+    rb.className = 'h-0.5 bg-gradient-to-r from-blue-400 to-indigo-600 transition-all';
+    document.documentElement.style.setProperty('--u','#2563eb');
+    nu.classList.remove('hidden'); np.classList.add('hidden');
+    mc.className = 'flex-1 min-w-0 show-u fi';
+    qru.style.display = ''; qrp.style.display = 'none';
+  } else {
+    cp.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold on-p';
+    cu.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600';
+    rb.className = 'h-0.5 bg-gradient-to-r from-purple-400 to-fuchsia-600 transition-all';
+    document.documentElement.style.setProperty('--u','#9333ea');
+    np.classList.remove('hidden'); nu.classList.add('hidden');
+    mc.className = 'flex-1 min-w-0 show-p fi';
+    qrp.style.display = ''; qru.style.display = 'none';
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function acc(btn) {
+  const item = btn.closest('.acc-item');
+  const body = item.querySelector('.acc-body');
+  const isOpen = body.classList.contains('open');
+  btn.closest('.scard, .sec-u, .sec-p').querySelectorAll('.acc-body.open').forEach(b => b.classList.remove('open'));
+  btn.closest('.scard, .sec-u, .sec-p').querySelectorAll('.acc-item.acc-open').forEach(i => i.classList.remove('acc-open'));
+  if (!isOpen) { body.classList.add('open'); item.classList.add('acc-open'); }
+}
+
+// Sidebar active-link on scroll
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('.nl').forEach(l => l.classList.remove('act'));
+      const lnk = document.querySelector(`.nl[href="#${e.target.id}"]`);
+      if (lnk) lnk.classList.add('act');
+    }
+  });
+}, { rootMargin:'-70px 0px -60% 0px' });
+document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+
+setRole('u');
+</script>
+</body>
+</html>

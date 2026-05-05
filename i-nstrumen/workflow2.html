@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>i-Nstrumen — Visual Workflow (with Snapshots)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; scroll-behavior: smooth; }
+
+  /* Role toggle */
+  .tab { transition: all .3s; }
+  .tab.on-u { background: linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; box-shadow:0 4px 20px #2563eb44; }
+  .tab.on-p { background: linear-gradient(135deg,#9333ea,#7e22ce); color:#fff; box-shadow:0 4px 20px #9333ea44; }
+  .sec-u,.sec-p { display:none; }
+  .show-u .sec-u { display:block; }
+  .show-p .sec-p { display:block; }
+
+  /* Snapshot frame — mimics a real browser/app window */
+  .snap {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px -20px rgba(15,23,42,0.4), 0 8px 24px -8px rgba(15,23,42,0.15);
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+  }
+  .snap-bar {
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .snap-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .snap-url {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size: 10px;
+    color: #94a3b8;
+    margin-left: 8px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+  }
+  .snap-label {
+    background: #1e293b; color: #fff;
+    padding: 3px 10px; border-radius: 4px;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    margin-left: auto;
+  }
+
+  /* Mock app shell */
+  .mock-header {
+    background: linear-gradient(to right, rgba(15,23,42,0.95), rgba(30,41,59,0.95));
+    color: #fff;
+    padding: 10px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mock-body { padding: 16px; background: #f8fafc; min-height: 100px; }
+
+  /* Step row with snapshot */
+  .step-row { display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px; align-items: start; }
+  @media (max-width: 768px) { .step-row { grid-template-columns: 1fr; } }
+
+  /* Sticky sidebar */
+  #sb { position: sticky; top: 76px; max-height: calc(100vh - 90px); overflow-y: auto; }
+  #sb::-webkit-scrollbar { width: 3px; }
+  #sb::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  .nl { display:block; padding:6px 12px; border-radius:6px; font-size:12px; color:#64748b; transition:.2s; border-left:2px solid transparent; }
+  .nl:hover, .nl.act { background:#f1f5f9; color:#0f172a; border-left-color:#2563eb; }
+  .nl.p:hover, .nl.p.act { border-left-color:#9333ea; background:#faf5ff; color:#6b21a8; }
+
+  /* Number badges */
+  .num-u, .num-p {
+    width: 36px; height: 36px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; color: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .num-u { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+  .num-p { background: linear-gradient(135deg, #a855f7, #6b21a8); }
+
+  /* Pulse */
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
+  .pulse { animation: pulse 2s infinite; }
+
+  /* Section divider */
+  .sec-div {
+    margin: 48px 0 24px;
+    border-top: 1px dashed #cbd5e1;
+    padding-top: 24px;
+  }
+
+  /* Highlight tag inside snapshots */
+  .hl {
+    position: absolute;
+    background: #fef08a;
+    color: #713f12;
+    border: 2px solid #facc15;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    box-shadow: 0 4px 12px rgba(250,204,21,0.4);
+    z-index: 10;
+    white-space: nowrap;
+  }
+  .hl::before {
+    content: '';
+    position: absolute;
+    width: 0; height: 0;
+    border: 6px solid transparent;
+  }
+  .hl.left::before  { left: -14px;  top: 50%; margin-top: -6px; border-right-color: #facc15; }
+  .hl.right::before { right: -14px; top: 50%; margin-top: -6px; border-left-color: #facc15; }
+  .hl.top::before   { top: -14px;   left: 50%; margin-left: -6px; border-bottom-color: #facc15; }
+
+  /* Annotation arrow */
+  .arrow {
+    position: absolute;
+    color: #ef4444;
+    font-weight: 800;
+    font-size: 20px;
+    z-index: 10;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  /* Fade */
+  @keyframes fi { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .fi { animation: fi .4s ease; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<!-- ═══ HEADER ═══ -->
+<header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center text-white font-black text-xs shadow">iN</div>
+      <div>
+        <div class="font-bold text-slate-900 text-sm leading-tight">i-Nstrumen</div>
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Visual Workflow · with Snapshots</div>
+      </div>
+    </div>
+
+    <div class="flex bg-slate-100 rounded-xl p-1 gap-1">
+      <button onclick="setRole('u')" id="tab-u" class="tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 on-u">👤 User</button>
+      <button onclick="setRole('p')" id="tab-p" class="tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600">🔬 Lab PIC</button>
+    </div>
+
+    <div class="flex gap-2">
+      <a href="workflow-guide.html" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">📖 Text Guide</a>
+      <a href="https://script.google.com/macros/s/AKfycbw1PrhjSzHsd__rxbEcXZp4iyF4v9e41pVYg1j7ewo6ocnPNw3CsdTt-j7UFb0NM-0l/exec"
+         target="_blank" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow">Open App ↗</a>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ HERO ═══ -->
+<section class="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white py-12 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <div class="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-xs mb-5 border border-white/20">
+      <span class="pulse w-2 h-2 bg-green-400 rounded-full"></span>
+      Visual workflow with screen-by-screen snapshots
+    </div>
+    <h1 class="text-3xl md:text-4xl font-black mb-3">See Every Step</h1>
+    <p class="text-slate-300 max-w-xl mx-auto text-sm">Each instruction below is paired with a snapshot of exactly what you'll see on screen.</p>
+  </div>
+</section>
+
+<!-- ═══ MAIN ═══ -->
+<div class="max-w-7xl mx-auto px-4 py-8 flex gap-8 items-start">
+
+  <!-- SIDEBAR -->
+  <nav id="sb" class="w-52 shrink-0 hidden lg:block">
+    <div id="nav-u">
+      <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">User Workflow</div>
+      <a href="#u1" class="nl">1. Home Dashboard</a>
+      <a href="#u2" class="nl">2. Select Lab</a>
+      <a href="#u3" class="nl">3. Equipment Cards</a>
+      <a href="#u4" class="nl">4. Walk-in Form</a>
+      <a href="#u5" class="nl">5. Booking Form</a>
+      <a href="#u6" class="nl">6. Identity Verify</a>
+      <a href="#u7" class="nl">7. Report Issue</a>
+    </div>
+    <div id="nav-p" class="hidden">
+      <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Lab PIC Workflow</div>
+      <a href="#p1" class="nl p">1. Admin Gate</a>
+      <a href="#p2" class="nl p">2. Pending Bookings</a>
+      <a href="#p3" class="nl p">3. Booking History</a>
+      <a href="#p4" class="nl p">4. Equipment List</a>
+      <a href="#p5" class="nl p">5. Edit Equipment</a>
+      <a href="#p6" class="nl p">6. Process Builder</a>
+      <a href="#p7" class="nl p">7. Coordinator List</a>
+    </div>
+  </nav>
+
+  <!-- CONTENT -->
+  <main class="flex-1 min-w-0 show-u fi" id="content">
+
+    <!-- ════════════ USER ════════════ -->
+    <div class="sec-u space-y-12">
+
+      <!-- U1 HOME DASHBOARD -->
+      <section id="u1">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">1</div>
+              <h2 class="text-xl font-black text-slate-900">Open the App</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">When you open i-Nstrumen, you land on the dashboard. As a regular user, you'll mainly use <strong>The Lab</strong> and <strong>Live Status</strong>.</p>
+            <ul class="text-xs text-slate-600 space-y-1.5">
+              <li>• <strong>The Lab</strong> → browse equipment + take action</li>
+              <li>• <strong>Live Status</strong> → see who's using equipment now</li>
+              <li>• Other tiles are for coordinators or restricted</li>
+            </ul>
+          </div>
+
+          <!-- SNAPSHOT: Home Dashboard -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">script.google.com/macros/s/.../exec</span>
+              <span class="snap-label">Home</span>
+            </div>
+            <div class="mock-header">
+              <div class="flex flex-col">
+                <div class="text-sm font-bold leading-none">i-Nstrumen</div>
+                <div class="text-[8px] text-blue-100 mt-1 uppercase tracking-widest opacity-80">Lab Usage Management</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button class="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-full text-[10px]"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+              </div>
+            </div>
+            <div class="mock-body p-4 relative">
+              <div class="mb-3">
+                <div class="text-base font-bold text-slate-800">i-Nstrumen Dashboard</div>
+                <div class="text-[10px] text-slate-500">Lab Interface Active. Choose an operation scope.</div>
+              </div>
+              <div class="grid grid-cols-4 gap-2 auto-rows-[60px]">
+                <!-- The Lab (large) -->
+                <div class="col-span-2 row-span-2 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 flex flex-col justify-between text-white relative overflow-hidden">
+                  <i class="ph-fill ph-flask text-lg"></i>
+                  <div>
+                    <div class="text-base font-bold leading-none">The Lab</div>
+                    <div class="text-[9px] text-blue-100 mt-1">Equipment & bookings</div>
+                  </div>
+                </div>
+                <!-- Live Status -->
+                <div class="col-span-2 rounded-2xl bg-white border border-slate-200 p-3 flex justify-between items-center">
+                  <div>
+                    <div class="flex items-center gap-1 text-emerald-600 text-[8px] font-bold uppercase mb-1">
+                      <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full pulse"></span>System Online
+                    </div>
+                    <div class="text-xs font-bold text-slate-800">Live Status</div>
+                  </div>
+                  <i class="ph-duotone ph-activity text-emerald-600 text-base"></i>
+                </div>
+                <!-- Control -->
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-2 flex flex-col justify-between">
+                  <div class="w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center text-white text-[10px]">
+                    <i class="ph-duotone ph-sliders-horizontal"></i>
+                  </div>
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-800">Control</div>
+                    <div class="text-[8px] text-slate-500">PIC only</div>
+                  </div>
+                </div>
+                <!-- Analytics -->
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-2 flex flex-col justify-between relative">
+                  <div class="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center text-white text-[10px]">
+                    <i class="ph-duotone ph-chart-pie-slice"></i>
+                  </div>
+                  <i class="ph-bold ph-lock-key absolute top-2 right-2 text-slate-300 text-[10px]"></i>
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-800">Analytics</div>
+                    <div class="text-[8px] text-slate-500">Restricted</div>
+                  </div>
+                </div>
+                <!-- Maintenance -->
+                <div class="col-span-2 rounded-2xl bg-slate-900 p-2 flex justify-between items-center text-white">
+                  <div class="flex items-center gap-2">
+                    <div class="p-1.5 bg-slate-700 rounded">
+                      <i class="ph-fill ph-wrench text-xs"></i>
+                    </div>
+                    <div>
+                      <div class="text-[10px] font-bold">Maintenance</div>
+                      <div class="text-[8px] text-slate-400">Restricted</div>
+                    </div>
+                  </div>
+                  <i class="ph-bold ph-lock-key text-slate-500 text-xs"></i>
+                </div>
+              </div>
+              <!-- Highlight callouts -->
+              <div class="hl left top-[70px] left-[180px]" style="left:50%;top:60px;">👈 Start here</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U2 LAB SELECTOR -->
+      <section id="u2" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">2</div>
+              <h2 class="text-xl font-black text-slate-900">Select Your Lab</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">After clicking <strong>The Lab</strong>, you'll see a list of all 13 IMEN labs. Click yours to open the equipment portal.</p>
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-r-lg text-xs text-slate-700">
+              💡 If you were given a lab-specific link (e.g., <code class="bg-white px-1 py-0.5 rounded text-[10px]">?lab=Cleanroom</code>), you'll skip this step entirely.
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Lab Selector -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Lab View</span>
+            </div>
+            <div class="mock-header">
+              <div class="flex items-center gap-2">
+                <button class="bg-white/10 hover:bg-white/20 p-1 rounded-full"><i class="ph-bold ph-arrow-left text-[10px]"></i></button>
+                <div class="text-xs font-bold">i-Nstrumen</div>
+              </div>
+            </div>
+            <div class="mock-body p-4">
+              <div class="text-center mb-3">
+                <div class="text-sm font-bold text-slate-800">Select Laboratory</div>
+                <div class="text-[10px] text-slate-500">Choose a facility to view equipment.</div>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center hover:bg-blue-50 hover:border-blue-200">
+                  <span class="text-[10px] font-medium text-slate-700">Artificial Kidney</span>
+                  <i class="ph-bold ph-caret-right text-slate-300 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+                  <span class="text-[10px] font-medium text-blue-700">Cleanroom</span>
+                  <i class="ph-bold ph-caret-right text-blue-500 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center">
+                  <span class="text-[10px] font-medium text-slate-700">MEMS/NEMS</span>
+                  <i class="ph-bold ph-caret-right text-slate-300 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center">
+                  <span class="text-[10px] font-medium text-slate-700">Microfluidics</span>
+                  <i class="ph-bold ph-caret-right text-slate-300 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center">
+                  <span class="text-[10px] font-medium text-slate-700">Nanophotonics</span>
+                  <i class="ph-bold ph-caret-right text-slate-300 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center">
+                  <span class="text-[10px] font-medium text-slate-700">Semiconductor</span>
+                  <i class="ph-bold ph-caret-right text-slate-300 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center">
+                  <span class="text-[10px] font-medium text-slate-700">Thin Film</span>
+                  <i class="ph-bold ph-caret-right text-slate-300 text-[10px]"></i>
+                </div>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center text-slate-300">
+                  <span class="text-[10px]">+ 6 more</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U3 EQUIPMENT CARDS -->
+      <section id="u3" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">3</div>
+              <h2 class="text-xl font-black text-slate-900">Find Your Equipment</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Equipment cards appear with photo, status badge, and action buttons. The buttons depend on the equipment's access mode:</p>
+            <div class="space-y-2 text-xs">
+              <div class="flex gap-2"><span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px]">Active</span><span class="text-slate-600">Ready to use — Start, Book, or Report</span></div>
+              <div class="flex gap-2"><span class="px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold text-[10px]">In Use</span><span class="text-slate-600">Session running — wait or Report</span></div>
+              <div class="flex gap-2"><span class="px-2 py-0.5 rounded-full bg-red-500 text-white font-bold text-[10px]">Maintenance</span><span class="text-slate-600">Down — only Report available</span></div>
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Equipment Card -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec?lab=Cleanroom</span>
+              <span class="snap-label">Equipment</span>
+            </div>
+            <div class="mock-body p-3">
+              <!-- Search bar -->
+              <div class="mb-3 relative">
+                <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[10px]" placeholder="Search equipment..." readonly>
+              </div>
+              <!-- Equipment card -->
+              <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <div class="relative h-20 bg-gradient-to-br from-slate-700 to-slate-900">
+                  <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,#3b82f6_0%,transparent_60%)] opacity-50"></div>
+                  <div class="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/90 text-white flex items-center gap-1">
+                    <span class="w-1 h-1 bg-white rounded-full"></span> In Use
+                  </div>
+                  <div class="absolute bottom-2 left-2 text-[8px] text-white/90 font-mono bg-black/30 px-1.5 py-0.5 rounded">UKM-CR-042</div>
+                </div>
+                <div class="p-3">
+                  <div class="text-xs font-bold text-slate-800 leading-tight">PECVD System — Oxford</div>
+                  <div class="text-[9px] text-slate-500 leading-relaxed mt-0.5">Plasma-enhanced CVD for SiO₂ and Si₃N₄ deposition.</div>
+                  <!-- Active session -->
+                  <div class="bg-emerald-50 p-1.5 rounded-xl border border-emerald-100 mt-2">
+                    <div class="flex items-center gap-1 text-[9px] text-emerald-800 font-bold">
+                      <div class="w-1 h-1 rounded-full bg-emerald-500 pulse"></div> Current Session
+                    </div>
+                    <div class="text-[9px] text-emerald-600 font-medium">Ahmad bin Yusof</div>
+                    <div class="text-[8px] text-emerald-500">Started: 09:14 AM</div>
+                  </div>
+                  <!-- Action buttons -->
+                  <div class="grid grid-cols-2 gap-1 mt-2">
+                    <button class="py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-[9px] flex items-center justify-center gap-1">
+                      <i class="ph-bold ph-play"></i> Start
+                    </button>
+                    <button class="py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-[9px]">
+                      Book
+                    </button>
+                    <button class="col-span-2 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 font-semibold text-[9px] flex items-center justify-center gap-1">
+                      <i class="ph-bold ph-warning-circle"></i> Report Issue
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U4 WALK-IN FORM -->
+      <section id="u4" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">4</div>
+              <h2 class="text-xl font-black text-slate-900">Walk-in: Start a Session</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Click <strong>Start</strong> on an Active equipment card. The session form opens. Fill in your details and submit.</p>
+            <div class="space-y-1.5 text-xs text-slate-600">
+              <div>• Name + Phone <span class="text-red-500">*required</span></div>
+              <div>• Student/Staff ID — <em>optional</em></div>
+              <div>• Affiliation <span class="text-red-500">*required</span></div>
+              <div>• Sample qty + Material + Duration</div>
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Start Session Form -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Modal</span>
+            </div>
+            <div class="bg-slate-900 text-white p-3">
+              <div class="text-sm font-bold">Start Session</div>
+              <div class="text-[9px] text-blue-200">PECVD System — Oxford</div>
+            </div>
+            <div class="bg-white p-3 space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5">Name *</label>
+                  <input class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]" value="Ahmad bin Yusof">
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5">Phone *</label>
+                  <input class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]" value="0123456789">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5">Student/Staff ID</label>
+                  <input class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]" placeholder="(Optional)">
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5">Affiliation *</label>
+                  <input class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]" value="FKAB">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Samples *</label>
+                  <input class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]" value="2">
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Duration *</label>
+                  <select class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]">
+                    <option>2 Hours</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Materials *</label>
+                <select class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]">
+                  <option>Silicon wafer</option>
+                </select>
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button class="flex-1 py-1.5 text-[10px] text-slate-500 font-bold">Cancel</button>
+                <button class="flex-1 py-1.5 bg-blue-600 text-white font-bold rounded text-[10px]">Start Log</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U5 BOOKING FORM -->
+      <section id="u5" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">5</div>
+              <h2 class="text-xl font-black text-slate-900">Booking in Advance</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Click <strong>Book</strong> to open the booking form. Fill in date, slot, personal details, samples, and payment method.</p>
+            <div class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded-r-lg text-xs text-slate-700 mb-3">
+              ⏰ <strong>Date must be ≥ 2 days ahead.</strong> If you're a registered PIC, entering your email lifts this limit automatically.
+            </div>
+            <div class="text-xs text-slate-600">
+              <strong>Time slots:</strong> Morning (8am–1pm) · Afternoon (2pm–5pm) · Full Day · 2 Days
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Booking Form -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Booking</span>
+            </div>
+            <div class="bg-indigo-900 text-white p-3">
+              <div class="text-sm font-bold">Request Booking</div>
+              <div class="text-[9px] text-indigo-200">PECVD System — Oxford</div>
+            </div>
+            <div class="bg-white p-3 space-y-2 max-h-[420px] overflow-y-auto">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Date *</label>
+                  <input type="date" class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]" value="2026-05-09">
+                  <div class="text-[7px] text-slate-400 mt-0.5">≥ 2 days in advance</div>
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Slot *</label>
+                  <select class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded text-[10px]">
+                    <option>Morning (8am-1pm)</option>
+                  </select>
+                </div>
+              </div>
+              <button class="text-[8px] text-indigo-600 font-bold flex items-center gap-1 ml-auto">
+                <i class="ph-bold ph-calendar"></i> Check Availability
+              </button>
+              <div class="bg-indigo-50 p-2 rounded border border-indigo-100">
+                <label class="block text-[8px] font-bold text-indigo-800 mb-1 uppercase">Process *</label>
+                <div class="flex gap-2 flex-wrap">
+                  <label class="flex items-center gap-1 text-[9px]"><input type="radio" checked> Deposition</label>
+                  <label class="flex items-center gap-1 text-[9px]"><input type="radio"> Etching</label>
+                </div>
+                <div class="mt-1.5">
+                  <select class="w-full p-1 bg-white border border-indigo-200 rounded text-[9px]"><option>PECVD</option></select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Name *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="Ahmad bin Yusof"></div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Phone *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="0123456789"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Email *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="ahmad@ukm.edu.my"></div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Student ID *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="A186452"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Affiliation *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="FKAB"></div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Supervisor *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="Dr. Roziana"></div>
+              </div>
+              <div class="bg-emerald-50 p-2 rounded-xl border-2 border-emerald-200">
+                <label class="block text-[8px] font-bold text-emerald-800 mb-1 uppercase">💳 Payment *</label>
+                <div class="grid grid-cols-3 gap-1">
+                  <div class="p-1 rounded border-2 border-emerald-500 bg-emerald-50 text-center">
+                    <i class="ph-fill ph-medal text-emerald-600 text-sm"></i>
+                    <div class="text-[8px] font-bold">Grant</div>
+                  </div>
+                  <div class="p-1 rounded border border-slate-200 text-center text-slate-400">
+                    <i class="ph-fill ph-money text-sm"></i>
+                    <div class="text-[8px] font-bold">Cash</div>
+                  </div>
+                  <div class="p-1 rounded border border-slate-200 text-center text-slate-400">
+                    <i class="ph-fill ph-dots-three-circle text-sm"></i>
+                    <div class="text-[8px] font-bold">Others</div>
+                  </div>
+                </div>
+                <input class="w-full mt-1 p-1.5 bg-white border-2 border-emerald-300 rounded text-[10px] font-mono" placeholder="Enter grant ref...">
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button class="flex-1 py-1.5 text-[10px] text-slate-500 font-bold">Cancel</button>
+                <button class="flex-1 py-1.5 bg-indigo-600 text-white font-bold rounded text-[10px]">Send Request</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U6 IDENTITY VERIFY -->
+      <section id="u6" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">6</div>
+              <h2 class="text-xl font-black text-slate-900">Check-in on Booking Day</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">If you have an approved booking for today, clicking <strong>Start / Check-in</strong> shows an identity verification screen first.</p>
+            <p class="text-xs text-slate-600">Enter the <strong>same phone number</strong> you used when booking. Once verified, the session form opens with all fields pre-filled.</p>
+          </div>
+
+          <!-- SNAPSHOT: Identity Verify -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Verify</span>
+            </div>
+            <div class="bg-white p-8 text-center">
+              <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-600">
+                <i class="ph-fill ph-shield-check text-xl"></i>
+              </div>
+              <div class="text-sm font-bold text-slate-800 mb-1">Identity Verification</div>
+              <div class="text-[10px] text-slate-500 mb-4">
+                Booking found for <strong>Ahmad bin Yusof</strong>.<br>Slot: <strong>Morning (8am-1pm)</strong>
+              </div>
+              <input type="tel" class="w-full text-center text-sm p-2 border border-slate-200 rounded-lg mb-3" placeholder="Enter Phone (e.g. 012345...)">
+              <div class="flex gap-2">
+                <button class="flex-1 py-1.5 border rounded-lg text-[10px] text-slate-600 font-medium">Cancel</button>
+                <button class="flex-1 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold">Verify Identity</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- U7 REPORT ISSUE -->
+      <section id="u7" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-u">7</div>
+              <h2 class="text-xl font-black text-slate-900">Reporting an Issue</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Click <strong>Report Issue</strong> on any equipment card. Two issue types:</p>
+            <div class="space-y-2 text-xs">
+              <div class="bg-red-50 p-2 rounded border-l-2 border-red-400">
+                <strong class="text-red-800">Equipment Breakdown</strong> → status set to Maintenance
+              </div>
+              <div class="bg-amber-50 p-2 rounded border-l-2 border-amber-400">
+                <strong class="text-amber-800">Misconduct / Cleanliness</strong> → status set to Attention
+              </div>
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Report Form -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Report</span>
+            </div>
+            <div class="bg-red-600 text-white p-3">
+              <div class="text-sm font-bold">Report Issue</div>
+              <div class="text-[9px] text-red-100">PECVD System — Oxford</div>
+            </div>
+            <div class="bg-white p-3 space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Name *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="Ahmad bin Yusof"></div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5">Email *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="ahmad@ukm.edu.my"></div>
+              </div>
+              <div class="p-2 bg-slate-50 rounded border">
+                <label class="block text-[8px] font-bold text-slate-500 mb-1.5 uppercase">Issue Type</label>
+                <div class="space-y-1.5">
+                  <label class="flex items-start gap-1.5">
+                    <input type="radio" checked class="mt-0.5">
+                    <div>
+                      <span class="text-[10px] font-bold text-slate-800 block">Equipment Breakdown</span>
+                      <span class="text-[8px] text-slate-500">Sets status to Maintenance.</span>
+                    </div>
+                  </label>
+                  <label class="flex items-start gap-1.5">
+                    <input type="radio" class="mt-0.5">
+                    <div>
+                      <span class="text-[10px] font-bold text-slate-800 block">Misconduct / Cleanliness</span>
+                      <span class="text-[8px] text-slate-500">Flags for PIC.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div class="p-2 bg-orange-50 rounded border border-orange-200">
+                <label class="block text-[8px] font-bold text-orange-800 mb-0.5 uppercase">Affected Process Flow?</label>
+                <p class="text-[7px] text-orange-600 mb-1">Unselected processes stay available.</p>
+                <label class="flex items-center gap-1.5"><input type="checkbox"><span class="text-[10px] font-bold">Whole Equipment</span></label>
+                <div class="ml-3 border-l-2 border-orange-200 pl-2 space-y-0.5 mt-0.5">
+                  <label class="flex items-center gap-1.5"><input type="checkbox" checked><span class="text-[9px]">Deposition (PECVD)</span></label>
+                  <label class="flex items-center gap-1.5"><input type="checkbox"><span class="text-[9px]">Etching</span></label>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[8px] font-bold text-slate-500 mb-0.5">Description *</label>
+                <textarea class="w-full p-1.5 bg-slate-50 border rounded text-[10px] h-12" placeholder="Describe the problem...">Plasma chamber not igniting. Pressure stable but no glow visible.</textarea>
+              </div>
+              <div class="flex gap-2 pt-1">
+                <button class="flex-1 py-1.5 text-[10px] text-slate-500 font-bold">Cancel</button>
+                <button class="flex-1 py-1.5 bg-red-600 text-white font-bold rounded text-[10px]">Submit Report</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- end sec-u -->
+
+    <!-- ════════════ PIC ════════════ -->
+    <div class="sec-p space-y-12">
+
+      <!-- P1 ADMIN GATE -->
+      <section id="p1">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">1</div>
+              <h2 class="text-xl font-black text-slate-900">Admin Email Gate</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Click <strong>Control</strong> on the home dashboard. You'll be asked for your PIC email.</p>
+            <p class="text-xs text-slate-600">Only emails registered as a coordinator (in the Config sheet) are accepted. The system unlocks the panel pre-filtered to your assigned lab.</p>
+          </div>
+
+          <!-- SNAPSHOT: Admin Gate -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">PIC Gate</span>
+            </div>
+            <div class="bg-white p-8 text-center">
+              <div class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white mx-auto mb-3 text-xl">
+                <i class="ph-fill ph-shield-check"></i>
+              </div>
+              <div class="text-sm font-bold text-slate-800 mb-1">PIC Access Required</div>
+              <div class="text-[10px] text-slate-500 mb-4">Enter your coordinator email to access PIC Control Operations.</div>
+              <label class="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-1 text-left">Coordinator Email</label>
+              <input type="email" class="w-full p-2 border border-slate-200 rounded-xl text-[11px] mb-3" placeholder="coordinator@imen.ukm.edu.my">
+              <button class="w-full py-2 bg-slate-900 text-white font-bold rounded-xl text-[11px] flex items-center justify-center gap-1">
+                <i class="ph-bold ph-sign-in"></i> Verify &amp; Enter
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P2 PENDING BOOKINGS -->
+      <section id="p2" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">2</div>
+              <h2 class="text-xl font-black text-slate-900">Approve / Reject Bookings</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">The Pending Bookings tab is the first thing you see. Review each request: user, date, equipment, payment method.</p>
+            <div class="space-y-2 text-xs">
+              <div class="bg-emerald-50 p-2 rounded border-l-2 border-emerald-400">
+                <strong>Approve</strong> — user gets approval email
+              </div>
+              <div class="bg-red-50 p-2 rounded border-l-2 border-red-400">
+                <strong>Reject</strong> — add a reason in remarks (required)
+              </div>
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Pending Bookings Table -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec?view=admin</span>
+              <span class="snap-label">Admin</span>
+            </div>
+            <div class="mock-body p-3">
+              <div class="flex gap-2 border-b border-slate-200 mb-2">
+                <button class="px-2 py-1 text-[10px] font-bold text-slate-800 border-b-2 border-blue-600">Pending (3)</button>
+                <button class="px-2 py-1 text-[10px] text-slate-500">History</button>
+                <button class="px-2 py-1 text-[10px] text-slate-500">Equipment</button>
+                <button class="px-2 py-1 text-[10px] text-slate-500">Labs</button>
+                <button class="px-2 py-1 text-[10px] text-slate-500">Coordinators</button>
+              </div>
+              <!-- Booking row -->
+              <div class="bg-white border border-slate-200 rounded-xl p-2 mb-2">
+                <div class="flex justify-between items-start mb-1.5">
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-800">Ahmad bin Yusof</div>
+                    <div class="text-[8px] text-slate-500">A186452 · FKAB</div>
+                  </div>
+                  <span class="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">Pending</span>
+                </div>
+                <div class="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9px] text-slate-600 mb-1.5">
+                  <div><strong>Equipment:</strong> PECVD System</div>
+                  <div><strong>Date:</strong> 2026-05-09</div>
+                  <div><strong>Slot:</strong> Morning</div>
+                  <div><strong>Process:</strong> Deposition › PECVD</div>
+                  <div><strong>Material:</strong> Silicon wafer</div>
+                  <div><strong>Payment:</strong> Grant — GUP-2024-001</div>
+                </div>
+                <div class="flex gap-1.5">
+                  <input class="flex-1 p-1 border border-slate-200 rounded text-[9px]" placeholder="Remarks (required for reject)">
+                  <button class="px-2 py-1 bg-emerald-500 text-white text-[9px] font-bold rounded">✓ Approve</button>
+                  <button class="px-2 py-1 bg-red-500 text-white text-[9px] font-bold rounded">✗ Reject</button>
+                </div>
+              </div>
+              <div class="bg-white border border-slate-200 rounded-xl p-2 opacity-60">
+                <div class="flex justify-between items-start mb-1">
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-800">Siti Aminah</div>
+                    <div class="text-[8px] text-slate-500">B221033 · FST</div>
+                  </div>
+                  <span class="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">Pending</span>
+                </div>
+                <div class="text-[9px] text-slate-500">SEM Hitachi · 2026-05-12 · Afternoon · Cash</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P3 BOOKING HISTORY -->
+      <section id="p3" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">3</div>
+              <h2 class="text-xl font-black text-slate-900">Booking History</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">The History tab shows all past bookings with filters for status and month. You can revoke any approved or rejected booking — useful when equipment unexpectedly goes down.</p>
+          </div>
+
+          <!-- SNAPSHOT: History Table -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec?view=admin</span>
+              <span class="snap-label">History</span>
+            </div>
+            <div class="mock-body p-3">
+              <div class="flex gap-1.5 mb-2">
+                <select class="p-1 bg-white border border-slate-200 rounded text-[9px]">
+                  <option>All Status</option>
+                </select>
+                <select class="p-1 bg-white border border-slate-200 rounded text-[9px]">
+                  <option>May 2026</option>
+                </select>
+                <button class="ml-auto px-2 py-1 bg-purple-600 text-white text-[9px] font-bold rounded">Export CSV</button>
+              </div>
+              <table class="w-full text-[9px] border-collapse">
+                <thead class="bg-purple-50">
+                  <tr>
+                    <th class="p-1.5 text-left">User</th>
+                    <th class="p-1.5 text-left">Equipment</th>
+                    <th class="p-1.5 text-left">Date</th>
+                    <th class="p-1.5 text-left">Status</th>
+                    <th class="p-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-b border-slate-100">
+                    <td class="p-1.5">Ahmad bin Yusof</td>
+                    <td class="p-1.5">PECVD</td>
+                    <td class="p-1.5">2026-05-09</td>
+                    <td class="p-1.5"><span class="bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded font-bold">Approved</span></td>
+                    <td class="p-1.5 text-right"><button class="text-amber-600 font-bold">Revoke</button></td>
+                  </tr>
+                  <tr class="border-b border-slate-100">
+                    <td class="p-1.5">Siti Aminah</td>
+                    <td class="p-1.5">SEM Hitachi</td>
+                    <td class="p-1.5">2026-05-04</td>
+                    <td class="p-1.5"><span class="bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded font-bold">Approved</span></td>
+                    <td class="p-1.5 text-right"><button class="text-amber-600 font-bold">Revoke</button></td>
+                  </tr>
+                  <tr class="border-b border-slate-100">
+                    <td class="p-1.5">Lee Wei Ming</td>
+                    <td class="p-1.5">XRD Bruker</td>
+                    <td class="p-1.5">2026-05-02</td>
+                    <td class="p-1.5"><span class="bg-red-100 text-red-700 px-1 py-0.5 rounded font-bold">Rejected</span></td>
+                    <td class="p-1.5 text-right"><button class="text-slate-400 font-bold">Re-open</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P4 EQUIPMENT LIST -->
+      <section id="p4" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">4</div>
+              <h2 class="text-xl font-black text-slate-900">Equipment List</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">The Equipment tab lists all gear in your lab. Add new equipment, edit, delete, or change status.</p>
+            <p class="text-xs text-slate-600">The 🔧 icon next to status indicates partial maintenance — some processes are flagged but the equipment is still partially usable.</p>
+          </div>
+
+          <!-- SNAPSHOT: Equipment Admin -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec?view=admin</span>
+              <span class="snap-label">Equipment</span>
+            </div>
+            <div class="mock-body p-3">
+              <div class="flex gap-1.5 mb-2">
+                <input class="flex-1 p-1 bg-white border border-slate-200 rounded text-[9px]" placeholder="Search...">
+                <button class="px-2 py-1 bg-blue-600 text-white text-[9px] font-bold rounded flex items-center gap-1"><i class="ph-bold ph-plus"></i> Add Equipment</button>
+                <button class="px-2 py-1 bg-slate-700 text-white text-[9px] font-bold rounded">Export CSV</button>
+              </div>
+              <div class="space-y-1.5">
+                <!-- Active -->
+                <div class="bg-white border border-slate-200 rounded-lg p-2 flex items-center gap-2">
+                  <div class="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center"><i class="ph-fill ph-cube text-slate-500 text-sm"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[10px] font-bold text-slate-800 truncate">PECVD System — Oxford</div>
+                    <div class="text-[8px] text-slate-500">UKM-CR-042 · Cleanroom</div>
+                  </div>
+                  <span class="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">Active</span>
+                  <button class="text-blue-600"><i class="ph-bold ph-pencil text-[12px]"></i></button>
+                  <button class="text-red-500"><i class="ph-bold ph-trash text-[12px]"></i></button>
+                </div>
+                <!-- Maintenance -->
+                <div class="bg-red-50/50 border border-red-100 rounded-lg p-2 flex items-center gap-2">
+                  <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center"><i class="ph-fill ph-wrench text-red-500 text-sm"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[10px] font-bold text-slate-800 truncate">SEM Hitachi SU-1000</div>
+                    <div class="text-[8px] text-red-600">Detector replacement in progress</div>
+                  </div>
+                  <span class="text-[8px] bg-red-500 text-white px-1.5 py-0.5 rounded font-bold">Maintenance</span>
+                  <button class="text-blue-600"><i class="ph-bold ph-pencil text-[12px]"></i></button>
+                </div>
+                <!-- Partial -->
+                <div class="bg-white border border-slate-200 rounded-lg p-2 flex items-center gap-2">
+                  <div class="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center"><i class="ph-fill ph-cube text-slate-500 text-sm"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[10px] font-bold text-slate-800 truncate flex items-center gap-1">XRD Bruker D8 <i class="ph-fill ph-wrench text-orange-500 text-[10px]"></i></div>
+                    <div class="text-[8px] text-orange-600">Partial — GIXRD mode down</div>
+                  </div>
+                  <span class="text-[8px] bg-orange-500 text-white px-1.5 py-0.5 rounded font-bold">Partial</span>
+                  <button class="text-blue-600"><i class="ph-bold ph-pencil text-[12px]"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P5 EDIT EQUIPMENT -->
+      <section id="p5" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">5</div>
+              <h2 class="text-xl font-black text-slate-900">Add or Edit Equipment</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Click the edit icon (or "Add Equipment") to open the form. Configure all properties — basic info, status, access mode, calibration, and material/process options.</p>
+            <p class="text-xs text-slate-600">Tracking unit determines what the user sees as the sample-quantity label (pcs, mg, g, hours).</p>
+          </div>
+
+          <!-- SNAPSHOT: Edit Equipment -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Edit</span>
+            </div>
+            <div class="bg-slate-900 text-white p-3">
+              <div class="text-sm font-bold">Edit Equipment</div>
+              <div class="text-[8px] text-slate-400 uppercase tracking-widest">Code: UKM-CR-042</div>
+            </div>
+            <div class="bg-white p-3 space-y-2 max-h-[420px] overflow-y-auto">
+              <div>
+                <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Equipment Name *</label>
+                <input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="PECVD System — Oxford">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Asset ID *</label><input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="UKM-CR-042"></div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Lab *</label><select class="w-full p-1.5 bg-slate-50 border rounded text-[10px]"><option>Cleanroom</option></select></div>
+              </div>
+              <div>
+                <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Image URL</label>
+                <input class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="https://drive.google.com/...">
+              </div>
+              <div>
+                <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Description</label>
+                <textarea class="w-full p-1.5 bg-slate-50 border rounded text-[10px] h-12">Plasma-enhanced CVD for SiO₂ and Si₃N₄ deposition.</textarea>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Status</label>
+                  <select class="w-full p-1.5 bg-emerald-50 border border-emerald-200 rounded text-[10px] text-emerald-800 font-bold"><option>Active</option></select>
+                </div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Access</label>
+                  <select class="w-full p-1.5 bg-slate-50 border rounded text-[10px]"><option>Both</option></select>
+                </div>
+                <div><label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Unit</label>
+                  <select class="w-full p-1.5 bg-slate-50 border rounded text-[10px]"><option>Quantity (pcs)</option></select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[8px] font-bold text-slate-500 mb-0.5 uppercase">Calibration Due</label>
+                <input type="date" class="w-full p-1.5 bg-slate-50 border rounded text-[10px]" value="2026-08-15">
+                <div class="text-[7px] text-emerald-600 mt-0.5">102 days remaining ✓</div>
+              </div>
+              <div class="bg-indigo-50 p-2 rounded border border-indigo-100">
+                <div class="text-[8px] font-bold text-indigo-800 uppercase mb-1">Process Capabilities</div>
+                <div class="bg-white p-1.5 rounded text-[9px] mb-1">
+                  <div class="font-bold text-indigo-900">Deposition</div>
+                  <div class="ml-2 text-slate-600">• PECVD <span class="text-indigo-500">(SiO₂, Si₃N₄)</span></div>
+                  <div class="ml-2 text-slate-600">• LPCVD <span class="text-indigo-500">(Poly-Si)</span></div>
+                </div>
+                <button class="text-[9px] text-indigo-600 font-bold">+ Add Process</button>
+              </div>
+              <div class="flex gap-2 pt-1">
+                <button class="flex-1 py-1.5 text-[10px] text-slate-500 font-bold">Cancel</button>
+                <button class="flex-1 py-1.5 bg-slate-900 text-white font-bold rounded text-[10px]">Save Changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P6 PROCESS BUILDER -->
+      <section id="p6" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">6</div>
+              <h2 class="text-xl font-black text-slate-900">Process Capability Builder</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Process capabilities use a 3-level hierarchy. Users see cascading dropdowns when booking — each level filters the next.</p>
+            <div class="text-xs text-slate-600 space-y-1">
+              <div class="flex items-center gap-1.5"><span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-mono text-[10px]">Process</span> top-level (e.g. Deposition)</div>
+              <div class="flex items-center gap-1.5 ml-3"><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-mono text-[10px]">└─ Variant</span> method (PECVD)</div>
+              <div class="flex items-center gap-1.5 ml-6"><span class="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono text-[10px]">└─ Specifics</span> recipe (SiO₂)</div>
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Process Builder -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec</span>
+              <span class="snap-label">Process</span>
+            </div>
+            <div class="bg-white p-3">
+              <div class="bg-purple-100 p-2 rounded border-l-2 border-purple-500 mb-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] font-bold text-purple-900">Deposition</span>
+                  <button class="text-red-500 text-[10px]"><i class="ph-bold ph-trash"></i></button>
+                </div>
+                <!-- Variants -->
+                <div class="ml-2 mt-1.5 border-l-2 border-purple-200 pl-2 space-y-1">
+                  <div class="bg-indigo-100 p-1.5 rounded">
+                    <div class="flex justify-between items-center">
+                      <span class="text-[9px] font-bold text-indigo-900">PECVD</span>
+                      <button class="text-red-500 text-[9px]">×</button>
+                    </div>
+                    <!-- Specifics -->
+                    <div class="ml-2 mt-1 flex flex-wrap gap-1">
+                      <span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[8px] font-mono">SiO₂ @ 300°C</span>
+                      <span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[8px] font-mono">Si₃N₄ @ 350°C</span>
+                      <button class="text-blue-600 text-[8px] font-bold">+ Add</button>
+                    </div>
+                  </div>
+                  <div class="bg-indigo-100 p-1.5 rounded">
+                    <div class="flex justify-between items-center">
+                      <span class="text-[9px] font-bold text-indigo-900">LPCVD</span>
+                    </div>
+                    <div class="ml-2 mt-1">
+                      <span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[8px] font-mono">Poly-Si</span>
+                    </div>
+                  </div>
+                  <button class="text-indigo-600 text-[9px] font-bold">+ Add Variant</button>
+                </div>
+              </div>
+              <button class="w-full py-1.5 border-2 border-dashed border-purple-300 text-purple-600 text-[10px] font-bold rounded">+ Add Process</button>
+              <p class="text-[8px] text-slate-500 mt-2">💡 Mark a variant as <strong>under maintenance</strong> via the wrench icon — only that variant becomes unbookable; the rest stay live.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- P7 COORDINATOR LIST -->
+      <section id="p7" class="sec-div">
+        <div class="step-row">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="num-p">7</div>
+              <h2 class="text-xl font-black text-slate-900">Coordinator &amp; Staff</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Manage who has PIC privileges. Adding an email here grants admin access for the assigned lab — no password needed.</p>
+            <div class="text-xs text-slate-600">
+              <strong>Coordinators</strong> = lab-specific admins · <strong>Technical Staff</strong> = global, get all issue alerts
+            </div>
+          </div>
+
+          <!-- SNAPSHOT: Coordinator List -->
+          <div class="snap">
+            <div class="snap-bar">
+              <span class="snap-dot bg-red-400"></span>
+              <span class="snap-dot bg-yellow-400"></span>
+              <span class="snap-dot bg-green-400"></span>
+              <span class="snap-url">.../exec?view=admin</span>
+              <span class="snap-label">PIC</span>
+            </div>
+            <div class="mock-body p-3">
+              <div class="text-[10px] font-bold text-slate-800 mb-2 flex justify-between items-center">
+                Lab Coordinators (PIC)
+                <button class="px-2 py-1 bg-purple-600 text-white text-[9px] font-bold rounded">+ Add Coordinator</button>
+              </div>
+              <div class="space-y-1">
+                <div class="bg-white border border-purple-100 rounded p-2 flex items-center gap-2">
+                  <div class="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold text-[10px]">RR</div>
+                  <div class="flex-1">
+                    <div class="text-[10px] font-bold text-slate-800">Dr. Roziana Razali</div>
+                    <div class="text-[8px] text-slate-500">roziana@imen.ukm.edu.my · Cleanroom</div>
+                  </div>
+                  <button class="text-blue-600"><i class="ph-bold ph-pencil text-[10px]"></i></button>
+                  <button class="text-red-500"><i class="ph-bold ph-trash text-[10px]"></i></button>
+                </div>
+                <div class="bg-white border border-purple-100 rounded p-2 flex items-center gap-2">
+                  <div class="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold text-[10px]">FA</div>
+                  <div class="flex-1">
+                    <div class="text-[10px] font-bold text-slate-800">Dr. Fauzan Ahmad</div>
+                    <div class="text-[8px] text-slate-500">fauzan@imen.ukm.edu.my · MEMS/NEMS</div>
+                  </div>
+                </div>
+                <div class="bg-white border border-purple-100 rounded p-2 flex items-center gap-2">
+                  <div class="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold text-[10px]">NS</div>
+                  <div class="flex-1">
+                    <div class="text-[10px] font-bold text-slate-800">Dr. Norashima Sahid</div>
+                    <div class="text-[8px] text-slate-500">norashima@imen.ukm.edu.my · Nanophotonics</div>
+                  </div>
+                </div>
+              </div>
+              <div class="text-[10px] font-bold text-slate-800 mt-3 mb-2">🛠 Technical Staff (Global)</div>
+              <div class="bg-white border border-slate-200 rounded p-2 flex items-center gap-2">
+                <div class="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold text-[10px]">AZ</div>
+                <div class="flex-1">
+                  <div class="text-[10px] font-bold text-slate-800">En. Azman Zakaria</div>
+                  <div class="text-[8px] text-slate-500">azman@imen.ukm.edu.my · Receives all alerts</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- end sec-p -->
+
+  </main>
+</div>
+
+<!-- ═══ CTA ═══ -->
+<div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white py-8 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <div class="text-xl font-black mb-2">Ready to use the system?</div>
+    <p class="text-blue-100 text-sm mb-4">Open the app or browse the full text guide for more detail.</p>
+    <div class="flex justify-center gap-3 flex-wrap">
+      <a href="https://script.google.com/macros/s/AKfycbw1PrhjSzHsd__rxbEcXZp4iyF4v9e41pVYg1j7ewo6ocnPNw3CsdTt-j7UFb0NM-0l/exec" target="_blank" class="px-5 py-2.5 bg-white text-blue-700 font-bold rounded-xl shadow text-sm">Open i-Nstrumen ↗</a>
+      <a href="workflow-guide.html" class="px-5 py-2.5 bg-blue-900/40 hover:bg-blue-900/60 text-white font-bold rounded-xl border border-white/30 text-sm">📖 Full Text Guide</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="bg-slate-900 text-slate-400 py-6 px-4 text-center text-xs">
+  <div class="font-bold text-white text-sm mb-1">i-Nstrumen · IMEN Lab Management System</div>
+  <div>Institute of Microengineering and Nanoelectronics (IMEN) · Universiti Kebangsaan Malaysia</div>
+</footer>
+
+<script>
+function setRole(r) {
+  const cu = document.getElementById('tab-u'), cp = document.getElementById('tab-p');
+  const nu = document.getElementById('nav-u'), np = document.getElementById('nav-p');
+  const mc = document.getElementById('content');
+  if (r === 'u') {
+    cu.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold on-u';
+    cp.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600';
+    nu.classList.remove('hidden'); np.classList.add('hidden');
+    mc.className = 'flex-1 min-w-0 show-u fi';
+  } else {
+    cp.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold on-p';
+    cu.className = 'tab px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600';
+    np.classList.remove('hidden'); nu.classList.add('hidden');
+    mc.className = 'flex-1 min-w-0 show-p fi';
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+const obs = new IntersectionObserver(es => {
+  es.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('.nl').forEach(l => l.classList.remove('act'));
+      const lnk = document.querySelector(`.nl[href="#${e.target.id}"]`);
+      if (lnk) lnk.classList.add('act');
+    }
+  });
+}, { rootMargin: '-70px 0px -60% 0px' });
+document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+
+setRole('u');
+</script>
+</body>
+</html>
