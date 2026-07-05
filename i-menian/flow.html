@@ -175,7 +175,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
           <div class="m-check"><span class="box">✓</span><span data-i18n="s1_mock_check">I confirm the information is correct → directs me to the NDA & a short assessment.</span></div>
         </div>
       </div>
-      <div class="note green"><span class="ic">↩️</span><div data-i18n="s1_note">Returning applicant? The system recognises you, loads your photo on file, and skips the NDA &amp; assessment automatically.</div></div>
+      <div class="note green"><span class="ic">↩️</span><div data-i18n="s1_note">Applied before? The system may recognise your details and ask if you've registered with IMEN previously — if you confirm, you won't need to redo the NDA &amp; assessment.</div></div>
     </div>
   </div>
 
@@ -198,9 +198,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
           <button class="m-btn navy" data-i18n="s2_mock_btn">Agree / Setuju</button>
         </div>
       </div>
-      <div class="note gray"><span class="ic">🔁</span><div data-i18n="s2_route_note">In the background, your NDA is routed for endorsement — you don't wait:</div></div>
+      <div class="note gray"><span class="ic">🔁</span><div data-i18n="s2_route_note">You're done with the NDA once you agree. Your supervisor and the Director endorse it in the background — only after your application is approved and your access is registered, so a form that gets rejected never troubles them:</div></div>
       <div class="route">
-        <span class="node me" data-i18n="r_you">You sign</span><span class="arr">→</span>
+        <span class="node me" data-i18n="r_you">You agree</span><span class="arr">→</span>
         <span class="node" data-i18n="r_sv">Supervisor endorses</span><span class="arr">→</span>
         <span class="node" data-i18n="r_dir">Director approves</span>
       </div>
@@ -337,15 +337,15 @@ const T = {
     spam:'Emails may land in your Spam / Junk folder — always check there too',
     track:'Track your application anytime under the “Status” tab in the portal',
     fab:'Apply Now', fab_sub:'Start your application', you:'You', staff:'Staff', approve:'Approve', reject:'Reject',
-    r_you:'You sign', r_sv:'Supervisor endorses', r_dir:'Director approves',
+    r_you:'You agree', r_sv:'Supervisor endorses', r_dir:'Director approves',
     s1_who:'Step 1\nYou', s1_title:'Fill in the form & confirm',
     s1_desc:'Complete the registration form, then tick the confirmation box. The system instantly checks whether you have registered before.',
     s1_mock_check:'I confirm the information is correct → directs me to the NDA & a short assessment.',
-    s1_note:'Returning applicant? The system recognises you, loads your photo on file, and skips the NDA & assessment automatically.',
+    s1_note:"Applied before? The system may recognise your details and ask if you've registered with IMEN previously — if you confirm, you won't need to redo the NDA & assessment.",
     s2_who:'Step 2\nNDA', s2_title:'Sign the Non-Disclosure Agreement',
     s2_desc:"An NDA pops up with your name & project pre-filled. Enter your IC / passport and tap Agree. You move on immediately — no need to wait for it to be fully signed.",
     s2_mock_btn:'Agree / Setuju',
-    s2_route_note:"In the background, your NDA is routed for endorsement — you don't wait:",
+    s2_route_note:"You're done with the NDA once you agree. Your supervisor and the Director endorse it in the background — only after your application is approved and your access is registered, so a form that gets rejected never troubles them:",
     s3_who:'Step 3\nTest', s3_title:'Pass the safety assessment',
     s3_desc:'Answer all the lab-safety questions. A perfect score is required to continue — you can retake it as many times as needed.',
     s3_mock_btn:'Submit Session',
@@ -374,15 +374,15 @@ const T = {
     spam:'E-mel mungkin tersimpan dalam folder Spam / Sampah anda — sila semak di sana juga',
     track:'Jejaki permohonan anda pada bila-bila masa di tab “Status” dalam portal',
     fab:'Mohon Sekarang', fab_sub:'Mulakan permohonan anda', you:'Anda', staff:'Kakitangan', approve:'Luluskan', reject:'Tolak',
-    r_you:'Anda tandatangan', r_sv:'Penyelia perakui', r_dir:'Pengarah luluskan',
+    r_you:'Anda bersetuju', r_sv:'Penyelia perakui', r_dir:'Pengarah luluskan',
     s1_who:'Langkah 1\nAnda', s1_title:'Isi borang & sahkan',
     s1_desc:'Lengkapkan borang pendaftaran, kemudian tandakan kotak pengesahan. Sistem akan menyemak serta-merta sama ada anda pernah mendaftar sebelum ini.',
     s1_mock_check:'Saya sahkan maklumat ini betul → membawa saya ke NDA & penilaian ringkas.',
-    s1_note:'Pemohon berulang? Sistem mengenali anda, memuatkan foto sedia ada, dan melangkau NDA & penilaian secara automatik.',
+    s1_note:'Pernah memohon sebelum ini? Sistem mungkin mengenali maklumat anda dan bertanya sama ada anda pernah mendaftar dengan IMEN — jika anda mengesahkannya, anda tidak perlu mengulang NDA & penilaian.',
     s2_who:'Langkah 2\nNDA', s2_title:'Tandatangani Perjanjian Kerahsiaan',
     s2_desc:'NDA akan dipaparkan dengan nama & projek anda terisi. Masukkan No. Kad Pengenalan / pasport dan tekan Setuju. Anda terus ke langkah seterusnya — tidak perlu menunggu ia ditandatangani sepenuhnya.',
     s2_mock_btn:'Setuju / Agree',
-    s2_route_note:'Di latar belakang, NDA anda dihantar untuk perakuan — anda tidak perlu menunggu:',
+    s2_route_note:'Anda selesai dengan NDA sebaik sahaja bersetuju. Penyelia dan Pengarah akan memperakuinya di latar belakang — hanya selepas permohonan anda diluluskan dan akses anda didaftarkan, jadi borang yang ditolak tidak akan mengganggu mereka:',
     s3_who:'Langkah 3\nUjian', s3_title:'Lulus penilaian keselamatan',
     s3_desc:'Jawab semua soalan keselamatan makmal. Markah penuh diperlukan untuk meneruskan — anda boleh menduduki semula seberapa kerap yang perlu.',
     s3_mock_btn:'Hantar Sesi',
