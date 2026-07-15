@@ -1,0 +1,2374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ── Security: Content-Security-Policy ── -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'self' https://script.google.com;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+    <title>i-Menian | Lab Access</title>
+    <script>
+    // ── GITHUB-PAGES MODE SHIM ────────────────────────────────────────────────
+    // When THIS file is served from GitHub Pages, the native google.script.run
+    // (provided only inside Google's sandbox) does not exist. This shim recreates
+    // it on top of fetch() → the Apps Script JSON API (doPost in Code.gs), so every
+    // existing google.script.run call works UNCHANGED in both environments.
+    //   • On script.google.com (and the APK WebView) native google.script.run is
+    //     present → this shim returns immediately and does nothing.
+    //   • On a LOCAL dev server (localhost) it also returns → the mock block in
+    //     <body> drives the offline preview as before.
+    //   • On GitHub Pages it installs the fetch bridge.
+    // NOTE: google.script.url has no bridge here — readUrlParams() (in the app)
+    // falls back to window.location.search when it's absent.
+    (function () {
+        if (window.google && window.google.script && window.google.script.run) return; // native GAS
+        var host = location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '') return; // local preview → mock
+
+        // ⚠️ VERIFY this is the CURRENT deployment: Apps Script ▸ Deploy ▸ Manage
+        //    deployments ▸ (active) ▸ Web app URL. A stale ID = every call fails. ⚠️
+        var API_URL = 'https://script.google.com/macros/s/AKfycbx7kSzb09RIJfuj4hL4t8TzLeAIvv54uuWiaIbLLomt_mN0mNWjV1Zs3nfnG2hK_ebwzg/exec';
+        // Must match the doPost whitelist in Code.gs exactly.
+        var API_FNS = ['getInitialData','getNdaContent','getAssessmentQuestions','getApplicationPhoto',
+                       'getPhotosBatch','lookupReturningApplicant','precheckApplicant','verifyAdminPin',
+                       'verifyStaffAccess','verifyEmailToken','submitFullApplication','submitAssessmentResults',
+                       'updateApplicationStatus','saveAdmsId','assignRoleToLab','initiateAccessVerification',
+                       'syncStaffData','syncLabData'];
+
+        function makeRunner() {
+            var onOk  = function () {};
+            var onErr = function (e) { console.error('[API] ', e); };
+            var runner = {
+                withSuccessHandler: function (fn) { if (fn) onOk  = fn; return runner; },
+                withFailureHandler: function (fn) { if (fn) onErr = fn; return runner; },
+                withUserObject:     function ()   { return runner; }
+            };
+            API_FNS.forEach(function (name) {
+                runner[name] = function () {
+                    var args = Array.prototype.slice.call(arguments);
+                    fetch(API_URL, {
+                        method:  'POST',
+                        // text/plain keeps this a CORS "simple request" (no preflight).
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body:    JSON.stringify({ fn: name, args: args })
+                    })
+                    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                    .then(function (data) {
+                        if (data && data.ok) onOk(data.result);
+                        else onErr(new Error((data && data.error) || 'Unknown API error'));
+                    })
+                    .catch(function (e) { onErr(e); });
+                };
+            });
+            return runner;
+        }
+
+        window.google = window.google || {};
+        window.google.script = window.google.script || {};
+        // Getter → every `google.script.run.…` expression gets a FRESH runner, so
+        // two in-flight calls can never share/overwrite each other's handlers.
+        Object.defineProperty(window.google.script, 'run', { get: makeRunner });
+    })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f2f2f7; color: #1c1c1e; text-align: left; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+        .ios-card { border-radius: 24px; background: #ffffff; border: 1px solid rgba(0, 0, 0, 0.05); }
+        .ios-input { border-radius: 12px; background: #f2f2f7; border: 1px solid transparent; padding: 12px 16px; outline: none; transition: all 0.2s; font-size: 14px; width: 100%; font-weight: 500; }
+        .ios-input:focus { background: #ffffff; border-color: #007aff; box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1); }
+        .btn-primary { background: #007aff; color: #ffffff; border-radius: 16px; font-weight: 600; transition: all 0.2s; border: none; cursor: pointer; text-align: center; }
+        .btn-danger { background: #ff3b30; color: #ffffff; border-radius: 16px; font-weight: 600; transition: all 0.2s; border: none; cursor: pointer; text-align: center; }
+        .loader { border: 2.5px solid #f3f3f3; border-top: 2.5px solid #007aff; border-radius: 50%; width: 22px; height: 22px; animation: spin 1s linear infinite; margin: auto; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .modal-bg { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(10px); position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+        /* ADMS ID input styling */
+        .adms-input {
+            background: #f0f7ff;
+            border: 1.5px solid #93c5fd;
+            border-radius: 10px;
+            padding: 9px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Inter', monospace;
+            color: #1e3a8a;
+            outline: none;
+            transition: all 0.2s;
+            width: 100%;
+            letter-spacing: 0.04em;
+        }
+        .adms-input:focus { background: white; border-color: #1e3a8a; box-shadow: 0 0 0 3px rgba(30,58,138,0.1); }
+        .adms-input::placeholder { color: #93c5fd; font-weight: 500; letter-spacing: 0; }
+
+        /* =============================================
+           Lab Registration Page (ApplicationForm)
+           ============================================= */
+        .reg-page {
+            min-height: 100vh;
+            display: flex;
+            background: #f0f4f8;
+            position: relative;
+            overflow: hidden;
+        }
+        .reg-page::before {
+            content: '';
+            position: absolute;
+            top: -160px;
+            left: -120px;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(30, 58, 138, 0.11) 0%, rgba(37, 99, 235, 0.05) 40%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .reg-page::after {
+            content: '';
+            position: absolute;
+            bottom: -200px;
+            right: -100px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(30, 58, 138, 0.07) 0%, transparent 65%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .reg-hero {
+            width: 42%;
+            min-height: 100vh;
+            padding: 64px 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            z-index: 1;
+        }
+        @media (max-width: 900px) { .reg-hero { display: none; } }
+        .reg-tags {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 48px;
+        }
+        .reg-tag-label { font-size: 12px; font-weight: 600; color: #9ca3af; letter-spacing: 0.03em; }
+        .reg-tag {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 9999px;
+            padding: 5px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            white-space: nowrap;
+        }
+        .reg-tag.active { background: #1e3a8a; border-color: #1e3a8a; color: white; }
+        .reg-tag-more { font-size: 12px; font-weight: 600; color: #9ca3af; }
+        .reg-headline {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: clamp(36px, 4vw, 52px);
+            font-weight: 800;
+            line-height: 1.1;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+            margin-bottom: 20px;
+        }
+        .reg-headline .accent { color: #1e3a8a; }
+        .reg-subtext { font-size: 14px; color: #6b7280; line-height: 1.7; max-width: 340px; margin-bottom: 40px; }
+        .reg-cta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: #1e3a8a;
+            color: white;
+            border-radius: 9999px;
+            padding: 14px 28px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            box-shadow: 0 4px 24px rgba(30, 58, 138, 0.30);
+            border: none;
+            cursor: default;
+        }
+        .reg-preview-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px 24px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .reg-preview-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+        .reg-step-chip { padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .reg-step-chip.done   { background: #dbeafe; color: #1e3a8a; }
+        .reg-step-chip.active { background: #1e3a8a; color: white; }
+        .reg-step-chip.idle   { background: #f1f5f9; color: #94a3b8; }
+        .reg-form-panel {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 48px 40px;
+            overflow-y: auto;
+            position: relative;
+            z-index: 1;
+        }
+        @media (max-width: 900px) { .reg-form-panel { padding: 32px 20px; } }
+        .reg-form-card {
+            background: white;
+            border-radius: 28px;
+            padding: 48px 44px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 8px 48px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .reg-form-title { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; margin-bottom: 4px; }
+        .reg-form-sub { font-size: 13px; color: #9ca3af; font-weight: 500; margin-bottom: 32px; }
+        .reg-section-label {
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #3b82f6;
+            margin-bottom: 12px;
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .reg-section-label::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+        .reg-input {
+            width: 100%;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 11px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f172a;
+            outline: none;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+        .reg-input:focus { background: white; border-color: #1e3a8a; box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.08); }
+        .reg-input::placeholder { color: #94a3b8; font-weight: 500; }
+        .reg-input:disabled { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+        .reg-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #1e3a8a; margin-bottom: 6px; display: block; }
+        .reg-photo-ring {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            border: 2px dashed #93c5fd;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .reg-photo-ring:hover { border-color: #1e3a8a; }
+        .reg-submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(30, 58, 138, 0.30);
+            transition: all 0.2s;
+            margin-top: 32px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .reg-submit-btn:hover { background: #1e40af; box-shadow: 0 6px 28px rgba(30, 58, 138, 0.40); transform: translateY(-1px); }
+        .reg-submit-btn:disabled { background: #cbd5e1; box-shadow: none; color: #94a3b8; cursor: not-allowed; transform: none; }
+        .reg-success {
+            min-height: 100vh;
+            background: #f0f4f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        .reg-success-card {
+            background: white;
+            border-radius: 28px;
+            padding: 64px 48px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 8px 48px rgba(0,0,0,0.08);
+        }
+        .reg-success-icon {
+            width: 72px; height: 72px;
+            background: #dbeafe;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .reg-success-title {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 28px; font-weight: 800;
+            color: #0f172a; margin-bottom: 10px;
+            letter-spacing: -0.02em;
+        }
+    </style>
+</head>
+<body>
+    <div id="lab-access-root"></div>
+
+    <!-- Mock google.script.* for local preview only — has no effect inside GAS -->
+    <script>
+    if (typeof google === 'undefined') {
+        var _mockData = {
+            applications: [], lab_users: [], config: {},
+            staff: [ {ID:'IMN_1', Name:'Dr. Ahmad Sample', Email:'ahmad@example.com', Role:'AKADEMIK'} ],
+            labs: [ {ID:'LAB_1', Name:'Cleanroom Fabrication Lab', PIC_ID:'IMN_1', HOL_ID:'IMN_1'},
+                    {ID:'LAB_2', Name:'Characterization Lab', PIC_ID:'IMN_1', HOL_ID:'IMN_1'} ],
+            supervisors: [ {id:'Dr. Ahmad Sample', name:'Dr. Ahmad Sample'} ]
+        };
+
+        /* Build a chainable runner — each call to withSuccessHandler / withFailureHandler
+           returns a fresh proxy that remembers the callbacks, and any other property
+           access is treated as the actual RPC method invocation.                          */
+        function _makeRunner(sCb, fCb) {
+            return new Proxy({}, {
+                get: function(_, name) {
+                    if (name === 'withSuccessHandler') {
+                        return function(cb) { return _makeRunner(cb, fCb); };
+                    }
+                    if (name === 'withFailureHandler') {
+                        return function(cb) { return _makeRunner(sCb, cb); };
+                    }
+                    /* Anything else = RPC method */
+                    return function() {
+                        var _args = arguments;
+                        setTimeout(function() {
+                            try {
+                                var result;
+                                if (name === 'getInitialData')   result = _mockData;
+                                else if (name === 'loadQuestions') result = [];
+                                else if (name === 'verifyAdminPin') result = false;
+                                else if (name === 'verifyStaffAccess') result = { ok: false }; // always denied in local preview (no DB access)
+                                else if (name === 'verifyEmailToken')  result = { ok: false }; // always denied in local preview (no DB access)
+                                else if (name === 'precheckApplicant')      { var _c=String((_args[0]||{}).category||''); var _st=/staff/i.test(_c); var _em=String((_args[0]||{}).email||'').toLowerCase(); var _ret=/return/.test(_em); result = _ret ? { isStaff:false, isReturning:true, admsId:'643', needsNda:false, needsAssessment:false, hasPhoto:true } : { isStaff:_st, isReturning:false, admsId:'', needsNda:!_st, needsAssessment:!_st, hasPhoto:false }; }
+                                else if (name === 'lookupReturningApplicant'){ var _e=String((_args[0]||{}).email||'').toLowerCase(); result = /return/.test(_e) ? { found:true, name:'Ahmad bin Razali', photo:'' } : { found:false }; }
+                                else if (name === 'submitFullApplication')  result = { success:true, id:'APP_PREVIEW' };
+                                else if (name === 'getNdaContent')          result = null;  // NdaModal falls back to bundled NDA_CONTENT
+                                else if (name === 'getAssessmentQuestions') result = [
+                                    {id:'Q1', text_en:'Sample: What must you wear inside the cleanroom?', text_ms:'Contoh: Apakah yang perlu dipakai di dalam bilik bersih?', options_en:{A:'The proper PPE / cleanroom suit',B:'Slippers',C:'Shorts',D:'Nothing special'}, options_ms:{A:'PPE / sut bilik bersih yang betul',B:'Selipar',C:'Seluar pendek',D:'Tiada apa-apa khas'}, answer:'A'},
+                                    {id:'Q2', text_en:'Sample: Who should you report a lab incident to?', text_ms:'Contoh: Kepada siapa anda perlu melaporkan insiden makmal?', options_en:{A:'The Lab PIC / safety officer',B:'No one',C:'Social media',D:'Just ignore it'}, options_ms:{A:'PIC / pegawai keselamatan makmal',B:'Tiada sesiapa',C:'Media sosial',D:'Abaikan sahaja'}, answer:'A'}
+                                ];
+                                else result = null;
+                                if (sCb) sCb(result);
+                            } catch(e) {
+                                if (fCb) fCb(e);
+                            }
+                        }, 80);
+                    };
+                }
+            });
+        }
+
+        window.google = {
+            script: {
+                run: _makeRunner(null, null),
+                url: {
+                    getLocation: function(cb) {
+                        setTimeout(function(){ cb({ parameter:{}, hash:'' }); }, 40);
+                    }
+                }
+            }
+        };
+    }
+    </script>
+
+    <script type="text/babel-app" id="app-src">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // Read URL query params across ALL environments:
+        //   • native GAS — the app runs in a sandboxed iframe, so the real query
+        //     string lives on the OUTER url; google.script.url.getLocation reads it.
+        //   • local preview — the mock provides the same getLocation (returns {}).
+        //   • GitHub Pages — no google.script.url; read window.location.search.
+        function readUrlParams(cb) {
+            try {
+                if (window.google && window.google.script && window.google.script.url
+                    && typeof window.google.script.url.getLocation === 'function') {
+                    window.google.script.url.getLocation(function (loc) { cb((loc && loc.parameter) || {}); });
+                    return;
+                }
+            } catch (e) {}
+            var p = {};
+            try { new URLSearchParams(window.location.search).forEach(function (v, k) { p[k] = v; }); } catch (e) {}
+            cb(p);
+        }
+
+        // Permanent access exceptions — these users cannot be subject to revocation.
+        // Matching is case-insensitive partial match on distinctive name tokens.
+        const PROTECTED_NAME_TOKENS = ['ahmad ashrif', 'shafii', 'hazde'];
+        const isProtectedUser = (name) => {
+            if (!name) return false;
+            const lower = String(name).toLowerCase();
+            return PROTECTED_NAME_TOKENS.some(token => lower.includes(token));
+        };
+
+        const Icons = {
+            Back: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>,
+            Search: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>,
+            Chevron: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>,
+            ArrowRight: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>,
+            AppIcon: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" /><path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm-12.06 7.5a2.25 2.25 0 00-2.25 2.25v2.25a2.25 2.25 0 002.25 2.25h2.25a2.25 2.25 0 002.25-2.25v-2.25a2.25 2.25 0 00-2.25-2.25h-2.25z" /></svg>,
+            User: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 117.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>,
+            Gear: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.42 24.42 0 010 3.46" /></svg>,
+            Refresh: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>,
+            Check: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>,
+            Camera: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"/></svg>,
+            IdCard: (p) => <svg {...p} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" /></svg>
+        };
+
+        const ConfirmModal = ({ show, title, msg, onConfirm, onCancel, onConfirmSkipVisit }) => {
+            const [clicked, setClicked] = useState(false);
+            if (!show) return null;
+            const handleConfirm = () => {
+                if (clicked) return;
+                setClicked(true);
+                onConfirm();
+            };
+            const handleSkipVisit = () => {
+                if (clicked) return;
+                setClicked(true);
+                onConfirmSkipVisit();
+            };
+            return (
+                <div className="modal-bg animate-ios">
+                    <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl text-center">
+                        <h3 className="text-xl font-bold mb-2">{title}</h3>
+                        <p className="text-gray-500 text-sm mb-8 leading-relaxed">{msg}</p>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleConfirm}
+                                disabled={clicked}
+                                className={`w-full py-4 rounded-2xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${clicked ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#007aff] text-white'}`}
+                            >
+                                {clicked && <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>}
+                                {clicked ? 'Processing…' : 'Confirm'}
+                            </button>
+                            {onConfirmSkipVisit && (
+                                <button
+                                    onClick={handleSkipVisit}
+                                    disabled={clicked}
+                                    className={`w-full py-4 rounded-2xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${clicked ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#34c759] text-white'}`}
+                                >
+                                    {clicked && <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>}
+                                    {clicked ? 'Processing…' : 'Confirm (No Visit)'}
+                                </button>
+                            )}
+                            <button onClick={onCancel} disabled={clicked} className="w-full py-4 rounded-2xl font-bold text-sm text-gray-400 disabled:opacity-30 transition-opacity">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const RejectModal = ({ show, onConfirm, onCancel }) => {
+            const [reason, setReason] = useState("");
+            const [clicked, setClicked] = useState(false);
+            if (!show) return null;
+            const handleConfirm = () => {
+                if (clicked || !reason.trim()) return;
+                setClicked(true);
+                onConfirm(reason);
+            };
+            return (
+                <div className="modal-bg animate-ios">
+                    <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl text-center">
+                        <h3 className="text-xl font-bold mb-4 text-[#ff3b30]">Reject Application</h3>
+                        <p className="text-gray-500 text-xs mb-2 text-left font-bold uppercase">Reason for Rejection</p>
+                        <textarea className="ios-input h-32 mb-8" placeholder="Please state the reason..." value={reason} onChange={e=>setReason(e.target.value)} autoFocus disabled={clicked}></textarea>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleConfirm}
+                                disabled={!reason.trim() || clicked}
+                                className={`w-full py-4 rounded-2xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${clicked ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#ff3b30] text-white'} disabled:opacity-50`}
+                            >
+                                {clicked && <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>}
+                                {clicked ? 'Processing…' : 'Confirm Rejection'}
+                            </button>
+                            <button onClick={onCancel} disabled={clicked} className="w-full py-4 rounded-2xl font-bold text-sm text-gray-400 disabled:opacity-30 transition-opacity">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        /* ─────────────────────────────────────────────────────────────────────
+           Security utilities
+           ───────────────────────────────────────────────────────────────────── */
+
+        // Strip any HTML / special chars before sending data to GAS
+        const _sanitize = (v) => String(v ?? '')
+            .replace(/<[^>]*>/g, '')          // no HTML tags
+            .replace(/[<>"'`\\;{}()]/g, '')   // no injection chars
+            .trim()
+            .substring(0, 512);               // hard cap on length
+
+        // Layer 2 session token — set on login, sent with every privileged GAS call.
+        // Empty for applicants/anonymous. Module-scoped so all components can read it.
+        let AUTH_TOKEN = '';
+
+        // Wrap every GAS runner call so inputs are always sanitised
+        const safeRun = (fn) => typeof google !== 'undefined' ? fn() : null;
+
+        /* ─────────────────────────────────────────────────────────────────────
+           Staff Login Modal
+           — No hints about what the credential is.
+           — Three red dots = wrong input (zero text clue).
+           — Five failures → locked for this session.
+           ───────────────────────────────────────────────────────────────────── */
+        const StaffLoginModal = ({ credential, setCredential, onSubmit, onClose, hasError, verifying }) => (
+            <div className="modal-bg animate-ios">
+                <div style={{background:'rgba(255,255,255,0.94)',backdropFilter:'blur(32px)',WebkitBackdropFilter:'blur(32px)',borderRadius:'32px',border:'1px solid rgba(255,255,255,0.9)',boxShadow:'0 24px 80px rgba(0,0,0,0.16)'}} className="w-full max-w-sm p-10 text-center">
+
+                    {/* Lock icon */}
+                    <div style={{width:'52px',height:'52px',borderRadius:'50%',background:'rgba(0,122,255,0.08)',border:'1px solid rgba(0,122,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px'}}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2"/>
+                            <path d="M7 11V7a5 5 0 0110 0v4"/>
+                        </svg>
+                    </div>
+
+                    <h3 className="text-xl font-bold mb-6">Restricted Access</h3>
+
+                    {/* Error message — no hint about credential type */}
+                    <div style={{height:'22px',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'10px'}}>
+                        {hasError && (
+                            <p style={{fontSize:'12px',fontWeight:'600',color:'#ff3b30',letterSpacing:'0.02em'}}>
+                                Credential not recognised.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Credential input — wrapped in form so browser can offer to save */}
+                    <form onSubmit={e => { e.preventDefault(); onSubmit(); }} autoComplete="on">
+                        {/* Hidden username field — required for browser password manager to save the pair */}
+                        <input type="text" autoComplete="username" style={{display:'none'}} readOnly tabIndex="-1" />
+
+                        <input
+                            type="password"
+                            className="w-full ios-input p-5 mb-8"
+                            style={{textAlign:'center',fontSize:'16px',letterSpacing:'0.22em'}}
+                            value={credential}
+                            onChange={e => { setCredential(e.target.value); }}
+                            autoFocus
+                            autoComplete="current-password"
+                            autoCorrect="off"
+                            spellCheck="false"
+                        />
+
+                        <div className="flex gap-4">
+                            <button type="button" onClick={onClose} disabled={verifying} className="flex-1 py-4 font-bold text-gray-400 disabled:opacity-40">Abort</button>
+                            <button type="submit" disabled={!credential.trim() || verifying}
+                                    className="flex-1 btn-primary py-4 disabled:opacity-40 flex items-center justify-center gap-2">
+                                {verifying
+                                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/><span>Verifying…</span></>
+                                    : 'Verify'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [viewMode, setViewMode] = useState('landing');
+            const [userRole, setUserRole] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [labFilter, setLabFilter] = useState("all");
+            const [db, setDb] = useState({ staff: [], labs: [], applications: [], lab_users: [], supervisors: [] });
+            const [isLoading, setIsLoading] = useState(true);
+            const [toast, setToast] = useState(null);
+            const [showStatusHint, setShowStatusHint] = useState(true);
+            const [adminPin, setAdminPin] = useState("");
+            const [showAdminLogin, setShowAdminLogin] = useState(false);
+            // ── Staff auth ──
+            const [showStaffLogin, setShowStaffLogin] = useState(false);
+            const [staffLoginRole, setStaffLoginRole] = useState(null);
+            const [staffCredential, setStaffCredential] = useState('');
+            const [staffLoginError, setStaffLoginError] = useState(false);   // true = show error text
+            const [staffVerifying, setStaffVerifying] = useState(false);     // true = spinner
+            const [staffLabName, setStaffLabName]   = useState(null);   // single lab (fixed badge) — null = show dropdown
+            const [staffLabNames, setStaffLabNames] = useState([]);    // all labs assigned to this PIC/HOL (empty = no restriction)
+            const [assessmentTarget, setAssessmentTarget] = useState(null);
+            const [assessmentLocked, setAssessmentLocked] = useState(null);
+            const showToast = (msg, type = 'info') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
+            const refreshData = () => { if (typeof google === 'undefined') return; setIsLoading(true); google.script.run.withSuccessHandler((data) => { setDb(data); setIsLoading(false); }).withFailureHandler(()=>setIsLoading(false)).getInitialData(AUTH_TOKEN); };
+
+            // ── Staff auth helpers ──
+            const openStaffLogin = (role) => {
+                setStaffLoginRole(role);
+                setStaffCredential('');
+                setStaffLoginError(false);
+                // Reset lockout only if starting fresh (not if already locked from a previous attempt)
+                setShowStaffLogin(true);
+            };
+
+            const verifyStaffLogin = () => {
+                if (staffVerifying || !staffCredential.trim()) return;
+                if (typeof google === 'undefined') { showToast('Staff auth only works on the live deployment.', 'error'); return; }
+
+                const clean = _sanitize(staffCredential);
+                setStaffVerifying(true);
+                setStaffLoginError(false);
+
+                const grant = (labs, token) => {
+                    AUTH_TOKEN = token || '';
+                    setShowStaffLogin(false);
+                    setUserRole(staffLoginRole);
+                    setViewMode('app');
+                    setActiveTab('dashboard');
+                    setStaffCredential('');
+                    setStaffLoginError(false);
+                    if (labs && labs.length > 1) { setStaffLabNames(labs); setStaffLabName(null); setLabFilter(labs[0]); }
+                    else if (labs && labs.length === 1) { setStaffLabNames(labs); setStaffLabName(labs[0]); setLabFilter(labs[0]); }
+                    else { setStaffLabName(null); setStaffLabNames([]); setLabFilter('all'); }
+                    refreshData();
+                };
+                const onFail = () => { setStaffVerifying(false); setStaffCredential(''); setStaffLoginError(true); };
+                const timeoutId = setTimeout(onFail, 12000);
+
+                // Try the master admin PIN first — verified on the SERVER (no PIN in the browser).
+                google.script.run
+                    .withSuccessHandler(adminRes => {
+                        if (adminRes && (adminRes === true || adminRes.ok)) {
+                            clearTimeout(timeoutId); setStaffVerifying(false);
+                            grant([], adminRes.token);      // master PIN → unrestricted
+                            return;
+                        }
+                        // Not a master PIN → verify as a staff email.
+                        google.script.run
+                            .withSuccessHandler(res => {
+                                clearTimeout(timeoutId); setStaffVerifying(false);
+                                if (res && res.ok) grant(res.labNames || (res.labName ? [res.labName] : []), res.token);
+                                else onFail();
+                            })
+                            .withFailureHandler(() => { clearTimeout(timeoutId); onFail(); })
+                            .verifyStaffAccess(clean, staffLoginRole);
+                    })
+                    .withFailureHandler(() => { clearTimeout(timeoutId); onFail(); })
+                    .verifyAdminPin(clean);
+            };
+
+            useEffect(() => {
+                if (typeof google === 'undefined') { setIsLoading(false); return; }
+                readUrlParams((params) => {
+                    google.script.run.withSuccessHandler((data) => {
+                        setDb(data || { staff: [], labs: [], applications: [], lab_users: [], supervisors: [] });
+                        if (params.appId) {
+                            const target = data.applications.find(a => a.ID === params.appId);
+                            if (target) {
+                                if (target.Status === 'pending_assessment') {
+                                    setAssessmentTarget(target);
+                                } else if (target.Status === 'pending_access' || target.Status === 'approved') {
+                                    setAssessmentLocked({ title: "Assessment Completed", msg: "You have already passed the safety assessment for this application. Your record is securely saved.", type: "success" });
+                                } else {
+                                    setAssessmentLocked({ title: "Access Denied", msg: "The safety assessment is currently not active for this application status.", type: "error" });
+                                }
+                            } else {
+                                setAssessmentLocked({ title: "Not Found", msg: "The requested application ID does not exist in the registry.", type: "error" });
+                            }
+                        } else if (params.role === 'applicant') {
+                            setUserRole('applicant'); setViewMode('app'); setActiveTab('apply');
+                        } else if (params.role === 'pic' || params.role === 'hol') {
+                            if (params.token) {
+                                // Email link with token — auto-login, no password needed
+                                google.script.run
+                                    .withSuccessHandler(res => {
+                                        if (res && res.ok) {
+                                            AUTH_TOKEN = res.token || '';
+                                            setUserRole(res.role || params.role);
+                                            setViewMode('app');
+                                            setActiveTab('dashboard');
+                                            refreshData();
+                                            const labs = res.labNames || (res.labName ? [res.labName] : []);
+                                            if (labs.length > 1) {
+                                                setStaffLabNames(labs);
+                                                setStaffLabName(null);
+                                                setLabFilter(labs[0]);
+                                            } else if (labs.length === 1) {
+                                                setStaffLabNames(labs);
+                                                setStaffLabName(labs[0]);
+                                                setLabFilter(labs[0]);
+                                            }
+                                        } else {
+                                            // Token expired/invalid — fall back to manual login
+                                            openStaffLogin(params.role);
+                                            if (params.lab) setLabFilter(params.lab);
+                                        }
+                                        setIsLoading(false);
+                                    })
+                                    .withFailureHandler(() => {
+                                        openStaffLogin(params.role);
+                                        if (params.lab) setLabFilter(params.lab);
+                                        setIsLoading(false);
+                                    })
+                                    .verifyEmailToken(params.token);
+                                return; // setIsLoading handled in callbacks above
+                            }
+                            // No token — require manual credential
+                            openStaffLogin(params.role);
+                            if (params.lab) setLabFilter(params.lab);
+                        } else if (params.role) {
+                            setUserRole(params.role); setViewMode('app'); setActiveTab('dashboard');
+                            if (params.lab) setLabFilter(params.lab);
+                        }
+                        setIsLoading(false);
+                    }).getInitialData(AUTH_TOKEN);
+                });
+            }, []);
+
+            if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-[#f2f2f7]"><div className="loader"></div></div>;
+
+            if (assessmentTarget) return <AssessmentSession appId={assessmentTarget.ID} onFinish={() => { refreshData(); }} onCancel={() => { setAssessmentTarget(null); setViewMode('landing'); }} showToast={showToast} />;
+            if (assessmentLocked) return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-[#f2f2f7] p-10 text-center animate-ios">
+                    <div className="bg-white p-10 rounded-[32px] shadow-xl max-w-md w-full border border-gray-100">
+                        <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-6 ${assessmentLocked.type === 'success' ? 'bg-green-100 text-green-500' : 'bg-rose-100 text-rose-500'}`}>
+                            {assessmentLocked.type === 'success' ? (
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                            ) : (
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            )}
+                        </div>
+                        <h2 className="text-2xl font-bold mb-3 uppercase">{assessmentLocked.title}</h2>
+                        <p className="text-gray-500 mb-8 text-[13px] leading-relaxed">{assessmentLocked.msg}</p>
+                        <button onClick={() => window.close()} className="w-full py-4 bg-gray-100 rounded-2xl font-bold text-sm text-gray-600 hover:bg-gray-200 transition-colors">Close Window</button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen pb-12">
+                    {viewMode === 'landing' ? (
+                        <BentoGridLanding
+                            onSelectRole={(r) => {
+                            if (r === 'admin') setShowAdminLogin(true);
+                            else if (r === 'pic' || r === 'hol') openStaffLogin(r);
+                            else { setUserRole(r); setViewMode('app'); setActiveTab(r === 'applicant' ? 'apply' : 'dashboard'); }
+                        }}
+                            showAdminLogin={showAdminLogin}
+                            setShowAdminLogin={setShowAdminLogin}
+                            adminPin={adminPin}
+                            setAdminPin={setAdminPin}
+                            verifyAdmin={() => {
+                                google.script.run.withSuccessHandler((res) => {
+                                    if (res && (res === true || res.ok)) { AUTH_TOKEN = res.token || ''; setUserRole('admin'); setViewMode('app'); setShowAdminLogin(false); refreshData(); }
+                                    else showToast("Invalid PIN", "error");
+                                }).verifyAdminPin(adminPin);
+                            }}
+                        />
+                    ) : (
+                        <div className="animate-ios">
+                            <Navbar userRole={userRole} activeTab={activeTab} setActiveTab={setActiveTab} onBack={() => { setViewMode('landing'); setUserRole(null); setStaffLabName(null); setStaffLabNames([]); setLabFilter('all'); }} />
+                            {userRole === 'applicant' && activeTab === 'apply' && showStatusHint && (
+                                <StatusHint onClose={() => setShowStatusHint(false)} onGo={() => { setShowStatusHint(false); setActiveTab('dashboard'); }} />
+                            )}
+                            <main className="max-w-5xl mx-auto px-6 py-10">
+                                {activeTab === 'dashboard' && <Dashboard db={db} userRole={userRole} showToast={showToast} refreshData={refreshData} startAssessment={setAssessmentTarget} labFilter={labFilter} setLabFilter={setLabFilter} staffLabName={staffLabName} staffLabNames={staffLabNames} />}
+                                {activeTab === 'apply' && <ApplicationForm db={db} setActiveTab={setActiveTab} showToast={showToast} refreshData={refreshData} userRole={userRole} />}
+                                {activeTab === 'database' && <AdminControlPanel db={db} refreshData={refreshData} showToast={showToast} />}
+                                {activeTab === 'users' && <LabUsersManager db={db} userRole={userRole} showToast={showToast} refreshData={refreshData} labFilter={labFilter} setLabFilter={setLabFilter} staffLabName={staffLabName} staffLabNames={staffLabNames} />}
+                            </main>
+                        </div>
+                    )}
+                    {toast && <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-8 py-3.5 rounded-2xl shadow-2xl text-white font-semibold text-[13px] backdrop-blur-xl ${toast.type === 'error' ? 'bg-[#ff3b30]' : 'bg-[#1c1c1e]/95'}`}>{toast.msg}</div>}
+
+                    {/* ── Staff Login Modal ── */}
+                    {showStaffLogin && (
+                        <StaffLoginModal
+                            credential={staffCredential}
+                            setCredential={setStaffCredential}
+                            onSubmit={verifyStaffLogin}
+                            onClose={() => { setShowStaffLogin(false); setStaffCredential(''); setStaffLoginError(false); setStaffVerifying(false); }}
+                            hasError={staffLoginError}
+                            verifying={staffVerifying}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const Navbar = ({ userRole, activeTab, setActiveTab, onBack }) => (
+            <nav className="glass sticky top-0 z-40 shadow-sm">
+                <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        {userRole !== 'applicant' && <button onClick={onBack} className="flex items-center gap-1.5 text-[#007aff] font-bold text-sm"><Icons.Back className="w-4 h-4"/> <span>Back</span></button>}
+                        <span className="font-bold text-lg">i-Menian</span>
+                    </div>
+                    <div className="flex bg-gray-200/50 p-1 rounded-xl">
+                        {userRole === 'applicant' ? (
+                            <React.Fragment><NavTab active={activeTab==='apply'} onClick={()=>setActiveTab('apply')} label="Apply" /><NavTab active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} label="Status" /></React.Fragment>
+                        ) : (
+                            <React.Fragment><NavTab active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} label="Summary" /><NavTab active={activeTab==='users'} onClick={()=>setActiveTab('users')} label="Users" />{(userRole==='admin') && <NavTab active={activeTab==='database'} onClick={()=>setActiveTab('database')} label="Config" />}</React.Fragment>
+                        )}
+                    </div>
+                </div>
+            </nav>
+        );
+
+        const NavTab = ({ active, onClick, label }) => <button onClick={onClick} className={`px-4 py-1.5 rounded-[10px] text-[11px] font-bold transition-all ${active ? 'bg-white text-[#007aff]' : 'text-gray-500'}`}>{label}</button>;
+
+        // Gentle pulsing pointer to the "Status" tab — applicants often miss that they can track progress there.
+        const StatusHint = ({ onClose, onGo }) => (
+            <div className="animate-ios" style={{position:'fixed', top:'62px', left:0, right:0, zIndex:60, pointerEvents:'none'}}>
+                <div style={{maxWidth:'64rem', margin:'0 auto', padding:'0 24px', display:'flex', justifyContent:'flex-end'}}>
+                    <div style={{position:'relative', width:'252px', maxWidth:'calc(100vw - 36px)', pointerEvents:'auto'}}>
+                        <div style={{position:'absolute', top:'-6px', right:'30px', width:'14px', height:'14px', background:'#1e3a8a', transform:'rotate(45deg)', borderRadius:'3px'}}></div>
+                        <div style={{background:'#1e3a8a', color:'#fff', borderRadius:'14px', padding:'12px 14px', boxShadow:'0 10px 30px rgba(30,58,138,0.4)', position:'relative'}}>
+                            <div style={{display:'flex', alignItems:'flex-start', gap:'8px'}}>
+                                <span style={{position:'relative', display:'inline-flex', width:'9px', height:'9px', marginTop:'4px', flexShrink:0}}>
+                                    <span className="animate-ping" style={{position:'absolute', inset:0, borderRadius:'50%', background:'#93c5fd', opacity:0.75}}></span>
+                                    <span style={{position:'relative', display:'inline-block', width:'9px', height:'9px', borderRadius:'50%', background:'#bfdbfe'}}></span>
+                                </span>
+                                <div style={{flex:1}}>
+                                    <p style={{fontSize:'12px', fontWeight:700, margin:'0 0 2px'}}>Track your application</p>
+                                    <p style={{fontSize:'11px', margin:0, lineHeight:1.5, color:'rgba(255,255,255,0.88)'}}>Tap <b>Status</b> (top-right) anytime to follow your progress and emails.</p>
+                                    <button onClick={onGo} style={{marginTop:'9px', fontSize:'10px', fontWeight:700, background:'#fff', color:'#1e3a8a', border:'none', borderRadius:'8px', padding:'5px 11px', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.04em'}}>Show me</button>
+                                </div>
+                                <button onClick={onClose} aria-label="Dismiss" style={{background:'none', border:'none', color:'rgba(255,255,255,0.65)', fontSize:'17px', lineHeight:1, cursor:'pointer', padding:'0 0 0 2px'}}>&times;</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const BentoGridLanding = ({ onSelectRole, showAdminLogin, setShowAdminLogin, adminPin, setAdminPin, verifyAdmin }) => (
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden" style={{background:'linear-gradient(145deg,#eef3ff 0%,#f8f9ff 45%,#edfaf4 100%)'}}>
+
+                {/* ── Decorative gradient blobs ── */}
+                <div style={{position:'absolute',top:'-140px',left:'-100px',width:'560px',height:'560px',borderRadius:'50%',background:'radial-gradient(circle,rgba(0,122,255,0.13) 0%,transparent 70%)',filter:'blur(48px)',pointerEvents:'none',zIndex:0}}/>
+                <div style={{position:'absolute',bottom:'-120px',right:'-80px',width:'500px',height:'500px',borderRadius:'50%',background:'radial-gradient(circle,rgba(88,86,214,0.11) 0%,transparent 70%)',filter:'blur(48px)',pointerEvents:'none',zIndex:0}}/>
+                <div style={{position:'absolute',top:'55%',left:'30%',width:'360px',height:'360px',borderRadius:'50%',background:'radial-gradient(circle,rgba(52,199,89,0.09) 0%,transparent 70%)',filter:'blur(48px)',pointerEvents:'none',zIndex:0}}/>
+
+                {/* ── Header ── */}
+                <div className="text-center mb-12 animate-ios" style={{zIndex:1,width:'100%',maxWidth:'860px'}}>
+                    <div style={{display:'inline-flex',alignItems:'center',gap:'8px',background:'rgba(0,122,255,0.08)',border:'1px solid rgba(0,122,255,0.18)',borderRadius:'100px',padding:'5px 18px',marginBottom:'22px'}}>
+                        <span style={{width:'7px',height:'7px',borderRadius:'50%',background:'#007AFF',display:'block',boxShadow:'0 0 6px rgba(0,122,255,0.6)'}}></span>
+                        <span style={{fontSize:'10px',fontWeight:'700',letterSpacing:'2.5px',textTransform:'uppercase',color:'#007AFF'}}>IMEN Lab Access System</span>
+                    </div>
+                    <h1 style={{fontSize:'clamp(52px,7vw,76px)',fontWeight:'900',letterSpacing:'-3px',lineHeight:'0.95',background:'linear-gradient(125deg,#0a0a0a 0%,#1a1a4e 45%,#0055D4 80%,#007AFF 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',marginBottom:'14px'}}>i-Menian</h1>
+                    <p style={{fontSize:'13px',color:'#8E8E93',fontWeight:'400',lineHeight:'1.6'}}>Intelligent laboratory access management system.</p>
+                    <p style={{fontSize:'12px',color:'#AEAEB2',fontWeight:'400',marginTop:'4px'}}>Select your role to get started</p>
+                </div>
+
+                {/* ── Bento Grid ── */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl w-full relative" style={{zIndex:1}}>
+
+                    {/* Applicant — tall primary card */}
+                    <LandingCard role="applicant" title="Application" desc="Submit and track your lab access request" icon={<Icons.AppIcon className="w-6 h-6"/>} accent="#007AFF" onClick={onSelectRole} primary />
+
+                    {/* Staff column */}
+                    <div className="flex flex-col gap-5">
+                        <LandingCard role="pic" title="Staff PIC" desc="Review &amp; verify applicant submissions" icon={<Icons.User className="w-6 h-6"/>} accent="#34C759" onClick={onSelectRole} />
+                        <LandingCard role="hol" title="Lab Coordinator" desc="Final authorization &amp; oversight" icon={<Icons.User className="w-6 h-6"/>} accent="#FF9500" onClick={onSelectRole} />
+                    </div>
+
+                    {/* Admin — dark glass card */}
+                    <div onClick={() => onSelectRole('admin')} className="group hover:scale-[1.02] transition-all duration-200 cursor-pointer text-left flex flex-col justify-between"
+                        style={{background:'rgba(20,20,28,0.82)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'24px',padding:'32px',boxShadow:'0 8px 40px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)'}}>
+                        <div style={{width:'48px',height:'48px',borderRadius:'14px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.85)'}}>
+                            <Icons.Gear className="w-6 h-6"/>
+                        </div>
+                        <div style={{marginTop:'auto',paddingTop:'32px'}}>
+                            <h3 style={{fontSize:'20px',fontWeight:'800',color:'#FFFFFF',letterSpacing:'-0.4px',marginBottom:'5px'}}>Control Center</h3>
+                            <p style={{fontSize:'13px',color:'rgba(255,255,255,0.38)',lineHeight:'1.5'}}>Registry &amp; system management</p>
+                        </div>
+                        <div className="group-hover:translate-x-1 transition-transform" style={{marginTop:'28px',display:'flex',alignItems:'center',gap:'6px',color:'#007AFF',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>
+                            Initialize <Icons.ArrowRight className="w-3 h-3"/>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Handbook pill ── */}
+                <a href="https://imenhub-portal.github.io/i-menian/flow" target="_blank" rel="noopener"
+                   style={{position:'fixed',bottom:'28px',left:'28px',zIndex:200,display:'flex',alignItems:'center',gap:'9px',
+                           background:'rgba(255,255,255,0.72)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',
+                           border:'1px solid rgba(255,255,255,0.9)',borderRadius:'100px',
+                           padding:'10px 18px 10px 12px',
+                           boxShadow:'0 4px 20px rgba(0,0,0,0.08),0 1px 4px rgba(0,0,0,0.04)',
+                           textDecoration:'none',cursor:'pointer',transition:'all .22s ease'}}
+                   onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.92)';e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 8px 28px rgba(0,0,0,0.12),0 2px 6px rgba(0,0,0,0.06)';}}
+                   onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.72)';e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 4px 20px rgba(0,0,0,0.08),0 1px 4px rgba(0,0,0,0.04)';}}>
+                    <span style={{width:'32px',height:'32px',borderRadius:'50%',background:'linear-gradient(135deg,#1a6fff,#0040cc)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 3px 10px rgba(0,80,255,0.3)'}}>
+                        <Icons.AppIcon className="w-4 h-4" style={{color:'white'}}/>
+                    </span>
+                    <span style={{display:'flex',flexDirection:'column',lineHeight:'1.25'}}>
+                        <span style={{fontSize:'11px',fontWeight:'700',color:'#1C1C1E',letterSpacing:'-.1px'}}>User Handbook</span>
+                        <span style={{fontSize:'10px',color:'#8E8E93',fontWeight:'400'}}>Read before applying</span>
+                    </span>
+                    <Icons.ArrowRight className="w-3 h-3" style={{marginLeft:'2px',flexShrink:0,color:'#8E8E93'}}/>
+                </a>
+
+                {/* ── Admin PIN Modal ── */}
+                {showAdminLogin && (
+                    <div className="modal-bg animate-ios">
+                        <div style={{background:'rgba(255,255,255,0.92)',backdropFilter:'blur(32px)',WebkitBackdropFilter:'blur(32px)',borderRadius:'32px',border:'1px solid rgba(255,255,255,0.9)',boxShadow:'0 24px 80px rgba(0,0,0,0.14)'}} className="w-full max-w-sm p-10 text-center">
+                            <h3 className="text-xl font-bold mb-8">Verification Required</h3>
+                            <input type="password" maxLength="6" className="w-full text-center text-4xl tracking-[0.8em] ios-input p-5 mb-10" value={adminPin} onChange={e=>setAdminPin(e.target.value)} onKeyDown={e=>e.key==='Enter' && verifyAdmin()} autoFocus />
+                            <div className="flex gap-4"><button onClick={()=>setShowAdminLogin(false)} className="flex-1 py-4 font-bold text-gray-400">Abort</button><button onClick={verifyAdmin} className="flex-1 btn-primary py-4">Authorize</button></div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+
+        const CARD_GRADIENTS = {
+            '#007AFF': 'linear-gradient(145deg,#1a6fff 0%,#0040cc 55%,#002fa3 100%)',
+            '#34C759': 'linear-gradient(145deg,#2ecc71 0%,#18a34a 55%,#0f7a34 100%)',
+            '#FF9500': 'linear-gradient(145deg,#ff9f0a 0%,#e06b00 55%,#b84f00 100%)',
+        };
+        const CARD_SHADOWS = {
+            '#007AFF': '0 8px 32px rgba(0,80,255,0.35),0 2px 8px rgba(0,40,180,0.2)',
+            '#34C759': '0 8px 32px rgba(20,180,80,0.35),0 2px 8px rgba(10,120,50,0.2)',
+            '#FF9500': '0 8px 32px rgba(255,140,0,0.35),0 2px 8px rgba(180,80,0,0.2)',
+        };
+
+        const LandingCard = ({ role, title, desc, icon, accent, onClick, primary }) => (
+            <div onClick={() => onClick(role)}
+                className={`group hover:scale-[1.02] transition-all duration-200 cursor-pointer text-left flex flex-col justify-between ${primary ? 'md:h-full' : ''}`}
+                style={{background: CARD_GRADIENTS[accent] || `linear-gradient(145deg,${accent},${accent}cc)`, border:'1px solid rgba(255,255,255,0.18)', borderRadius:'24px', padding:'32px', boxShadow: CARD_SHADOWS[accent] || `0 8px 32px ${accent}55`, ...(primary ? {} : {height:'200px'})}}>
+                <div style={{width:'48px',height:'48px',borderRadius:'14px',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.25)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 14px rgba(0,0,0,0.15)',color:'rgba(255,255,255,0.95)'}}>
+                    {icon}
+                </div>
+                <div style={{marginTop:'auto',paddingTop:'24px'}}>
+                    <h3 style={{fontSize:'20px',fontWeight:'800',color:'#fff',letterSpacing:'-0.4px',marginBottom:'5px'}}>{title}</h3>
+                    <p style={{fontSize:'13px',color:'rgba(255,255,255,0.7)',lineHeight:'1.5'}}>{desc}</p>
+                </div>
+                <div className="group-hover:translate-x-1 transition-transform" style={{marginTop:'24px',display:'flex',alignItems:'center',gap:'6px',color:'rgba(255,255,255,0.9)',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>
+                    Enter <Icons.ArrowRight className="w-3 h-3"/>
+                </div>
+            </div>
+        );
+
+        const Dashboard = ({ db, userRole, showToast, refreshData, startAssessment, labFilter, setLabFilter, staffLabName, staffLabNames }) => {
+            const [search, setSearch] = useState("");
+            const [procId, setProcId] = useState(null);
+            const [photoMap, setPhotoMap]         = useState({});
+            const [loadingPhotos, setLoadingPhotos] = useState(false);
+            const [photosDone, setPhotosDone]     = useState(0);
+            const [photosTotal, setPhotosTotal]   = useState(0);
+
+            const loadAllPhotos = () => {
+                if (loadingPhotos || typeof google === 'undefined') return;
+                const total = (db.applications || []).length;
+                if (!total) return;
+                const BATCH = 30, CONCUR = 3;
+                const totalBatches = Math.ceil(total / BATCH);
+                let batchIdx = 0, completedRows = 0;
+                setLoadingPhotos(true); setPhotosDone(0); setPhotosTotal(total);
+                function runNext() {
+                    if (batchIdx >= totalBatches) return;
+                    const myBatch = batchIdx++;
+                    const startRow = myBatch * BATCH + 1;
+                    const onDone = (result) => {
+                        if (result) setPhotoMap(prev => ({ ...prev, ...result }));
+                        completedRows += BATCH;
+                        const done = Math.min(completedRows, total);
+                        setPhotosDone(done);
+                        if (completedRows >= total) setLoadingPhotos(false);
+                        runNext();
+                    };
+                    google.script.run
+                        .withSuccessHandler(onDone)
+                        .withFailureHandler(() => onDone(null))
+                        .getPhotosBatch(startRow, BATCH, AUTH_TOKEN);
+                }
+                for (let c = 0; c < Math.min(CONCUR, totalBatches); c++) runNext();
+            };
+            // ── PIC / HOL: track which app IDs we've already requested ──────────
+            const requestedPhotos = useRef(new Set());
+
+            const [confirmModal, setConfirmModal] = useState({ show: false, appId: null, status: null, admsId: null });
+            const [rejectModal, setRejectModal] = useState({ show: false, appId: null });
+            const [showCompleted, setShowCompleted] = useState(false);
+            const [showRejected, setShowRejected] = useState(false);
+
+            const filtered = useMemo(() => {
+                const term = search.toLowerCase().trim();
+                return db.applications.filter(app => {
+                    const matchesSearch = userRole === 'applicant'
+                        ? (String(app.StudentID || "").toLowerCase() === term || String(app.Email || "").toLowerCase() === term)
+                        : (
+                            String(app.Name || "").toLowerCase().includes(term) ||
+                            String(app.LabName || "").toLowerCase().includes(term) ||
+                            // ✅ NEW: ADMS_ID is searchable
+                            (String(app.ADMS_ID || "").trim() !== "" && String(app.ADMS_ID || "").toLowerCase().includes(term))
+                          );
+                    const labNameRaw = app.LabName || "";
+                    const matchesLab = !labFilter || labFilter === 'all' || String(labNameRaw).toLowerCase().trim() === String(labFilter).toLowerCase().trim();
+                    // Three buckets:
+                    //  • Active      — in-progress (pending_*), plus admin's approved-without-ADMS_ID
+                    //                  (kept visible so the officer can assign without opening a toggle).
+                    //  • Completed   — approved (admin: approved WITH ADMS_ID). Behind "Show Completed".
+                    //  • Rejected    — rejected + auto_cancelled. Behind "Show Rejected / Cancelled".
+                    const isRejected = (app.Status === 'rejected' || app.Status === 'auto_cancelled');
+                    const isCompleted = userRole === 'admin'
+                        ? (app.Status === 'approved' && !!String(app.ADMS_ID || '').trim())
+                        : (app.Status === 'approved');
+                    const isActive = !isRejected && !isCompleted;
+                    const matchesHistory = userRole === 'applicant' ? true
+                        : (isActive || (isCompleted && showCompleted) || (isRejected && showRejected));
+                    if (userRole === 'applicant' && term.length < 3) return false;
+                    return matchesSearch && matchesLab && matchesHistory;
+                });
+            }, [db.applications, search, userRole, labFilter, showCompleted, showRejected]);
+
+            // ── PIC / HOL: auto-load photos for their filtered apps only ─────────
+            useEffect(() => {
+                if ((userRole !== 'pic' && userRole !== 'hol') || typeof google === 'undefined' || !filtered.length) return;
+                filtered.forEach(app => {
+                    const id = app.ID;
+                    if (!id || requestedPhotos.current.has(id) || photoMap[id]) return;
+                    requestedPhotos.current.add(id);
+                    google.script.run
+                        .withSuccessHandler(photo => {
+                            if (photo) setPhotoMap(prev => ({ ...prev, [id]: photo }));
+                        })
+                        .withFailureHandler(() => {})
+                        .getApplicationPhoto(id, AUTH_TOKEN);
+                });
+            }, [filtered, userRole]);
+
+            const executeStatusUpdate = (appId, newStatus, reason = "", skipVisit = false) => {
+                setProcId(appId);
+                const roleLabel = userRole === 'pic' ? 'PIC' : (userRole === 'hol' ? 'Coordinator' : 'Admin');
+                google.script.run
+                    .withSuccessHandler(() => {
+                        showToast(newStatus === 'rejected' ? "Rejected & Emailed" : "Synced", newStatus === 'rejected' ? "error" : "success");
+                        setProcId(null);
+                        setConfirmModal({show:false});
+                        setRejectModal({show:false});
+                        refreshData();
+                    })
+                    .withFailureHandler((err) => {
+                        showToast("Error: " + err.message, "error");
+                        setProcId(null);
+                    })
+                    .updateApplicationStatus(appId, newStatus, `Approved by ${roleLabel}`, reason, skipVisit, AUTH_TOKEN);
+            };
+
+            return (
+                <div className="space-y-10">
+                    <ConfirmModal
+                        show={confirmModal.show}
+                        title="Confirm Update"
+                        msg={confirmModal.admsId ? `Returning applicant — ADMS ID already linked (${confirmModal.admsId}). Select registration type.` : "Authorize this phase?"}
+                        onConfirm={()=>executeStatusUpdate(confirmModal.appId, confirmModal.status)}
+                        onCancel={()=>setConfirmModal({show:false})}
+                        onConfirmSkipVisit={confirmModal.admsId ? ()=>executeStatusUpdate(confirmModal.appId, confirmModal.status, "", true) : undefined}
+                    />
+                    <RejectModal show={rejectModal.show} onConfirm={(reason)=>executeStatusUpdate(rejectModal.appId, 'rejected', reason)} onCancel={()=>setRejectModal({show:false})} />
+
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+                        <div className="flex flex-col gap-4 text-left">
+                            <h2 className="text-2xl font-bold uppercase">Status Monitor</h2>
+                            {(userRole === 'pic' || userRole === 'hol') && (
+                                staffLabName
+                                    ? <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#007aff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                          <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">{staffLabName}</span>
+                                      </div>
+                                    : <select className="bg-white border rounded-lg px-3 py-1.5 text-xs font-bold shadow-sm" value={labFilter} onChange={e => setLabFilter(e.target.value)}>
+                                          {/* Show ALL LABS option only for admin / master-PIN (no restriction) */}
+                                          {(!staffLabNames || staffLabNames.length === 0) && <option value="all">ALL LABS</option>}
+                                          {(staffLabNames && staffLabNames.length > 0
+                                              ? db.labs.filter(l => staffLabNames.includes(l.Name))
+                                              : db.labs
+                                          ).map(l => <option key={l.ID} value={l.Name}>{l.Name}</option>)}
+                                      </select>
+                            )}
+                        </div>
+                        <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+                            <input
+                                className="w-full md:w-80 ios-input shadow-sm"
+                                placeholder={userRole === 'admin' ? "Search name, lab or ADMS ID..." : "Search ID, Name or Email..."}
+                                value={search}
+                                onChange={e=>setSearch(e.target.value)}
+                            />
+                            {userRole !== 'applicant' && (
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[#007aff] focus:ring-[#007aff] cursor-pointer" checked={showCompleted} onChange={e => setShowCompleted(e.target.checked)} />
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-gray-600 transition-colors">Show Completed</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-500 cursor-pointer" checked={showRejected} onChange={e => setShowRejected(e.target.checked)} />
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-rose-600 transition-colors">Show Rejected / Cancelled</span>
+                                    </label>
+                                </div>
+                            )}
+                            {userRole === 'admin' && (
+                                <button onClick={loadAllPhotos} disabled={loadingPhotos}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border"
+                                    style={{
+                                        background: loadingPhotos ? '#f3f4f6' : Object.keys(photoMap).length > 0 ? '#f0fdf4' : '#007aff',
+                                        color:      loadingPhotos ? '#9ca3af' : Object.keys(photoMap).length > 0 ? '#16a34a' : '#fff',
+                                        borderColor:loadingPhotos ? '#e5e7eb' : Object.keys(photoMap).length > 0 ? '#86efac' : '#007aff',
+                                        cursor:     loadingPhotos ? 'not-allowed' : 'pointer'
+                                    }}>
+                                    {loadingPhotos
+                                        ? `📷 Loading... ${photosDone}/${photosTotal}`
+                                        : Object.keys(photoMap).length > 0
+                                            ? `✓ ${Object.keys(photoMap).length} Photos Loaded`
+                                            : '📷 Load Photos'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {filtered.length > 0
+                            ? filtered.map(app => <PassCard key={app.ID} app={app} db={db} userRole={userRole} photoSrc={photoMap[app.ID] || null} onApprove={(id, s, admsId)=>setConfirmModal({show:true, appId:id, status:s, admsId: admsId||null})} onReject={(id)=>setRejectModal({show:true, appId:id})} loading={procId===app.ID} startAssessment={startAssessment} showToast={showToast} refreshData={refreshData} />)
+                            : <div className="py-24 text-center text-[#8e8e93] font-bold opacity-30 uppercase tracking-widest">No pending records found.</div>
+                        }
+                    </div>
+                </div>
+            );
+        };
+
+        /* =============================================
+           PassCard — v5.2 additions:
+           · ADMS_ID displayed below Matric/ID (blue mono badge)
+           · Admin + 'approved': "Assign ADMS ID" button opens
+             inline input + Save. After save, updates in-place.
+           ============================================= */
+        const PassCard = ({ app, db, userRole, photoSrc, onApprove, onReject, loading, startAssessment, showToast, refreshData }) => {
+            const [expanded, setExpanded]           = useState(false);
+            const [showAdmsInput, setShowAdmsInput] = useState(false);
+            const [admsValue, setAdmsValue]         = useState(String(app.ADMS_ID || "").trim());
+            const [savingAdms, setSavingAdms]       = useState(false);
+            const [savedAdms, setSavedAdms]         = useState(String(app.ADMS_ID || "").trim());
+
+            const statusMap = {
+                'pending_pic':        { label: 'PIC REVIEW',         color: 'bg-orange-50 text-orange-600',  border: 'border-l-orange-500' },
+                'pending_hol':        { label: 'COORDINATOR REVIEW', color: 'bg-blue-50 text-blue-600',      border: 'border-l-blue-500' },
+                'pending_assessment': { label: 'SAFETY TEST REQ',    color: 'bg-purple-50 text-purple-600',  border: 'border-l-purple-500' },
+                'pending_access':     { label: 'SECURITY QUEUE',     color: 'bg-indigo-50 text-indigo-600',  border: 'border-l-indigo-500' },
+                'approved':           { label: 'AUTHORIZED',         color: 'bg-[#f6ffed] text-[#52c41a]',  border: 'border-l-[#52c41a]' },
+                'rejected':           { label: 'REJECTED',           color: 'bg-rose-50 text-rose-600',      border: 'border-l-rose-500' },
+                'auto_cancelled':     { label: 'AUTO CANCELLED',     color: 'bg-gray-100 text-gray-400',    border: 'border-l-gray-400' }
+            };
+            const currentStatus = statusMap[app.Status] || { label: app.Status, color: 'bg-gray-50 text-gray-500', border: 'border-l-gray-300' };
+            const initial = app.Name ? app.Name.charAt(0).toUpperCase() : '?';
+
+            const lab          = db?.labs?.find(l => l.Name === app.LabName);
+            const pic          = lab ? db?.staff?.find(s => String(s.ID) === String(lab.PIC_ID)) : null;
+            const hol          = lab ? db?.staff?.find(s => String(s.ID) === String(lab.HOL_ID)) : null;
+            const reviewerName = app.Status === 'pending_pic' ? (pic?.Name || null)
+                               : app.Status === 'pending_hol' ? (hol?.Name || null)
+                               : null;
+
+            // ── ADMS ID save handler ───────────────────────────────────────────
+            const handleSaveAdms = () => {
+                if (!admsValue.trim()) return;
+                setSavingAdms(true);
+                google.script.run
+                    .withSuccessHandler(() => {
+                        setSavedAdms(admsValue.trim());
+                        setShowAdmsInput(false);
+                        setSavingAdms(false);
+                        showToast("ADMS ID saved: " + admsValue.trim(), "success");
+                        refreshData();
+                    })
+                    .withFailureHandler(err => {
+                        setSavingAdms(false);
+                        showToast("Save failed: " + err.message, "error");
+                    })
+                    .saveAdmsId(app.ID, admsValue.trim(), AUTH_TOKEN);
+            };
+
+            return (
+                <div className={`bg-white rounded-[20px] border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-all relative border-l-4 ${currentStatus.border} flex flex-col text-left`}>
+                    {loading && <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-50 flex items-center justify-center"><div className="loader"></div></div>}
+
+                    <div className="p-6 flex-grow">
+                        {/* ── Header row ── */}
+                        <div className="flex justify-between items-start mb-6">
+                            <div className="flex gap-4 items-center">
+                                <div className="w-11 h-11 rounded-full bg-gray-50 border flex items-center justify-center text-lg font-bold text-gray-400 shadow-inner overflow-hidden shrink-0">
+                                    {photoSrc
+                                        ? <img src={photoSrc} className="w-full h-full object-cover" alt="Applicant" />
+                                        : initial
+                                    }
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-gray-900 leading-tight tracking-tight uppercase">{app.Name}</h3>
+                                    {/* Matric ID */}
+                                    <p className="text-xs text-[#007aff] font-mono font-semibold mt-0.5">{app.StudentID}</p>
+                                    {/* ── ADMS ID badge (shown only when saved) ── */}
+                                    {savedAdms && (
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <Icons.IdCard className="w-3 h-3 text-indigo-400 shrink-0" />
+                                            <p className="text-[10px] font-mono font-bold text-indigo-500 tracking-wide">
+                                                ADMS ID: <span className="text-indigo-700">{savedAdms}</span>
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                                <span className={`px-3 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider ${currentStatus.color}`}>{currentStatus.label}</span>
+                                {reviewerName && (
+                                    <p className="text-[9px] font-semibold text-gray-400 text-right leading-tight max-w-[140px] truncate">{reviewerName}</p>
+                                )}
+                                {savedAdms && (
+                                    <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 text-[9px] font-bold uppercase tracking-wide border border-amber-200">Returning</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── Detail grid ── */}
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-6 mb-5 border-b border-gray-50 pb-5">
+                            <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Facility</p><p className="text-xs font-bold text-gray-800 uppercase">{app.LabName}</p></div>
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
+                                    {app.Category === 'Staff' || app.Category === 'IMEN\'s Staff only' ? 'Internal Role' : (['Internship','Research Attachment','FYP','Sabbatical','Industrial Attachment'].includes(app.Category) ? 'Co-SV / Mentor' : 'Supervisor')}
+                                </p>
+                                <p className="text-xs font-semibold text-gray-700 truncate">
+                                    {app.Category === 'Staff' || app.Category === 'IMEN\'s Staff only' ? 'Staff' : (app.SupervisorName || "N/A")}
+                                </p>
+                            </div>
+                            <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Contact</p><p className="text-[11px] font-medium text-gray-600 truncate">{app.Email}</p><p className="text-[11px] font-medium text-gray-500">{app.Phone || "No Phone"}</p></div>
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Term</p>
+                                {(() => { const parts = (app.Duration||'').split(' – '); return parts.length === 2 ? (<><p className="text-[11px] font-medium text-gray-600">{parts[0]}</p><p className="text-[10px] text-gray-400">to {parts[1]}</p></>) : (<p className="text-[11px] font-medium text-gray-600">{app.Duration || "N/A"}</p>); })()}
+                            </div>
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Category</p>
+                                <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wide border border-blue-100">{app.Category || "N/A"}</span>
+                            </div>
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Institute / Affiliation</p>
+                                <p className="text-[11px] font-medium text-gray-600">{app.Affiliation || "N/A"}</p>
+                            </div>
+                        </div>
+
+                        {/* ── Project block ── */}
+                        <div className="bg-[#f8f9fa] rounded-2xl p-4 border border-gray-100">
+                            <div className="mb-3">
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Project Name</p>
+                                <p className="text-[13px] font-semibold text-gray-800 leading-snug">{app.ProjectName || "N/A"}</p>
+                            </div>
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Equipment / Requirements</p>
+                                <p className="text-xs font-medium text-gray-600 whitespace-pre-wrap leading-relaxed">{app.Equipment || "None stated"}</p>
+                            </div>
+                        </div>
+
+                        {/* ── Applicant assessment button ── */}
+                        {app.Status === 'pending_assessment' && userRole === 'applicant' && (
+                            <button onClick={() => startAssessment(app)} className="w-full py-4 mt-5 bg-purple-600 text-white rounded-2xl font-bold text-sm shadow-md hover:bg-purple-700 transition-colors">Start Assessment</button>
+                        )}
+
+                        {/* ── ADMIN: ADMS ID assignment panel (shown on 'approved' cards) ── */}
+                        {userRole === 'admin' && app.Status === 'approved' && (
+                            <div className="mt-5">
+                                {!showAdmsInput ? (
+                                    /* Button: triggers inline input */
+                                    <button
+                                        onClick={() => setShowAdmsInput(true)}
+                                        className="w-full py-3 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400 transition-all font-bold text-[11px] uppercase tracking-widest"
+                                    >
+                                        <Icons.IdCard className="w-4 h-4" />
+                                        {savedAdms ? "Update ADMS ID" : "Assign ADMS ID"}
+                                    </button>
+                                ) : (
+                                    /* Inline input + Save/Cancel */
+                                    <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 space-y-3">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Icons.IdCard className="w-4 h-4 text-indigo-500 shrink-0" />
+                                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Assign ADMS ID</p>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            className="adms-input"
+                                            placeholder="Enter ADMS ID number..."
+                                            value={admsValue}
+                                            onChange={e => setAdmsValue(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Enter') handleSaveAdms(); if (e.key === 'Escape') setShowAdmsInput(false); }}
+                                            autoFocus
+                                            disabled={savingAdms}
+                                        />
+                                        <div className="flex gap-2 pt-1">
+                                            <button
+                                                onClick={() => { setShowAdmsInput(false); setAdmsValue(savedAdms); }}
+                                                disabled={savingAdms}
+                                                className="flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wide text-gray-400 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleSaveAdms}
+                                                disabled={!admsValue.trim() || savingAdms}
+                                                className="flex-[2] py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wide text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-200 disabled:text-indigo-300 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                {savingAdms
+                                                    ? <><div className="border-2 border-white/30 border-t-white rounded-full w-3 h-3 animate-spin"></div> Saving...</>
+                                                    : <><Icons.Check className="w-3.5 h-3.5" /> Save ADMS ID</>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── Footer bar ── */}
+                    <div className="bg-gray-50/50 p-4 border-t border-gray-100 flex justify-between items-center rounded-b-[20px]">
+                        <div className="flex items-center gap-3">
+                            <button onClick={()=>setExpanded(!expanded)} className="text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wider flex items-center gap-1 transition-colors">
+                                {expanded ? 'Hide Logs' : 'View Logs'} <Icons.Chevron className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : 'rotate-90'}`} />
+                            </button>
+                            <span className="text-[10px] text-gray-300">|</span>
+                            <span className="text-[9px] font-mono font-bold text-gray-400">ID: {(app.ID || "").slice(-6)}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            {userRole === 'pic' && app.Status === 'pending_pic' && (
+                                <>
+                                    <button onClick={()=>onReject(app.ID)} className="px-5 py-2.5 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-colors">Reject</button>
+                                    <button onClick={()=>onApprove(app.ID, 'pending_hol')} className="px-5 py-2.5 bg-[#007aff] hover:bg-blue-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-wide shadow-sm transition-colors">Approve</button>
+                                </>
+                            )}
+                            {userRole === 'hol' && app.Status === 'pending_hol' && (
+                                <>
+                                    <button onClick={()=>onReject(app.ID)} className="px-5 py-2.5 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-colors">Reject</button>
+                                    <button onClick={()=>onApprove(app.ID, 'pending_access')} className="px-5 py-2.5 bg-[#007aff] hover:bg-blue-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-wide shadow-sm transition-colors">Approve</button>
+                                </>
+                            )}
+                            {userRole === 'admin' && app.Status === 'pending_access' && (
+                                <button onClick={()=>onApprove(app.ID, 'approved', app.ADMS_ID)} className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-wide shadow-sm transition-colors">Register &amp; Notify Applicant</button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ── Logs panel ── */}
+                    {expanded && (
+                        <div className="p-5 bg-gray-900 text-left border-t border-gray-800 rounded-b-[18px]">
+                            {app.NDA_Status && (() => {
+                                const fmtTs = (iso) => { if (!iso) return null; const d = new Date(iso); return isNaN(d.getTime()) ? null : d.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
+                                const ndaLabel = ({'not_required':'Not required','not_submitted':'Not yet signed','pending_registration':'Agreed — routes after approval','pending_sv':'Awaiting supervisor','pending_director':'Awaiting Director','approved':'Fully authorized','purged':'Cancelled'})[app.NDA_Status] || app.NDA_Status;
+                                return (
+                                    <div className="mb-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3">
+                                        <p className="text-[9px] text-indigo-300 font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Icons.IdCard className="w-3 h-3"/> NDA — {ndaLabel}</p>
+                                        {app.NDA_Status === 'not_required'
+                                            ? <p className="text-[10px] font-mono text-gray-400">Not required — staff or returning applicant.</p>
+                                            : app.NDA_Status === 'purged'
+                                            ? <p className="text-[10px] font-mono text-gray-400">Cancelled — application was rejected; the pending NDA was purged.</p>
+                                            : <div className="space-y-1.5">
+                                                {app.NDA_Status === 'pending_registration' && <p className="text-[10px] font-mono text-gray-500 mb-1">Supervisor &amp; Director are notified only after the form is approved and the ADMS ID is assigned.</p>}
+                                                {[['Applicant signed', app.NDA_Applicant_At], ['Supervisor endorsed', app.NDA_SV_At], ['Director approved', app.NDA_Director_At]].map(([lbl, at], i) => (
+                                                    <div key={i} className="flex justify-between items-center text-[10px] font-mono">
+                                                        <span className="text-gray-400">{lbl}</span>
+                                                        <span className={at ? 'text-green-400' : 'text-gray-600'}>{fmtTs(at) || 'pending'}</span>
+                                                    </div>
+                                                ))}
+                                              </div>}
+                                    </div>
+                                );
+                            })()}
+                            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-3 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div> System Logs</p>
+                            <div className="space-y-2">
+                                {JSON.parse(app.Logs || "[]").map((l, i) => <p key={i} className="text-[10px] font-mono text-gray-300">{l}</p>)}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const DetailRow = ({ label, value }) => <div><p className="text-[10px] text-gray-400 uppercase font-bold">{label}</p><p className="text-sm font-bold">{value || 'N/A'}</p></div>;
+
+        /* =============================================
+           NDA pop-up (applicant signs before submission)
+           Bundled fallback text mirrors getNdaContent() on the server;
+           the live deployment overrides it via google.script.run.
+           ============================================= */
+        const NDA_CONTENT = {
+            formNo: 'UKM-IMEN-NDA', effectiveDate: '15/06/2025', classification: 'TERHAD',
+            title: 'CONFIDENTIAL DISCLOSURE AND LIMITED USE AGREEMENT',
+            ismsNote: 'This is a legally binding agreement. By signing it digitally below, the INDIVIDUAL confirms that he or she has read, understood and agrees to be bound by all the terms herein. A digital signature carries the same legal effect as a handwritten signature.',
+            preamble: 'This Confidential Disclosure and Limited Use Agreement is made between the abovementioned INDIVIDUAL and the Institute of Microengineering and Nanoelectronics (IMEN). The UNIVERSITY refers to Universiti Kebangsaan Malaysia.',
+            agreeLine: 'The INDIVIDUAL and IMEN here forth agree on the following terms:',
+            clauses: [
+                'The UNIVERSITY is the owner of technology developed at IMEN.',
+                'The INDIVIDUAL will conduct research activities under the supervision of a project leader who represents the UNIVERSITY as the owner of technology, or supervisors appointed by IMEN.',
+                'The INDIVIDUAL is not allowed to disclose any findings of the research conducted at IMEN to any outside parties without the agreement of his or her project leader or supervisors.',
+                'The INDIVIDUAL is not allowed to issue statements, whether written or oral, to any print or electronic media without the agreement of his or her project leader or supervisors.',
+                'The INDIVIDUAL may only publish findings of the research conducted at IMEN with the agreement of his or her project leader or supervisors.',
+                'The INDIVIDUAL may only present findings of the research conducted at IMEN at conferences, seminars or other forums with the agreement of his or her project leader or supervisors.',
+                'The INDIVIDUAL, if registered as a post-graduate student with the UNIVERSITY, may use the findings of the research conducted at IMEN for the purpose of completing a thesis under the supervision of his or her project leader or supervisors.',
+                'The UNIVERSITY has exclusive intellectual property (IP) rights to the findings of the research conducted at IMEN and is the only party that may apply for patents, copyrights, registered industrial designs, trade marks or other IP related items pertaining to the research findings.',
+                'The INDIVIDUAL shall not violate the IP rights of the UNIVERSITY even after he or she has completed his/her research at IMEN.'
+            ],
+            logo: ''
+        };
+
+        const NdaModal = ({ form, db, onApprove, onCancel }) => {
+            const [content, setContent] = useState(NDA_CONTENT);
+            const [ic, setIc] = useState('');
+            const [icError, setIcError] = useState(false);
+            const [checks, setChecks] = useState({});        // per-term acknowledgement
+            const [checkError, setCheckError] = useState(false);
+            useEffect(() => {
+                if (typeof google !== 'undefined') {
+                    google.script.run.withSuccessHandler(c => { if (c && c.clauses) setContent(c); }).withFailureHandler(()=>{}).getNdaContent();
+                }
+            }, []);
+            const project = (form.projectName || '').trim();
+            const allChecked = content.clauses.length > 0 && content.clauses.every((_, i) => checks[i]);
+            const canSubmit = !!ic.trim() && allChecked;
+            const approve = () => {
+                if (!ic.trim()) { setIcError(true); return; }
+                if (!allChecked) { setCheckError(true); return; }
+                onApprove(ic.trim());
+            };
+            return (
+                <div className="modal-bg animate-ios" style={{alignItems:'flex-start', overflowY:'auto', padding:'24px', zIndex:1000}}>
+                    <div className="bg-white" style={{borderRadius:'24px', maxWidth:'720px', width:'100%', maxHeight:'92vh', display:'flex', flexDirection:'column', boxShadow:'0 24px 80px rgba(0,0,0,0.18)'}}>
+                        <div style={{overflowY:'auto', padding:'32px 36px', textAlign:'left', color:'#1c1c1e'}}>
+                            <p style={{fontSize:'12px', color:'#b91c1c', fontStyle:'italic', margin:'0 0 16px'}}>{content.ismsNote}</p>
+                            <table style={{width:'100%', borderCollapse:'collapse', marginBottom:'22px', fontSize:'12px'}}><tbody><tr>
+                                <td style={{border:'1px solid #cbd5e1', padding:'10px', width:'92px', textAlign:'center'}}>
+                                    {content.logo ? <img src={content.logo} style={{maxWidth:'80px', height:'auto'}} alt="UKM" /> : <span style={{fontWeight:800, color:'#1e3a8a'}}>UKM</span>}
+                                </td>
+                                <td style={{border:'1px solid #cbd5e1', padding:'10px', fontWeight:700}}>{content.formNo}<br/><span style={{fontWeight:400, color:'#64748b'}}>PERJANJIAN KERAHSIAAN (NDA)</span></td>
+                                <td style={{border:'1px solid #cbd5e1', padding:'10px', textAlign:'right'}}>Tarikh Kuatkuasa:<br/><b>{content.effectiveDate}</b><br/><span style={{display:'inline-block', marginTop:'6px', border:'1px solid #1c1c1e', padding:'2px 10px', fontWeight:700}}>{content.classification}</span></td>
+                            </tr></tbody></table>
+                            <h2 style={{textAlign:'center', fontSize:'16px', margin:'8px 0 18px', letterSpacing:'0.3px'}}>{content.title}</h2>
+                            <div style={{display:'flex', gap:'12px', alignItems:'baseline', marginBottom:'12px'}}>
+                                <span style={{width:'170px', color:'#475569', fontSize:'13px', flexShrink:0}}>Name / Nama</span>
+                                <span style={{flex:1, borderBottom:'1px dashed #94a3b8', fontWeight:700, fontSize:'13px'}}>{form.name || '—'}</span>
+                            </div>
+                            <div style={{display:'flex', gap:'12px', alignItems:'baseline', marginBottom:'20px'}}>
+                                <span style={{width:'170px', color:'#475569', fontSize:'13px', flexShrink:0}}>Project / Perkara</span>
+                                <span style={{flex:1, borderBottom:'1px dashed #94a3b8', fontSize:'13px', fontWeight: project ? 500 : 400, fontStyle: project ? 'normal' : 'italic', color: project ? '#1c1c1e' : '#9ca3af'}}>{project || 'e.g. Fabrication of a MEMS-based pressure sensor'}</span>
+                            </div>
+                            <p style={{fontSize:'13.5px', lineHeight:1.6, margin:'0 0 12px'}}>{content.preamble}</p>
+                            <p style={{fontSize:'13.5px', fontWeight:700, margin:'0 0 6px'}}>{content.agreeLine}</p>
+                            <p style={{fontSize:'12px', color:'#64748b', margin:'0 0 12px'}}>Please tick each term to confirm you have read and agree. / Sila tanda setiap terma untuk mengesahkan anda telah membaca dan bersetuju.</p>
+                            <div style={{margin:'0 0 6px'}}>
+                                {content.clauses.map((t, i) => (
+                                    <label key={i} style={{display:'flex', gap:'10px', alignItems:'flex-start', cursor:'pointer', marginBottom:'10px', fontSize:'13.5px', lineHeight:1.55, color:'#1c1c1e'}}>
+                                        <input type="checkbox" checked={!!checks[i]} onChange={e=>{ const v=e.target.checked; setChecks(c=>({...c,[i]:v})); setCheckError(false); }} style={{marginTop:'3px', width:'16px', height:'16px', accentColor:'#1e3a8a', flexShrink:0}} />
+                                        <span><b style={{marginRight:'4px'}}>{i+1}.</b>{t}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            {checkError && <p style={{fontSize:'11px', color:'#ef4444', margin:'0 0 6px', fontWeight:600}}>Please tick all terms before agreeing. / Sila tanda semua terma sebelum bersetuju.</p>}
+                            <div style={{marginTop:'14px', paddingTop:'16px', borderTop:'1px solid #e2e8f0'}}>
+                                <p style={{fontSize:'11px', fontWeight:800, letterSpacing:'0.5px', color:'#94a3b8', textTransform:'uppercase', margin:'0 0 8px'}}>Applicant / Pemohon</p>
+                                <div style={{fontWeight:700, fontSize:'14px', color:'#0f172a'}}>{form.name || '—'}</div>
+                                <div style={{marginTop:'8px', maxWidth:'340px'}}>
+                                    <label className="reg-label">IC / Passport No.*</label>
+                                    <input className="reg-input" style={icError ? {borderColor:'#ef4444'} : {}} value={ic} onChange={e=>{ setIc(e.target.value); setIcError(false); }} placeholder="e.g. 990101-14-5678 / A12345678" />
+                                    {icError && <p style={{fontSize:'11px', color:'#ef4444', marginTop:'4px', fontWeight:600}}>Please enter your IC / Passport number.</p>}
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{borderTop:'1px solid #eee', padding:'16px 24px', display:'flex', gap:'12px', flexShrink:0}}>
+                            <button onClick={onCancel} style={{flex:1, padding:'14px', borderRadius:'14px', fontWeight:700, fontSize:'13px', color:'#94a3b8', background:'#f8fafc', border:'1px solid #e2e8f0', cursor:'pointer'}}>Cancel</button>
+                            <button onClick={approve} disabled={!canSubmit} className="btn-primary" style={{flex:1, padding:'14px', opacity: canSubmit ? 1 : 0.55, cursor: canSubmit ? 'pointer' : 'not-allowed'}}>Agree / Setuju</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        /* =============================================
+           ApplicationForm
+           ============================================= */
+        const ApplicationForm = ({ db, setActiveTab, showToast, refreshData }) => {
+            const [success, setSuccess] = useState(false);
+            const [submitting, setSubmitting] = useState(false);
+            const [confirmed, setConfirmed] = useState(false);   // confirm box ticked → form held/locked
+            const [phase, setPhase] = useState('idle');          // idle | precheck | nda | assessment | ready
+            const [flags, setFlags] = useState(null);            // { needsNda, needsAssessment, isStaff, isReturning, admsId }
+            const [nda, setNda] = useState({ approved: false, ic: '' });
+            const [assessment, setAssessment] = useState(null);  // { score, total, report }
+            const [returning, setReturning] = useState(null);    // {name, photo} from a prior registration
+            const [returnPrompt, setReturnPrompt] = useState({ show: false }); // "returning or new?" choice
+            const [asNew, setAsNew] = useState(false);           // matched applicant chose to apply as new
+            const [form, setForm] = useState({
+                name: '', studentId: '', email: '', phone: '',
+                labId: '', supervisorName: '', projectName: '',
+                startDate: '', endDate: '', category: '', affiliation: '', equipment: '', photo: ''
+            });
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_SIZE = 400;
+                        let width = img.width, height = img.height;
+                        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } }
+                        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                        canvas.width = width; canvas.height = height;
+                        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                        setForm(f => ({...f, photo: canvas.toDataURL('image/jpeg', 0.85)}));
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const finalCategory = form.category === "IMEN's Staff only" ? "Staff" : form.category;
+            const labName = (db.labs.find(l => l.ID == form.labId) || {}).Name || '';
+            const fmtD = d => { const dt = new Date(d); return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); };
+            const duration = (form.startDate && form.endDate) ? `${fmtD(form.startDate)} – ${fmtD(form.endDate)}` : '';
+
+            const resetGate = () => { setConfirmed(false); setPhase('idle'); setFlags(null); setNda({ approved: false, ic: '' }); setAssessment(null); setReturnPrompt({ show: false }); setAsNew(false); };
+
+            // "Welcome back" — when the applicant leaves the email/matric field, check the
+            // registry for THEIR own record and, if found, pre-load their photo and offer
+            // their registered name. Keyed on their own identifier, so no data is exposed.
+            const checkReturning = () => {
+                if (confirmed || typeof google === 'undefined') return;
+                if (!form.email && !form.studentId) return;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        if (res && res.found) {
+                            setReturning({ name: res.name || '', photo: res.photo || '' });
+                            if (res.photo) setForm(f => f.photo ? f : ({ ...f, photo: res.photo }));
+                        }
+                    })
+                    .withFailureHandler(() => {})
+                    .lookupReturningApplicant({ email: form.email, studentId: form.studentId });
+            };
+
+            const validateForm = () => {
+                if (!form.name || !form.email || !form.labId || !form.category || !form.projectName || !form.startDate || !form.endDate || !form.equipment) return false;
+                if (form.category !== "IMEN's Staff only" && !form.supervisorName) return false;
+                return true;
+            };
+
+            // Ticking the confirm box holds (locks) the form and starts the gating flow.
+            const onConfirmToggle = (checked) => {
+                if (!checked) { resetGate(); return; }
+                if (!validateForm()) { showToast('Please complete all required fields first.', 'error'); return; }
+                setConfirmed(true);
+                setPhase('precheck');
+                const applyFlags = (res) => {
+                    const f = res || { needsNda: true, needsAssessment: true, hasPhoto: false };
+                    setFlags(f);
+                    // "Returning" is only a SUGGESTION — always ask FIRST, before any photo
+                    // or step gating. (The photo for a returning applicant is reused from the
+                    // database once they confirm; demanding it up front would hide this dialog.)
+                    if (f.isReturning) { setReturnPrompt({ show: true }); setPhase('choose'); return; }
+                    // New / staff path: a photo is needed only if none on file and none uploaded.
+                    if (!f.hasPhoto && !form.photo) {
+                        showToast('Please add your applicant photo before continuing.', 'error');
+                        resetGate();
+                        return;
+                    }
+                    if (f.needsNda) setPhase('nda');
+                    else if (f.needsAssessment) setPhase('assessment');
+                    else {
+                        setPhase('ready');                  // staff → unlock immediately
+                        showToast('Staff applicant — the NDA & assessment are not required. You can submit directly.', 'success');
+                    }
+                };
+                if (typeof google === 'undefined') { applyFlags({ needsNda: true, needsAssessment: true }); return; }
+                google.script.run
+                    .withSuccessHandler(applyFlags)
+                    .withFailureHandler(() => { showToast('Could not verify records — please try again.', 'error'); resetGate(); })
+                    .precheckApplicant({ name: form.name, email: form.email, studentId: form.studentId, category: finalCategory });
+            };
+
+            const onNdaApprove = (icValue) => {
+                setNda({ approved: true, ic: icValue });
+                setPhase((flags && flags.needsAssessment) ? 'assessment' : 'ready');
+            };
+
+            const onAssessmentPass = (score, total, report) => {
+                setAssessment({ score, total, report });
+                setPhase('ready');
+                showToast('Assessment passed (' + score + '/' + total + ') — you can now submit your application.', 'success');
+            };
+
+            // Returning suggestion — applicant's choice
+            const chooseReturning = () => {
+                setAsNew(false);
+                setReturnPrompt({ show: false });
+                setPhase('ready');
+                showToast('Welcome back — continuing as a returning applicant.', 'success');
+            };
+            const chooseNew = () => {
+                // Applying as new → a photo is required (won't reuse the on-file one).
+                if (!(flags && flags.hasPhoto) && !form.photo) {
+                    setReturnPrompt({ show: false });
+                    showToast('Please add your applicant photo before continuing.', 'error');
+                    resetGate();
+                    return;
+                }
+                setAsNew(true);
+                setFlags(f => ({ ...(f || {}), needsNda: true, needsAssessment: true }));
+                setReturnPrompt({ show: false });
+                setPhase('nda');
+            };
+
+            const finalSubmit = () => {
+                if (phase !== 'ready' || submitting) return;
+                setSubmitting(true);
+                const payload = {
+                    ...form, duration, category: finalCategory, labName,
+                    ic: nda.ic, ndaApproved: nda.approved, asNew: asNew,
+                    score: assessment ? assessment.score : 0,
+                    total: assessment ? assessment.total : 0,
+                    report: assessment ? assessment.report : []
+                };
+                // NOTE: do NOT call refreshData() here — it flips the app to the
+                // full-screen loader and unmounts this form, wiping the success screen.
+                // The refresh happens when the applicant taps "Track Application Status".
+                const done = () => { setSubmitting(false); setSuccess(true); };
+                if (typeof google === 'undefined') { setTimeout(done, 400); return; }
+                google.script.run
+                    .withSuccessHandler(done)
+                    .withFailureHandler(err => { setSubmitting(false); showToast('Submit failed: ' + err.message, 'error'); })
+                    .submitFullApplication(payload);
+            };
+
+            if (success) return (
+                <div className="reg-success">
+                    <div className="reg-success-card">
+                        <div className="reg-success-icon">
+                            <svg className="w-8 h-8 text-[#1e3a8a]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                            </svg>
+                        </div>
+                        <div className="reg-success-title">Submitted</div>
+                        <p style={{color:'#9ca3af', fontSize:'14px', marginBottom:'32px', lineHeight:'1.6'}}>
+                            Your application has been sent for PIC &amp; Coordinator review. You'll be notified by email on each stage.
+                        </p>
+                        <button onClick={() => { refreshData && refreshData(); setActiveTab('dashboard'); }} className="reg-submit-btn" style={{marginTop: 0}}>
+                            Track Application Status
+                        </button>
+                    </div>
+                </div>
+            );
+
+            if (phase === 'assessment') {
+                return <AssessmentSession embedded showToast={showToast} onPass={onAssessmentPass} onCancel={resetGate} />;
+            }
+
+            return (
+                <div style={{margin: '0 -24px', marginTop: '-40px'}}>
+                    {phase === 'nda' && <NdaModal form={form} db={db} onApprove={onNdaApprove} onCancel={resetGate} />}
+                    {phase === 'precheck' && <div className="modal-bg animate-ios"><div className="loader"></div></div>}
+                    {returnPrompt.show && (
+                        <div className="modal-bg animate-ios" style={{zIndex:60}}>
+                            <div style={{background:'#fff', borderRadius:'18px', maxWidth:'420px', width:'calc(100% - 40px)', padding:'26px 24px', boxShadow:'0 24px 60px rgba(15,23,42,.28)', textAlign:'center'}}>
+                                <div style={{width:'52px', height:'52px', borderRadius:'50%', background:'#eff6ff', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', fontSize:'26px'}}>👋</div>
+                                <h3 style={{margin:'0 0 3px', fontSize:'16px', fontWeight:800, color:'#0f172a'}}>Have you applied to i-Menian before?</h3>
+                                <p style={{margin:'0 0 14px', fontSize:'13px', fontWeight:700, color:'#64748b'}}>Pernahkah anda memohon ke i-Menian sebelum ini?</p>
+                                <p style={{margin:'0 0 4px', fontSize:'12.5px', lineHeight:1.5, color:'#475569'}}>
+                                    Your details match someone already in our records{returning && returning.name ? <span> (<strong>{returning.name}</strong>)</span> : null} — perhaps from a <strong>different lab or project</strong>. You'll still complete this application; we just need to know which is true.
+                                </p>
+                                <p style={{margin:'0 0 18px', fontSize:'11.5px', lineHeight:1.5, color:'#94a3b8'}}>
+                                    Maklumat anda sepadan dengan rekod sedia ada — mungkin daripada makmal atau projek lain. Anda tetap perlu melengkapkan permohonan ini.
+                                </p>
+                                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                    <button type="button" onClick={chooseReturning} style={{width:'100%', padding:'11px 12px', borderRadius:'12px', border:'none', background:'#1e3a8a', color:'#fff', cursor:'pointer', lineHeight:1.3}}>
+                                        <div style={{fontWeight:700, fontSize:'13px'}}>Yes — I've applied to i-Menian before</div>
+                                        <div style={{fontWeight:500, fontSize:'11px', opacity:.85}}>Ya — saya pernah memohon ke i-Menian</div>
+                                    </button>
+                                    <button type="button" onClick={chooseNew} style={{width:'100%', padding:'11px 12px', borderRadius:'12px', border:'1px solid #cbd5e1', background:'#fff', color:'#334155', cursor:'pointer', lineHeight:1.3}}>
+                                        <div style={{fontWeight:700, fontSize:'13px'}}>No — this is my first time</div>
+                                        <div style={{fontWeight:500, fontSize:'11px', color:'#94a3b8'}}>Tidak — ini kali pertama saya</div>
+                                    </button>
+                                </div>
+                                <button type="button" onClick={resetGate} style={{marginTop:'14px', background:'none', border:'none', color:'#94a3b8', fontSize:'12px', cursor:'pointer'}}>Cancel / Batal</button>
+                            </div>
+                        </div>
+                    )}
+                    <div className="reg-page">
+
+                        {/* ── LEFT HERO PANEL ── */}
+                        <div className="reg-hero">
+                            <div>
+                                <div className="reg-tags">
+                                    <span className="reg-tag-label">Access Type</span>
+                                    <span className="reg-tag active">Research</span>
+                                    <span className="reg-tag">Internship</span>
+                                    <span className="reg-tag">IMEN's Staff only</span>
+                                    <span className="reg-tag-more">+more</span>
+                                </div>
+                                <div className="reg-headline">
+                                    Lab Access That<br/>
+                                    <span className="accent">Starts Here.</span>
+                                </div>
+                                <p className="reg-subtext">
+                                    Complete your registration to gain access to IMEN facilities. Your application will be reviewed by the Staff PIC and Lab Coordinator.
+                                </p>
+                                <div className="reg-cta-pill">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+                                    i-MENIAN Portal
+                                </div>
+                                <div className="reg-preview-card" style={{marginTop: '32px'}}>
+                                    <p style={{fontSize:'9px', fontWeight:'800', textTransform:'uppercase', letterSpacing:'0.12em', color:'#3b82f6', marginBottom:'12px'}}>
+                                        Approval Pipeline
+                                    </p>
+                                    <div className="reg-preview-steps" style={{display:'flex', alignItems:'center', flexWrap:'wrap', gap:'4px'}}>
+                                        <span className="reg-step-chip active">NDA</span>
+                                        <span style={{color:'#94a3b8', fontSize:'12px', fontWeight:'700'}}>›</span>
+                                        <span className="reg-step-chip idle">Assessment</span>
+                                        <span style={{color:'#94a3b8', fontSize:'12px', fontWeight:'700'}}>›</span>
+                                        <span className="reg-step-chip idle">Submit</span>
+                                        <span style={{color:'#94a3b8', fontSize:'12px', fontWeight:'700'}}>›</span>
+                                        <span className="reg-step-chip idle">PIC</span>
+                                        <span style={{color:'#94a3b8', fontSize:'12px', fontWeight:'700'}}>›</span>
+                                        <span className="reg-step-chip idle">HOL</span>
+                                        <span style={{color:'#94a3b8', fontSize:'12px', fontWeight:'700'}}>›</span>
+                                        <span className="reg-step-chip idle">Access</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── RIGHT FORM PANEL ── */}
+                        <div className="reg-form-panel">
+                            <div className="reg-form-card">
+                                <div style={{marginBottom:'28px'}}>
+                                    <div className="reg-form-title">Lab Entry Registration</div>
+                                    <div className="reg-form-sub">Fill in your details to apply for facility access</div>
+                                </div>
+
+                                {returning && !confirmed && (
+                                    <div style={{marginBottom:'24px', padding:'14px 16px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'14px', display:'flex', gap:'12px', alignItems:'center'}}>
+                                        {returning.photo && <img src={returning.photo} style={{width:'40px', height:'40px', borderRadius:'50%', objectFit:'cover', flexShrink:0, border:'1px solid #bfdbfe'}} alt="" />}
+                                        <div style={{flex:1}}>
+                                            <p style={{fontSize:'12px', fontWeight:700, color:'#1e3a8a', margin:'0 0 2px'}}>Welcome back!</p>
+                                            <p style={{fontSize:'11px', color:'#475569', margin:0, lineHeight:1.5}}>We found your previous registration{returning.photo ? ' and loaded your photo on file' : ''}. When you confirm your details, we'll ask you to verify this.</p>
+                                            {returning.name && form.name !== returning.name && (
+                                                <button type="button" onClick={()=>setForm(f=>({...f, name: returning.name}))} style={{marginTop:'8px', fontSize:'11px', fontWeight:700, color:'#fff', background:'#1e3a8a', border:'none', borderRadius:'8px', padding:'6px 12px', cursor:'pointer'}}>
+                                                    Use my registered name: {returning.name}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                <form onSubmit={(e)=>{e.preventDefault(); finalSubmit();}}>
+                                  <fieldset disabled={confirmed} style={{border:0, padding:0, margin:0, minInlineSize:'auto'}}>
+                                    <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', marginBottom:'28px'}}>
+                                        <label style={{cursor:'pointer'}}>
+                                            <div className="reg-photo-ring" style={{width:'88px', height:'88px'}}>
+                                                {form.photo
+                                                    ? <img src={form.photo} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="Profile" />
+                                                    : <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'4px'}}><Icons.Camera className="w-7 h-7" style={{color:'#93c5fd'}} /></div>
+                                                }
+                                            </div>
+                                            <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} style={{display:'none'}} />
+                                        </label>
+                                        <span style={{fontSize:'10px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.08em', color:'#3b82f6'}}>Applicant Photo</span>
+                                        <span style={{fontSize:'10px', color:'#94a3b8', textAlign:'center', maxWidth:'260px', lineHeight:'1.4'}}>First-time applicants, please add a photo. Returning applicants — your photo on file is used automatically.</span>
+                                    </div>
+
+                                    <div className="reg-section-label">Personal Information</div>
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+                                        <RegField label="Full Name" value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} />
+                                        <RegField label="Student ID / Passport (for international)" value={form.studentId} onChange={v=>setForm(f=>({...f,studentId:v}))} onBlur={checkReturning} optional note="Optional — your UKM student ID, or passport number for international applicants. Using the same ID each time helps us recognise you." />
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+                                        <RegField label="Email" type="email" value={form.email} onChange={v=>setForm(f=>({...f,email:v.toLowerCase()}))} onBlur={checkReturning} note="Not case-sensitive — but please double-check the spelling; all NDA, approval and status emails are sent here." />
+                                        <RegField label="Phone" value={form.phone} onChange={v=>setForm(f=>({...f,phone:v}))} />
+                                    </div>
+                                    <div style={{marginBottom:'16px'}}>
+                                        <RegField label="Institute / Faculty / Industry" value={form.affiliation} onChange={v=>setForm(f=>({...f,affiliation:v}))} placeholder="e.g. Faculty of Engineering, UKM / Petronas / MIMOS" />
+                                    </div>
+
+                                    <div className="reg-section-label">Facility &amp; Role</div>
+                                    <div style={{marginBottom:'16px'}}>
+                                        <RegSelect label="Facility" options={db.labs.map(l=>({id:l.ID, name:l.Name}))} value={form.labId} onChange={v=>setForm(f=>({...f,labId:v}))} />
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+                                        <RegSelect
+                                            label="Category"
+                                            options={[
+                                                {id:'MSc Student', name:'MSc Student'},
+                                                {id:'PhD Student', name:'PhD Student'},
+                                                {id:'Postdoc', name:'Postdoc'},
+                                                {id:'Research Assistant', name:'Research Assistant'},
+                                                {id:'IMEN\'s Staff only', name:'IMEN\'s Staff only'},
+                                                {id:'Internship', name:'Internship'},
+                                                {id:'Research Attachment', name:'Research Attachment'},
+                                                {id:'FYP', name:'FYP'},
+                                                {id:'Sabbatical', name:'Sabbatical'},
+                                                {id:'Industrial Attachment', name:'Industrial Attachment'},
+                                                {id:'Research Officer', name:'Research Officer'}
+                                            ]}
+                                            value={form.category}
+                                            onChange={v=>setForm(f=>({...f,category:v}))}
+                                        />
+                                        {form.category === 'IMEN\'s Staff only' ? (
+                                            <div>
+                                                <label className="reg-label">Supervisor</label>
+                                                <input disabled className="reg-input" value="Not Required (Staff)" />
+                                            </div>
+                                        ) : (
+                                            <RegSelect
+                                                label={['Internship','Research Attachment','FYP','Sabbatical','Industrial Attachment'].includes(form.category) ? 'Co-SV / Mentor' : 'Supervisor (IMEN)'}
+                                                options={db.supervisors}
+                                                value={form.supervisorName}
+                                                onChange={v=>setForm(f=>({...f,supervisorName:v}))}
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="reg-section-label">Project Details</div>
+                                    <div style={{marginBottom:'16px'}}>
+                                        <RegField label="Project Name" value={form.projectName} onChange={v=>setForm(f=>({...f,projectName:v}))} />
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+                                        <RegField label="Start Date" type="date" value={form.startDate} onChange={v=>setForm(f=>({...f,startDate:v}))} />
+                                        <RegField label="End Date" type="date" value={form.endDate} onChange={v=>setForm(f=>({...f,endDate:v}))} />
+                                    </div>
+                                    <div style={{marginBottom:'4px'}}>
+                                        <label className="reg-label">Equipment / Specific Requirements</label>
+                                        <textarea
+                                            required
+                                            className="reg-input"
+                                            style={{height:'100px', resize:'none'}}
+                                            placeholder="List any specific equipment or lab requirements..."
+                                            value={form.equipment}
+                                            onChange={e=>setForm(f=>({...f,equipment:e.target.value}))}
+                                        />
+                                    </div>
+                                  </fieldset>
+
+                                    {/* ── Confirmation gate ── */}
+                                    <label style={{display:'flex', alignItems:'flex-start', gap:'12px', marginTop:'28px', padding:'16px', background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:'14px', cursor: submitting ? 'default' : 'pointer'}}>
+                                        <input type="checkbox" style={{marginTop:'2px', width:'18px', height:'18px', accentColor:'#1e3a8a', cursor:'pointer'}} checked={confirmed} disabled={submitting} onChange={e=>onConfirmToggle(e.target.checked)} />
+                                        <span style={{fontSize:'12px', fontWeight:600, color:'#475569', lineHeight:1.5}}>I confirm that all the information provided above is true and correct. On confirming, I will be directed to sign the Non-Disclosure Agreement (NDA) and complete a short safety assessment before submitting. <span style={{fontWeight:400, color:'#94a3b8'}}>(Returning applicants and IMEN staff skip these steps.)</span></span>
+                                    </label>
+
+                                    {confirmed && phase !== 'ready' && (
+                                        <p style={{fontSize:'11px', fontWeight:700, color:'#3b82f6', textAlign:'center', marginTop:'14px', textTransform:'uppercase', letterSpacing:'0.06em'}}>
+                                            {phase === 'nda' ? 'Complete the NDA to continue…' : phase === 'assessment' ? 'Complete the safety assessment to continue…' : 'Processing…'}
+                                        </p>
+                                    )}
+
+                                    {phase === 'ready' && (
+                                        <div style={{marginTop:'18px', padding:'14px 16px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'14px', display:'flex', gap:'10px', alignItems:'flex-start'}}>
+                                            <span style={{color:'#16a34a', fontWeight:800, flexShrink:0, lineHeight:1.45}}>✓</span>
+                                            <span style={{fontSize:'12px', color:'#166534', lineHeight:1.5, fontWeight:500}}>
+                                                {flags && flags.isReturning
+                                                    ? 'Welcome back — our records show you have registered with IMEN before, so the NDA and safety assessment are not required again. Please continue with "Submit Application" below.'
+                                                    : (flags && flags.isStaff)
+                                                        ? 'As IMEN staff, the NDA and safety assessment are not required. Please continue with "Submit Application" below.'
+                                                        : 'Your NDA has been signed and your safety assessment passed. Please continue with "Submit Application" below.'}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <button type="submit" disabled={phase !== 'ready' || submitting} className="reg-submit-btn"
+                                        style={ phase === 'ready' && !submitting ? {boxShadow:'0 0 0 4px rgba(30,58,138,0.18), 0 8px 28px rgba(30,58,138,0.45)'} : {} }>
+                                        {submitting ? 'Submitting…' : phase === 'ready' ? 'Submit Application' : 'Complete Steps to Submit'}
+                                    </button>
+
+                                    {confirmed && !submitting && (
+                                        <button type="button" onClick={resetGate} style={{display:'block', margin:'14px auto 0', fontSize:'11px', fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em', background:'none', border:'none', cursor:'pointer'}}>
+                                            ← Edit details
+                                        </button>
+                                    )}
+                                </form>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const RegField = ({ label, value, onChange, type="text", placeholder, disabled=false, onBlur, note, optional=false }) => (
+            <div>
+                <label className="reg-label">{label}</label>
+                <input required={!optional} type={type} className="reg-input" value={value} onChange={e=>onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder || label} disabled={disabled} />
+                {note && <span style={{display:'block', fontSize:'10px', color:'#94a3b8', marginTop:'5px', lineHeight:1.45}}>{note}</span>}
+            </div>
+        );
+        const RegSelect = ({ label, options, value, onChange, disabled=false }) => (
+            <div>
+                <label className="reg-label">{label}</label>
+                <select required className="reg-input" value={value} onChange={e=>onChange(e.target.value)} disabled={disabled}>
+                    <option value="">-- Select --</option>
+                    {options.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+            </div>
+        );
+        const InputField = ({ label, value, onChange, type="text" }) => <div className="text-left"><label className="text-[10px] font-bold text-gray-400 uppercase ml-1">{label}</label><input required type={type} className="ios-input font-bold" value={value} onChange={e=>onChange(e.target.value)} /></div>;
+        const SelectField = ({ label, options, value, onChange }) => <div className="text-left"><label className="text-[10px] font-bold text-gray-400 uppercase ml-1">{label}</label><select required className="ios-input font-bold" value={value} onChange={e=>onChange(e.target.value)}><option value="">-- Select --</option>{options.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></div>;
+
+        const AssessmentSession = ({ appId, onFinish, onCancel, showToast, embedded = false, onPass }) => {
+            const [lang, setLang] = useState('EN');
+            const [questions, setQuestions] = useState([]);
+            const [answers, setAnswers] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [failModal, setFailModal] = useState(false);
+            const [completed, setCompleted] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+
+            useEffect(() => {
+                google.script.run.withSuccessHandler(q => {
+                    setQuestions(q || []);
+                    setLoading(false);
+                }).getAssessmentQuestions();
+            }, []);
+
+            const handleAutofill = () => {
+                const pin = prompt("Admin PIN Required:");
+                if (!pin || typeof google === 'undefined') return;
+                google.script.run.withSuccessHandler(res => {
+                    if (res && (res === true || res.ok)) {
+                        const ans = {}; questions.forEach(q => ans[q.id] = q.answer);
+                        setAnswers(ans);
+                        showToast("Admin: correct answers loaded", "success");
+                    } else { showToast("Invalid PIN", "error"); }
+                }).verifyAdminPin(pin);
+            };
+
+            const submit = () => {
+                let score = 0;
+                const total = questions.length;
+                questions.forEach(q => { if (answers[q.id] === q.answer) score++; });
+                if (score !== total) { setFailModal(true); showToast(`Failed: ${score}/${total} Correct. Review your answers.`, "error"); return; }
+                const report = questions.map(q => ({ text_en: q.text_en, userSelection: `${answers[q.id]}. ${q.options_en[answers[q.id]]}` }));
+                // Pre-submission (wizard) mode — hand the result back; no server write here.
+                if (typeof onPass === 'function') { onPass(score, total, report); return; }
+                // Legacy mode (kept for backward compatibility).
+                setIsSubmitting(true);
+                showToast("Submitting results...", "info");
+                google.script.run
+                    .withSuccessHandler(() => { setIsSubmitting(false); setCompleted(true); })
+                    .withFailureHandler((err) => { setIsSubmitting(false); showToast("System Error: " + err.message, "error"); })
+                    .submitAssessmentResults(appId, score, total, report);
+            };
+
+            if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="loader"></div></div>;
+
+            if (completed) return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-white p-10 text-center animate-ios">
+                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 mb-6"><svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M4.5 12.75l6 6 9-13.5" /></svg></div>
+                    <h1 className="text-3xl font-bold mb-4">Assessment Passed</h1>
+                    <p className="text-gray-500 max-w-md mx-auto mb-8">Your results have been successfully recorded. You may now safely close this window.</p>
+                    <button onClick={() => window.close()} className="px-8 py-3 bg-gray-100 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200">Close Window</button>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen bg-[#f2f2f7] p-6 pb-24 text-left relative">
+                    <div style={{zIndex: 1000, position: 'relative'}}>
+                        <ConfirmModal show={failModal} title="Assessment Not Passed" msg="You must answer ALL questions correctly to proceed. Please review your answers and try again." onConfirm={()=>setFailModal(false)} onCancel={()=>setFailModal(false)} />
+                    </div>
+                    <div className="max-w-3xl mx-auto space-y-10">
+                        <div className="ios-card p-10 bg-white">
+                            <div className="flex justify-between mb-6">
+                                <div><h2 className="text-xl font-bold uppercase">Safety Assessment</h2><p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">100% Score Required</p></div>
+                                <div className="bg-gray-100 p-1 rounded-xl">
+                                    <button onClick={()=>setLang('EN')} className={`px-4 py-1.5 rounded-lg text-[11px] font-bold ${lang==='EN' ? 'bg-white shadow-sm text-[#007aff]' : 'text-gray-500'}`}>English</button>
+                                    <button onClick={()=>setLang('MS')} className={`px-4 py-1.5 rounded-lg text-[11px] font-bold ${lang==='MS' ? 'bg-white shadow-sm text-[#007aff]' : 'text-gray-500'}`}>B. Melayu</button>
+                                </div>
+                            </div>
+                            <div className="border-t pt-6 space-y-4 text-left">
+                                <p className="text-xs font-bold uppercase text-[#007aff]">Objective</p>
+                                <p className="text-sm text-gray-600 text-left">The objective is to validate applicant readiness for laboratory safety at IMEN. Answer every question correctly to proceed.</p>
+                            </div>
+                            <div className="w-full flex justify-between items-center mt-6">
+                                {embedded && onCancel
+                                    ? <button onClick={onCancel} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider hover:text-gray-600">← Back to form</button>
+                                    : <span></span>}
+                                <button onClick={handleAutofill} className="text-[9px] font-bold text-rose-500 uppercase border border-rose-100 px-3 py-1 rounded-lg hover:bg-rose-50 transition-all shadow-sm">Autofill (Admin Debug)</button>
+                            </div>
+                        </div>
+
+                        {questions.map((q, idx) => (
+                            <div key={q.id} className="ios-card p-10 bg-white">
+                                <div className="flex gap-4 mb-8">
+                                    <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{idx + 1}</span>
+                                    <p className="text-lg font-bold">{lang === 'EN' ? q.text_en : q.text_ms}</p>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {Object.entries(lang === 'EN' ? q.options_en : q.options_ms).map(([key, text]) => (
+                                        <button key={key} onClick={() => setAnswers({...answers, [q.id]: key})} disabled={isSubmitting}
+                                            className={`p-5 rounded-2xl text-left font-semibold border-2 transition-all ${answers[q.id] === key ? 'border-[#007aff] bg-blue-50 text-[#007aff]' : 'border-transparent bg-gray-50 text-gray-500'}`}>
+                                            {key}. {text}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        <div className="fixed bottom-0 left-0 w-full p-6 bg-white/80 backdrop-blur-xl border-t z-50">
+                            <button onClick={submit} disabled={isSubmitting}
+                                className={`max-w-3xl mx-auto w-full py-5 font-bold uppercase tracking-widest shadow-xl transition-all duration-300 ${!isSubmitting ? 'btn-primary' : 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-2xl'}`}>
+                                {isSubmitting ? 'Processing...' : 'Submit Session'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        /* =============================================
+           AdminControlPanel
+           ============================================= */
+        const AdminControlPanel = ({ db, refreshData, showToast }) => {
+            const [search, setSearch] = useState("");
+            const [syncing, setSyncing] = useState(false);
+
+            const handleSync = () => {
+                setSyncing(true);
+                google.script.run
+                    .withSuccessHandler(staffRes => {
+                        google.script.run
+                            .withSuccessHandler(labRes => {
+                                showToast(`Synced ${staffRes.count} staff & ${labRes.count} labs.`, "success");
+                                setSyncing(false);
+                                refreshData();
+                            })
+                            .withFailureHandler(err => {
+                                showToast("Lab Sync Error: " + err.message, "error");
+                                setSyncing(false);
+                            })
+                            .syncLabData();
+                    })
+                    .withFailureHandler(err => {
+                        showToast("Staff Sync Error: " + err.message, "error");
+                        setSyncing(false);
+                    })
+                    .syncStaffData();
+            };
+
+            const labList = db.labs.filter(l => l.Name.toLowerCase().includes(search.toLowerCase()));
+            const handleUpdate = (id, staffId, type) => {
+                google.script.run.withSuccessHandler(() => { showToast("Updated", "success"); refreshData(); }).assignRoleToLab(id, staffId, type, AUTH_TOKEN);
+            };
+
+            return (
+                <div className="space-y-10">
+                    <div className="flex justify-between items-end">
+                        <div className="text-left">
+                            <h2 className="text-2xl font-bold uppercase">Security Mapping</h2>
+                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Facility Management</p>
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={handleSync} className="flex items-center gap-2 px-6 py-4 bg-white border rounded-2xl text-[10px] font-bold uppercase shadow-sm">
+                                {syncing ? <div className="loader !w-3 !h-3"></div> : <Icons.Refresh className="w-3 h-3 text-[#007aff]" />}
+                                Sync Staff &amp; Labs
+                            </button>
+                            <input className="ios-input md:w-80" placeholder="Filter Facility..." value={search} onChange={e=>setSearch(e.target.value)} />
+                        </div>
+                    </div>
+                    <div className="bg-white ios-card border overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 text-[10px] font-bold uppercase text-gray-400 border-b">
+                                <tr>
+                                    <th className="px-8 py-4">Facility</th>
+                                    <th className="px-8 py-4">Staff PIC</th>
+                                    <th className="px-8 py-4">Lab Coordinator</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {labList.map(lab => (
+                                    <tr key={lab.ID}>
+                                        <td className="px-8 py-6 font-bold uppercase text-sm">{lab.Name}</td>
+                                        <td className="px-8 py-6">
+                                            <select className="bg-gray-100 rounded-xl px-4 py-2 text-[10px] font-bold uppercase outline-none" value={lab.PIC_ID} onChange={e=>handleUpdate(lab.ID, e.target.value, 'PIC')}>
+                                                <option value="">-- No PIC --</option>
+                                                {db.staff.map(s => <option key={s.ID} value={s.ID}>{s.Name}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <select className="bg-gray-100 rounded-xl px-4 py-2 text-[10px] font-bold uppercase outline-none" value={lab.HOL_ID} onChange={e=>handleUpdate(lab.ID, e.target.value, 'HOL')}>
+                                                <option value="">-- No HOL --</option>
+                                                {db.staff.filter(s=>s.Role==='AKADEMIK').map(s => <option key={s.ID} value={s.ID}>{s.Name}</option>)}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const LabUsersManager = ({ db, userRole, showToast, refreshData, labFilter, setLabFilter, staffLabName, staffLabNames }) => {
+            const [search, setSearch] = useState("");
+            const [actionLoading, setActionLoading] = useState(null);
+            const [verifyModal, setVerifyModal] = useState({ show: false, userId: null });
+
+            const executeVerifyAccess = () => {
+                const userId = verifyModal.userId;
+                setVerifyModal({ show: false, userId: null });
+                setActionLoading(userId);
+                google.script.run
+                    .withSuccessHandler(() => {
+                        showToast("Verification email sent", "success");
+                        setActionLoading(null);
+                        if (refreshData) refreshData();
+                    })
+                    .withFailureHandler(err => {
+                        showToast("Error: " + err.message, "error");
+                        setActionLoading(null);
+                    })
+                    .initiateAccessVerification(userId, AUTH_TOKEN);
+            };
+
+            const resolveLabName = (labVal) => {
+                if (!labVal) return "—";
+                const str = String(labVal).trim();
+                const found = (db.labs || []).find(l => l.ID === str || l.Name === str);
+                return found ? found.Name : str;
+            };
+
+            const fmtDate = (iso) => {
+                if (!iso) return "—";
+                try {
+                    const d = new Date(iso);
+                    if (isNaN(d.getTime())) return "—";
+                    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                } catch { return "—"; }
+            };
+
+            const fmtPhone = (val) => {
+                if (val === null || val === undefined || val === "") return "—";
+                let str = String(val).replace(/^'+/, '').trim().replace(/\.0+$/, '');
+                if (!str || str === '0') return "—";
+                if (/^\d+$/.test(str) && !str.startsWith('0')) str = '0' + str;
+                return str;
+            };
+
+            const fmtMatric = (val) => {
+                if (val === null || val === undefined || val === "") return "—";
+                return String(val).replace(/^'+/, '').trim().replace(/\.0+$/, '') || "—";
+            };
+
+            const safeStr = (val) => String(val === null || val === undefined ? "" : val);
+
+            // Find the most recent approved application photo for this user by email
+            const getPhoto = (email) => {
+                if (!email) return null;
+                const apps = (db.applications || [])
+                    .filter(a => safeStr(a.Email).toLowerCase() === safeStr(email).toLowerCase()
+                              && a.Photo && safeStr(a.Photo).startsWith('data:image'))
+                    .sort((a, b) => safeStr(b.Date).localeCompare(safeStr(a.Date)));
+                return apps.length > 0 ? apps[0].Photo : null;
+            };
+
+            const filteredUsers = (db.lab_users || []).filter(u => {
+                const term = search.toLowerCase().trim();
+                const labNameRaw = resolveLabName(u.Lab);
+                const labName = String(labNameRaw).toLowerCase().trim();
+                
+                const matchesLab = !labFilter || labFilter === 'all' || labName === String(labFilter).toLowerCase().trim();
+                if (!matchesLab) return false;
+
+                if (!term) return true;
+                
+                const phone   = fmtPhone(u.Phone).toLowerCase();
+                const matric  = fmtMatric(u.MatriceNo).toLowerCase();
+                const admsId  = safeStr(u.ADMS_ID).trim();
+                return (
+                    safeStr(u.Name).toLowerCase().includes(term) ||
+                    matric.includes(term) ||
+                    labName.includes(term) ||
+                    safeStr(u.Email).toLowerCase().includes(term) ||
+                    phone.includes(term) ||
+                    (admsId !== "" && admsId !== "0" && admsId.toLowerCase().includes(term))
+                );
+            });
+
+            return (
+                <React.Fragment>
+                    <ConfirmModal
+                        show={verifyModal.show}
+                        title="Review Access"
+                        msg="Are you sure you want to review and potentially revoke this user's access? The user will receive an email notification to confirm their status."
+                        onConfirm={executeVerifyAccess}
+                        onCancel={() => setVerifyModal({ show: false, userId: null })}
+                    />
+                    <div className="ios-card bg-white border overflow-hidden text-left relative">
+                        <div className="p-8 border-b flex flex-col md:flex-row justify-between items-center bg-gray-50 gap-4">
+                        <div className="flex flex-col md:flex-row items-center md:items-end gap-4 text-left">
+                            <div>
+                                <h3 className="text-xl font-bold uppercase">Active Registry</h3>
+                                <div className="mt-2 bg-white px-6 py-2 rounded-full border text-[10px] font-bold tracking-widest uppercase inline-block">{filteredUsers.length} Records</div>
+                            </div>
+                            {(userRole === 'pic' || userRole === 'hol' || userRole === 'admin') && (
+                                (staffLabName && (userRole === 'pic' || userRole === 'hol'))
+                                    ? <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 max-w-[220px]">
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#007aff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                          <span className="text-xs font-bold text-blue-700 uppercase tracking-wide truncate">{staffLabName}</span>
+                                      </div>
+                                    : <select className="bg-white border rounded-lg px-3 py-1.5 text-xs font-bold shadow-sm max-w-[200px] truncate" value={labFilter || 'all'} onChange={e => setLabFilter(e.target.value)}>
+                                          {/* Show ALL LABS only for admin / master-PIN (no restriction) */}
+                                          {(!staffLabNames || staffLabNames.length === 0) && <option value="all">ALL LABS</option>}
+                                          {(staffLabNames && staffLabNames.length > 0
+                                              ? staffLabNames
+                                              : Array.from(new Set((db.lab_users || []).map(u => resolveLabName(u.Lab)).filter(l => l && l !== '—'))).sort()
+                                          ).map((lab, i) => (
+                                              <option key={i} value={lab}>{lab}</option>
+                                          ))}
+                                      </select>
+                            )}
+                        </div>
+                        <input className="ios-input md:w-72" placeholder="Search name, matric, lab, email or ADMS ID..." value={search} onChange={e=>setSearch(e.target.value)} />
+                    </div>
+                    <div className="overflow-x-auto custom-scrollbar pb-2">
+                        <table className="w-full min-w-[760px]">
+                            <thead className="bg-gray-50 text-[9px] text-gray-400 font-bold uppercase border-b tracking-wider">
+                                <tr>
+                                    <th className="px-5 py-5 text-center w-10">No.</th>
+                                    <th className="px-6 py-5 text-left">Applicant</th>
+                                    <th className="px-6 py-5 text-left">Matric / ADMS ID</th>
+                                    <th className="px-4 py-5 text-left">Contact</th>
+                                    <th className="px-6 py-5 text-left">Lab</th>
+                                    <th className="px-6 py-5 text-left">Category</th>
+                                    <th className="px-6 py-5 text-left">Date Registered</th>
+                                    <th className="px-6 py-5 text-left">Status / Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {filteredUsers.length === 0 && (
+                                    <tr><td colSpan="8" className="px-6 py-16 text-center text-gray-300 font-bold uppercase tracking-widest text-xs">No records found.</td></tr>
+                                )}
+                                {filteredUsers.map((u, idx) => {
+                                    const labName = resolveLabName(u.Lab);
+                                    const phone   = fmtPhone(u.Phone);
+                                    const matric  = fmtMatric(u.MatriceNo);
+                                    const hasAdms = u.ADMS_ID && safeStr(u.ADMS_ID).trim() !== "" && safeStr(u.ADMS_ID).trim() !== "0";
+                                    const photo   = getPhoto(u.Email);
+                                    const initial = u.Name ? String(u.Name).trim().charAt(0).toUpperCase() : '?';
+                                    return (
+                                        <tr key={u.ID || idx} className="hover:bg-gray-50/60 transition-colors">
+                                            {/* No. */}
+                                            <td className="px-5 py-4 text-center">
+                                                <span className="text-[11px] font-bold text-gray-400">{idx + 1}</span>
+                                            </td>
+                                            {/* Applicant */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shadow-sm shrink-0">
+                                                        {photo
+                                                            ? <img src={photo} className="w-full h-full object-cover" alt={u.Name} />
+                                                            : <span className="text-xs font-bold text-gray-400">{initial}</span>
+                                                        }
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm text-gray-900 uppercase leading-tight">{u.Name || "—"}</p>
+                                                        {(u.Category === 'Staff' || u.Category === "IMEN's Staff only") && (
+                                                            <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-wide">Internal Role</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            {/* Matric / ADMS */}
+                                            <td className="px-6 py-4">
+                                                <p className="font-mono text-xs font-bold text-[#007aff]">{matric}</p>
+                                                {hasAdms && (
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <Icons.IdCard className="w-3 h-3 text-indigo-400 shrink-0" />
+                                                        <p className="font-mono text-[10px] font-bold text-indigo-600">{u.ADMS_ID}</p>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            {/* Contact */}
+                                            <td className="px-4 py-4">
+                                                <p className="text-[11px] text-gray-700 font-medium break-all" title={u.Email}>{u.Email || "—"}</p>
+                                                <p className="text-[11px] text-gray-500 font-medium mt-0.5">{phone}</p>
+                                            </td>
+                                            {/* Lab */}
+                                            <td className="px-6 py-4">
+                                                <span className="text-xs font-bold text-gray-800 uppercase leading-snug">{labName}</span>
+                                            </td>
+                                            {/* Category */}
+                                            <td className="px-4 py-4 w-32">
+                                                <span className="px-2 py-1 rounded-lg bg-gray-100 text-[9px] font-bold text-gray-500 uppercase tracking-wide whitespace-normal inline-block text-center leading-tight w-full">{u.Category || "—"}</span>
+                                            </td>
+                                            {/* Date Registered */}
+                                            <td className="px-6 py-4">
+                                                <p className="text-[11px] font-mono font-semibold text-gray-600">{fmtDate(u.AddedAt)}</p>
+                                            </td>
+                                            {/* Status / Action */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col items-start gap-2">
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${u.Status === 'Active' ? 'bg-green-50 text-green-600' : u.Status === 'pending_verification' ? 'bg-orange-50 text-orange-600' : u.Status === 'Revoked' ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>
+                                                        {u.Status === 'pending_verification' ? 'Pending Verify' : (u.Status || "Active")}
+                                                    </span>
+                                                    {(userRole === 'pic' || userRole === 'admin') && (!u.Status || u.Status === 'Active') && (
+                                                        isProtectedUser(u.Name)
+                                                            ? <span className="px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider text-gray-300 border border-gray-100 bg-gray-50 whitespace-nowrap" title="Permanent access — cannot be reviewed">Permanent Access</span>
+                                                            : <button onClick={() => setVerifyModal({ show: true, userId: u.ID })} disabled={actionLoading === u.ID} className="px-2 py-1 bg-white border border-rose-200 hover:bg-rose-50 text-rose-500 rounded text-[9px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1 shadow-sm">
+                                                                {actionLoading === u.ID ? 'Sending...' : 'Click to review access'}
+                                                              </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                </React.Fragment>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('lab-access-root'));
+        root.render(<App />);
+    </script>
+
+    <!-- Bootstrap: compile the app with the CLASSIC JSX runtime.
+         The default/automatic runtime injects `import ... from "react/jsx-runtime"`,
+         which is illegal in a non-module script and blanks the page. Forcing classic
+         (React.createElement) avoids that and is version-independent. -->
+    <script>
+      (function () {
+        function boot() {
+          if (!window.Babel) { setTimeout(boot, 50); return; }
+          try {
+            var src = document.getElementById('app-src').textContent;
+            var out = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]] }).code;
+            (0, eval)(out);
+          } catch (e) {
+            var r = document.getElementById('lab-access-root');
+            if (r) r.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#b91c1c">The application failed to start: ' + (e && e.message ? e.message : e) + '</div>';
+            throw e;
+          }
+        }
+        boot();
+      })();
+    </script>
+</body>
+</html>
