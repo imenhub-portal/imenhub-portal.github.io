@@ -1,0 +1,30 @@
+name: Backup index.html
+
+on:
+  schedule:
+    - cron: '0 0 1,15 * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create dated backup
+        run: |
+          mkdir -p i-menian/backups
+          DATE=$(date +%Y-%m-%d)
+          cp i-menian/index.html "i-menian/backups/index_${DATE}.bak.html"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add i-menian/backups/
+          git diff --staged --quiet && echo "No changes to backup" && exit 0
+          git commit -m "Auto-backup index.html ($(date +%Y-%m-%d))"
+          git push
