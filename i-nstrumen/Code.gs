@@ -140,6 +140,7 @@ function handleFrontendAction(actionType, payload) {
       case 'Archive': return archiveSystem();
       case 'CancelBooking': return cancelBooking(payload);
       case 'FindMyBookings': return findMyBookings(payload);
+      case 'GetSmartMatch': return getSmartMatchEquipment(payload);
 
       // ── i-Menian Crossbridge ────────────────────────────────────────────────
       case 'SearchIMenian': {
@@ -1057,6 +1058,212 @@ function findMyBookings(payload) {
   }
 
   return results;
+}
+
+// ==========================================
+// AI SMART MATCH — multi-provider failover LLM router
+// Providers: Gemini (primary) → Mistral → Groq (fallback)
+// Keys stored in Script Properties: GEMINI_KEY, MISTRAL_KEY, GROQ_KEY
+// Stateless: no chat history stored server-side. Frontend sends last 6 msgs.
+// ==========================================
+
+function getSmartMatchEquipment(payload) {
+  const userPrompt = String((payload && payload.userPrompt) || '').trim();
+  const history    = Array.isArray(payload && payload.conversationHistory)
+                     ? payload.conversationHistory.slice(-6) : [];
+  if (!userPrompt) return { error: true, reply: 'Empty message.' };
+
+  const context = _buildEquipmentContext();
+  if (!context) return { error: true, reply: 'Equipment database is empty.' };
+
+  const systemInstruction =
+    'You are the i-Nstrumen Lab Assistant for IMEN (Institute of Microengineering and Nanoelectronics, UKM). ' +
+    'Match the user\'s requested process or fabrication need ONLY to equipment listed in the EQUIPMENT INVENTORY below. ' +
+    'Rules: (1) Never invent or suggest equipment not in the list. (2) If nothing matches, say so politely and suggest the closest alternative from the list if any. ' +
+    '(3) For multi-turn conversations, remember context from earlier messages. (4) Be concise and helpful. ' +
+    '(5) Always respond with valid JSON in this exact format: {"reply":"your conversational text here","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches"}]}. ' +
+    'If no matches, use an empty matches array. Do not wrap the JSON in markdown code fences.\n\n' +
+    'EQUIPMENT INVENTORY:\n' + context;
+
+  // ── Failover chain ──
+  const providers = [_callGemini, _callMistral, _callGroq];
+  const names     = ['Gemini', 'Mistral', 'Groq'];
+
+  for (let i = 0; i < providers.length; i++) {
+    try {
+      const raw = providers[i](systemInstruction, userPrompt, history);
+      if (raw) {
+        const parsed = _parseMatchResponse(raw);
+        console.log('[SmartMatch] ' + names[i] + ' succeeded.');
+        return parsed;
+      }
+    } catch (e) {
+      console.log('[SmartMatch] ' + names[i] + ' failed: ' + e.toString());
+    }
+  }
+
+  return {
+    error: true,
+    reply: 'All smart search channels are currently at capacity. Please try again shortly.',
+    matches: []
+  };
+}
+
+function _buildEquipmentContext() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.EQUIPMENT);
+  if (!sheet) return '';
+  const eqList = getDataAsObjects(sheet);
+  if (!eqList.length) return '';
+
+  const lines = [];
+  eqList.forEach(function(eq) {
+    if (!eq.name) return;
+    const status = String(eq.status || 'Active');
+    if (status === 'Maintenance') return; // don't offer broken tools
+
+    let caps = '';
+    try {
+      const parsed = typeof eq.processCapabilities === 'string'
+        ? JSON.parse(eq.processCapabilities || '[]')
+        : (eq.processCapabilities || []);
+      if (Array.isArray(parsed) && parsed.length) {
+        caps = parsed.map(function(c) {
+          let s = c.name || '';
+          if (Array.isArray(c.options) && c.options.length) {
+            s += ' (' + c.options.map(function(o) {
+              return typeof o === 'string' ? o : (o.name || '');
+            }).join(', ') + ')';
+          }
+          return s;
+        }).join('; ');
+      }
+    } catch(e) { caps = ''; }
+
+    const desc = String(eq.description || '').substring(0, 120);
+    lines.push(
+      '- ' + eq.name + ' | Lab: ' + (eq.lab || '?') +
+      ' | Status: ' + status +
+      (caps ? ' | Capabilities: ' + caps : '') +
+      (desc ? ' | Notes: ' + desc : '')
+    );
+  });
+
+  return lines.join('\n');
+}
+
+function _callGemini(systemInstruction, userPrompt, history) {
+  const key = PropertiesService.getScriptProperties().getProperty('GEMINI_KEY');
+  if (!key) throw new Error('GEMINI_KEY not configured');
+
+  const contents = [];
+  // Convert history to Gemini format
+  history.forEach(function(msg) {
+    contents.push({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.text }]
+    });
+  });
+  // System instruction + user prompt as final user turn
+  contents.push({
+    role: 'user',
+    parts: [{ text: systemInstruction + '\n\nUser request: ' + userPrompt }]
+  });
+
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      contents: contents,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+    }),
+    muteHttpExceptions: true
+  });
+
+  if (res.getResponseCode() !== 200) throw new Error('Gemini HTTP ' + res.getResponseCode());
+  const data = JSON.parse(res.getContentText());
+  return data.candidates[0].content.parts[0].text;
+}
+
+function _callMistral(systemInstruction, userPrompt, history) {
+  const key = PropertiesService.getScriptProperties().getProperty('MISTRAL_KEY');
+  if (!key) throw new Error('MISTRAL_KEY not configured');
+
+  const messages = [{ role: 'system', content: systemInstruction }];
+  history.forEach(function(msg) {
+    messages.push({ role: msg.role === 'user' ? 'user' : 'assistant', content: msg.text });
+  });
+  messages.push({ role: 'user', content: userPrompt });
+
+  const res = UrlFetchApp.fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + key },
+    payload: JSON.stringify({
+      model: 'mistral-small-latest',
+      messages: messages,
+      temperature: 0.3,
+      max_tokens: 1024
+    }),
+    muteHttpExceptions: true
+  });
+
+  if (res.getResponseCode() !== 200) throw new Error('Mistral HTTP ' + res.getResponseCode());
+  const data = JSON.parse(res.getContentText());
+  return data.choices[0].message.content;
+}
+
+function _callGroq(systemInstruction, userPrompt, history) {
+  const key = PropertiesService.getScriptProperties().getProperty('GROQ_KEY');
+  if (!key) throw new Error('GROQ_KEY not configured');
+
+  const messages = [{ role: 'system', content: systemInstruction }];
+  history.forEach(function(msg) {
+    messages.push({ role: msg.role === 'user' ? 'user' : 'assistant', content: msg.text });
+  });
+  messages.push({ role: 'user', content: userPrompt });
+
+  const res = UrlFetchApp.fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + key },
+    payload: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: messages,
+      temperature: 0.3,
+      max_tokens: 1024
+    }),
+    muteHttpExceptions: true
+  });
+
+  if (res.getResponseCode() !== 200) throw new Error('Groq HTTP ' + res.getResponseCode());
+  const data = JSON.parse(res.getContentText());
+  return data.choices[0].message.content;
+}
+
+function _parseMatchResponse(raw) {
+  let text = String(raw || '').trim();
+  // Strip markdown code fences if present
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+
+  try {
+    const obj = JSON.parse(text);
+    if (obj && typeof obj.reply === 'string') {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.EQUIPMENT);
+      const eqList = sheet ? getDataAsObjects(sheet) : [];
+      const validNames = {};
+      eqList.forEach(function(e) { validNames[String(e.name || '').toLowerCase()] = true; });
+
+      const matches = Array.isArray(obj.matches) ? obj.matches.filter(function(m) {
+        return m && m.name && validNames[String(m.name).toLowerCase()];
+      }) : [];
+
+      return { error: false, reply: obj.reply, matches: matches };
+    }
+  } catch(e) {
+    // JSON parse failed — return raw text as reply, no matches
+  }
+  return { error: false, reply: text, matches: [] };
 }
 
 function saveEquipment(eqObj) {
