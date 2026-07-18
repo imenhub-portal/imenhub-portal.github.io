@@ -1063,6 +1063,7 @@ function findMyBookings(payload) {
 // ==========================================
 // AI SMART MATCH — multi-provider failover LLM router
 // Providers: Gemini (primary) → Mistral → Groq (fallback)
+// Modes: restricted (inventory only) | advisory (knowledge + parameters)
 // Keys stored in Script Properties: GEMINI_KEY, MISTRAL_KEY, GROQ_KEY
 // Stateless: no chat history stored server-side. Frontend sends last 6 msgs.
 // ==========================================
@@ -1071,19 +1072,15 @@ function getSmartMatchEquipment(payload) {
   const userPrompt = String((payload && payload.userPrompt) || '').trim();
   const history    = Array.isArray(payload && payload.conversationHistory)
                      ? payload.conversationHistory.slice(-6) : [];
+  const mode       = String((payload && payload.mode) || 'restricted').trim();
+  const isAdvisory = mode === 'advisory';
+
   if (!userPrompt) return { error: true, reply: 'Empty message.' };
 
-  const context = _buildEquipmentContext();
+  const context = _buildEquipmentContext(isAdvisory);
   if (!context) return { error: true, reply: 'Equipment database is empty.' };
 
-  const systemInstruction =
-    'You are the i-Nstrumen Lab Assistant for IMEN (Institute of Microengineering and Nanoelectronics, UKM). ' +
-    'Match the user\'s requested process or fabrication need ONLY to equipment listed in the EQUIPMENT INVENTORY below. ' +
-    'Rules: (1) Never invent or suggest equipment not in the list. (2) If nothing matches, say so politely and suggest the closest alternative from the list if any. ' +
-    '(3) For multi-turn conversations, remember context from earlier messages. (4) Be concise and helpful. ' +
-    '(5) Always respond with valid JSON in this exact format: {"reply":"your conversational text here","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches"}]}. ' +
-    'If no matches, use an empty matches array. Do not wrap the JSON in markdown code fences.\n\n' +
-    'EQUIPMENT INVENTORY:\n' + context;
+  const systemInstruction = isAdvisory ? _ADVISORY_SYS(context) : _RESTRICTED_SYS(context);
 
   // ── Failover chain ──
   const providers = [_callGemini, _callMistral, _callGroq];
@@ -1094,7 +1091,10 @@ function getSmartMatchEquipment(payload) {
       const raw = providers[i](systemInstruction, userPrompt, history);
       if (raw) {
         const parsed = _parseMatchResponse(raw);
-        console.log('[SmartMatch] ' + names[i] + ' succeeded.');
+        parsed.provider      = names[i];
+        parsed.fallbackUsed  = i > 0;
+        parsed.mode          = mode;
+        console.log('[SmartMatch] ' + names[i] + ' succeeded (' + mode + ').');
         return parsed;
       }
     } catch (e) {
@@ -1105,11 +1105,40 @@ function getSmartMatchEquipment(payload) {
   return {
     error: true,
     reply: 'All smart search channels are currently at capacity. Please try again shortly.',
-    matches: []
+    matches: [],
+    mode: mode
   };
 }
 
-function _buildEquipmentContext() {
+// ── System instructions ──
+
+function _RESTRICTED_SYS(context) {
+  return 'You are the i-Nstrumen Lab Assistant for IMEN (Institute of Microengineering and Nanoelectronics, UKM). ' +
+    'Match the user\'s requested process or fabrication need ONLY to equipment listed in the EQUIPMENT INVENTORY below. ' +
+    'Rules: (1) Never invent or suggest equipment not in the list. (2) If nothing matches, say so politely and suggest the closest alternative from the list if any. ' +
+    '(3) For multi-turn conversations, remember context from earlier messages. (4) Be concise and helpful. ' +
+    '(5) Always respond with valid JSON in this exact format: {"reply":"your conversational text here","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches"}]}. ' +
+    'If no matches, use an empty matches array. Do not wrap the JSON in markdown code fences.\n\n' +
+    'EQUIPMENT INVENTORY:\n' + context;
+}
+
+function _ADVISORY_SYS(context) {
+  return 'You are the i-Nstrumen Lab Assistant with deep expertise in semiconductor fabrication, ' +
+    'thin film deposition, material characterization, and nano/micro-engineering equipment. ' +
+    'You help researchers at IMEN UKM find the right lab tools and understand how to use them.\n\n' +
+    'YOUR CAPABILITIES:\n' +
+    '1. MATCH: First check the EQUIPMENT INVENTORY below and recommend the best tools.\n' +
+    '2. EXPLAIN: Describe how each matched equipment works, its typical applications, and why it fits their need.\n' +
+    '3. PARAMETERS: If asked, suggest general operating parameters (voltages, temperatures, pressures, wavelengths, deposition rates) — these are REFERENCE GUIDELINES only, not exact SOPs.\n' +
+    '4. WORKFLOWS: For multi-step processes (e.g., lithography → etching → deposition → characterization), outline the full equipment chain.\n' +
+    '5. HONESTY: If a capability does not exist in our labs, state it clearly but mention if such tools are common in similar research facilities.\n' +
+    '6. DISCLAIMER: End your reply with exactly: "Advisory: These suggestions and parameters are for reference only. Always verify procedures, settings, and safety protocols with your lab PIC or equipment manual before operating any instrument."\n\n' +
+    'JSON FORMAT (always respond with exactly this shape, no markdown fences):\n' +
+    '{"reply":"your full response including explanation, parameters if relevant, and disclaimer","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches the request"}]}\n\n' +
+    'EQUIPMENT INVENTORY:\n' + context;
+}
+
+function _buildEquipmentContext(isAdvisory) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.EQUIPMENT);
   if (!sheet) return '';
   const eqList = getDataAsObjects(sheet);
@@ -1119,7 +1148,7 @@ function _buildEquipmentContext() {
   eqList.forEach(function(eq) {
     if (!eq.name) return;
     const status = String(eq.status || 'Active');
-    if (status === 'Maintenance') return; // don't offer broken tools
+    if (status === 'Maintenance') return;
 
     let caps = '';
     try {
@@ -1139,13 +1168,17 @@ function _buildEquipmentContext() {
       }
     } catch(e) { caps = ''; }
 
-    const desc = String(eq.description || '').substring(0, 120);
-    lines.push(
-      '- ' + eq.name + ' | Lab: ' + (eq.lab || '?') +
+    const desc = String(eq.description || '').substring(0, isAdvisory ? 250 : 120);
+    let line = '- ' + eq.name + ' | Lab: ' + (eq.lab || '?') +
       ' | Status: ' + status +
       (caps ? ' | Capabilities: ' + caps : '') +
-      (desc ? ' | Notes: ' + desc : '')
-    );
+      (desc ? ' | Notes: ' + desc : '');
+
+    if (isAdvisory) {
+      line += ' | Access: ' + (eq.accessMode || 'both') + ' | Tracking: ' + (eq.trackingUnit || 'Hours');
+    }
+
+    lines.push(line);
   });
 
   return lines.join('\n');
@@ -1258,7 +1291,7 @@ function debugSmartMatch() {
   Logger.log('');
   Logger.log('=== Equipment Context ===');
   try {
-    const ctx = _buildEquipmentContext();
+    const ctx = _buildEquipmentContext(false);
     const lines = ctx.split('\n').filter(function(l) { return l.trim(); });
     Logger.log('Equipment items: ' + lines.length);
     if (lines.length > 0) Logger.log('First: ' + lines[0].substring(0, 100));
@@ -1314,12 +1347,21 @@ function debugSmartMatch() {
   }
 
   Logger.log('');
-  Logger.log('=== Full getSmartMatchEquipment test ===');
+  Logger.log('=== Full getSmartMatchEquipment test (restricted) ===');
   try {
-    const result = getSmartMatchEquipment({ userPrompt: 'I need SEM imaging', conversationHistory: [] });
-    Logger.log('Result: ' + JSON.stringify(result).substring(0, 300));
+    const result = getSmartMatchEquipment({ userPrompt: 'I need SEM imaging', conversationHistory: [], mode: 'restricted' });
+    Logger.log('Restricted: ' + JSON.stringify(result).substring(0, 300));
   } catch(e) {
-    Logger.log('❌ Full test FAILED: ' + e.toString());
+    Logger.log('❌ Restricted FAILED: ' + e.toString());
+  }
+
+  Logger.log('');
+  Logger.log('=== Full getSmartMatchEquipment test (advisory) ===');
+  try {
+    const result = getSmartMatchEquipment({ userPrompt: 'Explain how thermal evaporation works and what settings I should use', conversationHistory: [], mode: 'advisory' });
+    Logger.log('Advisory: ' + JSON.stringify(result).substring(0, 300));
+  } catch(e) {
+    Logger.log('❌ Advisory FAILED: ' + e.toString());
   }
 }
 
