@@ -1241,6 +1241,88 @@ function _callGroq(systemInstruction, userPrompt, history) {
   return data.choices[0].message.content;
 }
 
+// ── DIAGNOSTIC: run from Apps Script editor → select "debugSmartMatch" → Run → View → Logs ──
+// Tests each provider individually and shows exactly which keys are set and what errors occur.
+function debugSmartMatch() {
+  const props = PropertiesService.getScriptProperties();
+  const geminiKey  = props.getProperty('GEMINI_KEY');
+  const mistralKey = props.getProperty('MISTRAL_KEY');
+  const groqKey    = props.getProperty('GROQ_KEY');
+
+  Logger.log('=== Script Properties Status ===');
+  Logger.log('GEMINI_KEY:  ' + (geminiKey  ? '✅ SET (' + geminiKey.substring(0, 8) + '…)' : '❌ MISSING'));
+  Logger.log('MISTRAL_KEY: ' + (mistralKey ? '✅ SET (' + mistralKey.substring(0, 8) + '…)' : '❌ MISSING'));
+  Logger.log('GROQ_KEY:    ' + (groqKey    ? '✅ SET (' + groqKey.substring(0, 8) + '…)' : '❌ MISSING'));
+
+  // Test equipment context
+  Logger.log('');
+  Logger.log('=== Equipment Context ===');
+  try {
+    const ctx = _buildEquipmentContext();
+    const lines = ctx.split('\n').filter(function(l) { return l.trim(); });
+    Logger.log('Equipment items: ' + lines.length);
+    if (lines.length > 0) Logger.log('First: ' + lines[0].substring(0, 100));
+  } catch(e) {
+    Logger.log('❌ Context error: ' + e.toString());
+  }
+
+  // Test each provider with a simple prompt
+  const testSys = 'You are a test assistant. Reply with exactly: {"reply":"test ok","matches":[]}';
+  const testPrompt = 'Say test ok';
+  const testHist = [];
+
+  Logger.log('');
+  Logger.log('=== Provider Tests ===');
+
+  // Gemini
+  if (geminiKey) {
+    try {
+      Logger.log('Testing Gemini...');
+      const r = _callGemini(testSys, testPrompt, testHist);
+      Logger.log('✅ Gemini OK: ' + r.substring(0, 80));
+    } catch(e) {
+      Logger.log('❌ Gemini FAILED: ' + e.toString());
+    }
+  } else {
+    Logger.log('⏭️  Gemini skipped (no key)');
+  }
+
+  // Mistral
+  if (mistralKey) {
+    try {
+      Logger.log('Testing Mistral...');
+      const r = _callMistral(testSys, testPrompt, testHist);
+      Logger.log('✅ Mistral OK: ' + r.substring(0, 80));
+    } catch(e) {
+      Logger.log('❌ Mistral FAILED: ' + e.toString());
+    }
+  } else {
+    Logger.log('⏭️  Mistral skipped (no key)');
+  }
+
+  // Groq
+  if (groqKey) {
+    try {
+      Logger.log('Testing Groq...');
+      const r = _callGroq(testSys, testPrompt, testHist);
+      Logger.log('✅ Groq OK: ' + r.substring(0, 80));
+    } catch(e) {
+      Logger.log('❌ Groq FAILED: ' + e.toString());
+    }
+  } else {
+    Logger.log('⏭️  Groq skipped (no key)');
+  }
+
+  Logger.log('');
+  Logger.log('=== Full getSmartMatchEquipment test ===');
+  try {
+    const result = getSmartMatchEquipment({ userPrompt: 'I need SEM imaging', conversationHistory: [] });
+    Logger.log('Result: ' + JSON.stringify(result).substring(0, 300));
+  } catch(e) {
+    Logger.log('❌ Full test FAILED: ' + e.toString());
+  }
+}
+
 function _parseMatchResponse(raw) {
   let text = String(raw || '').trim();
   // Strip markdown code fences if present
