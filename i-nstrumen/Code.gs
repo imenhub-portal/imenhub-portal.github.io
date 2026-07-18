@@ -138,6 +138,8 @@ function handleFrontendAction(actionType, payload) {
       case 'EditTechStaff':
         return saveConfig({ techStaff: payload.allTechStaff });
       case 'Archive': return archiveSystem();
+      case 'CancelBooking': return cancelBooking(payload);
+      case 'FindMyBookings': return findMyBookings(payload);
 
       // ── i-Menian Crossbridge ────────────────────────────────────────────────
       case 'SearchIMenian': {
@@ -865,6 +867,196 @@ function updateBooking(idOrObj, status) {
     }
   }
   return { success: false, error: "ID not found" };
+}
+
+function cancelBooking(payload) {
+  const id       = String(payload.bookingId || '').trim();
+  const reason   = String(payload.reason   || 'No reason provided').trim();
+  const cancelledAt = String(payload.cancelledTimestamp || new Date().toISOString()).trim();
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
+  const data  = sheet.getDataRange().getValues();
+
+  let targetRow = -1;
+  let booking   = null;
+
+  for (let i = 1; i < data.length; i++) {
+    const sheetId = String(data[i][0]).trim();
+    if (sheetId === id) {
+      targetRow = i + 1;
+      booking = {
+        id:               String(data[i][0]  || '').trim(),
+        equipmentName:    String(data[i][1]  || ''),
+        lab:              String(data[i][2]  || ''),
+        userName:         String(data[i][3]  || ''),
+        userEmail:        String(data[i][4]  || ''),
+        userPhone:        String(data[i][5]  || ''),
+        userId:           String(data[i][6]  || ''),
+        affiliation:      String(data[i][7]  || ''),
+        supervisor:       String(data[i][8]  || ''),
+        date:             String(data[i][9]  || ''),
+        duration:         String(data[i][10] || ''),
+        samples:          data[i][11],
+        materials:        String(data[i][12] || ''),
+        process:          String(data[i][13] || ''),
+        variant:          String(data[i][14] || ''),
+        status:           String(data[i][15] || ''),
+        remarks:          String(data[i][16] || ''),
+        timestampCreated: String(data[i][17] || ''),
+        timestampActioned:String(data[i][18] || ''),
+        paymentType:      String(data[i][19] || ''),
+        paymentRef:       String(data[i][20] || '')
+      };
+      break;
+    }
+  }
+
+  if (!booking) return { success: false, error: "Booking not found" };
+
+  const currentStatus = booking.status;
+  if (currentStatus !== 'Pending' && currentStatus !== 'Approved') {
+    return { success: false, error: "Only Pending or Approved bookings can be cancelled. Current status: " + currentStatus };
+  }
+
+  // Validate slot hasn't ended (only for Approved bookings; Pending can always cancel)
+  if (currentStatus === 'Approved') {
+    const slotEnd = _getBookingSlotEnd(booking.date, booking.duration);
+    const now = new Date();
+    if (now > slotEnd) {
+      return { success: false, error: "Cannot cancel — the booking slot has already ended." };
+    }
+  }
+
+  // Update the booking row
+  const cancelRemarks = 'Cancelled by user: ' + reason;
+  sheet.getRange(targetRow, 16).setValue('Cancelled');
+  sheet.getRange(targetRow, 17).setValue(cancelRemarks);
+  sheet.getRange(targetRow, 19).setValue(cancelledAt);
+
+  // Send notification email to PIC
+  _sendCancelNotification(booking, reason, cancelledAt);
+
+  return { success: true, booking: booking };
+}
+
+function _getBookingSlotEnd(dateStr, duration) {
+  const raw = String(dateStr || '').split('T')[0];
+  const [y, m, d] = raw.split('-').map(Number);
+  if (!y || !m || !d) return new Date(0);
+  const end = new Date(y, m - 1, d);
+  if (duration === '8am-1pm')  end.setHours(13, 0, 0, 0);
+  else if (duration === '2pm-5pm' || duration === '1pm-5pm') end.setHours(17, 0, 0, 0);
+  else if (duration === '1 Day') end.setHours(17, 0, 0, 0);
+  else if (duration === '2 Days') { end.setDate(end.getDate() + 1); end.setHours(17, 0, 0, 0); }
+  else end.setHours(17, 0, 0, 0);
+  return end;
+}
+
+function _sendCancelNotification(booking, reason, cancelledAt) {
+  const coordEmail = getCoordinatorEmail(booking.lab);
+  if (!coordEmail) return;
+
+  const cancelTime = new Date(cancelledAt).toLocaleString('en-MY', {
+    timeZone: 'Asia/Kuala_Lumpur',
+    dateStyle: 'full',
+    timeStyle: 'short'
+  });
+
+  const emailBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #6b7280; color: white; padding: 20px;">
+        <h2 style="margin: 0;">Booking Cancelled by User</h2>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">No action required — auto-approved cancellation</p>
+      </div>
+      <div style="padding: 20px;">
+        <p>The following booking has been <strong>cancelled by the user</strong>. The slot is now free.</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666; width: 30%;"><strong>Equipment</strong></td><td style="padding: 10px; font-size: 15px; font-weight: bold;">${booking.equipmentName}</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Lab</strong></td><td style="padding: 10px;">${booking.lab}</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>User</strong></td><td style="padding: 10px;">${booking.userName} (${booking.userId})</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Email</strong></td><td style="padding: 10px;">${booking.userEmail || '-'}</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Phone</strong></td><td style="padding: 10px;">${booking.userPhone || '-'}</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Date &amp; Slot</strong></td><td style="padding: 10px;">${booking.date} (${booking.duration})</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Process</strong></td><td style="padding: 10px;">${booking.process || '-'} ${booking.variant ? '> ' + booking.variant : ''}</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Previous Status</strong></td><td style="padding: 10px;">${booking.status}</td></tr>
+          <tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; color: #666;"><strong>Cancel Reason</strong></td><td style="padding: 10px; color: #dc2626; font-weight: bold;">${reason}</td></tr>
+          <tr><td style="padding: 10px; color: #666;"><strong>Time</strong></td><td style="padding: 10px;">${cancelTime}</td></tr>
+        </table>
+        <div style="margin-top: 20px; padding: 15px; background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 4px; font-size: 13px; color: #166534;">
+          <strong>Slot Released:</strong> The booking slot is now available for other researchers to book. No further action is needed from you.
+        </div>
+      </div>
+      <div style="background-color: #f9fafb; padding: 15px; text-align: center; font-size: 12px; color: #9ca3af;">
+        i-Nstrumen &mdash; IMEN Lab Management System
+      </div>
+    </div>`;
+
+  const subject = `[i-Nstrumen] Booking Cancelled: ${booking.equipmentName} — ${booking.userName} (${booking.date})`;
+  sendEmailSafe(coordEmail, subject, emailBody);
+}
+
+function findMyBookings(payload) {
+  const phone = String(payload.phone || '').trim();
+
+  const normalize = function(val) {
+    if (!val) return '';
+    var s = String(val).replace(/\D/g, '');
+    if (s.indexOf('60') === 0) s = s.substring(2);
+    if (s.indexOf('0')  === 0) s = s.substring(1);
+    return s;
+  };
+
+  const searchPhone = normalize(phone);
+  if (!searchPhone) return [];
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
+  const data  = sheet.getDataRange().getValues();
+  const results = [];
+
+  const now = new Date();
+
+  for (var i = 1; i < data.length; i++) {
+    const status = String(data[i][15] || '').trim();
+    if (status !== 'Pending' && status !== 'Approved') continue;
+
+    const rowPhone = normalize(String(data[i][5] || ''));
+    if (rowPhone !== searchPhone) continue;
+
+    // For Approved bookings, exclude if slot has already ended
+    if (status === 'Approved') {
+      const slotEnd = _getBookingSlotEnd(
+        String(data[i][9] || ''),
+        String(data[i][10] || '')
+      );
+      if (now > slotEnd) continue;
+    }
+
+    results.push({
+      id:               String(data[i][0]  || '').trim(),
+      equipmentName:    String(data[i][1]  || ''),
+      lab:              String(data[i][2]  || ''),
+      userName:         String(data[i][3]  || ''),
+      userEmail:        String(data[i][4]  || ''),
+      userPhone:        String(data[i][5]  || ''),
+      userId:           String(data[i][6]  || ''),
+      affiliation:      String(data[i][7]  || ''),
+      supervisor:       String(data[i][8]  || ''),
+      date:             String(data[i][9]  || ''),
+      duration:         String(data[i][10] || ''),
+      samples:          data[i][11],
+      materials:        String(data[i][12] || ''),
+      process:          String(data[i][13] || ''),
+      variant:          String(data[i][14] || ''),
+      status:           status,
+      remarks:          String(data[i][16] || ''),
+      timestampCreated: String(data[i][17] || ''),
+      timestampActioned:String(data[i][18] || ''),
+      paymentType:      String(data[i][19] || ''),
+      paymentRef:       String(data[i][20] || '')
+    });
+  }
+
+  return results;
 }
 
 function saveEquipment(eqObj) {

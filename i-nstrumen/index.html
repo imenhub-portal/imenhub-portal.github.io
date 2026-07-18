@@ -1109,6 +1109,10 @@
                             <button onclick="openModal('${eq.id}', 'Report')" title="Report Issue" aria-label="Report Issue" class="basis-auto sm:basis-full grow-0 py-2 sm:py-3 px-2.5 sm:px-4 rounded-lg sm:rounded-xl bg-white border border-slate-200 text-slate-500 font-semibold text-xs sm:text-sm xl:text-xs whitespace-nowrap hover:text-red-600 hover:bg-red-50 hover:border-red-100 transition active:scale-95 flex items-center justify-center gap-1.5">
                                 <i class="ph-bold ph-warning-circle"></i> <span class="hidden sm:inline">Report Issue</span>
                             </button>
+
+                            <button onclick="openCancelBooking('${eq.id}')" title="Cancel Booking" aria-label="Cancel Booking" class="basis-auto sm:basis-full grow-0 py-2 sm:py-3 px-2.5 sm:px-4 rounded-lg sm:rounded-xl bg-white border border-slate-200 text-slate-500 font-semibold text-xs sm:text-sm xl:text-xs whitespace-nowrap hover:text-orange-600 hover:bg-orange-50 hover:border-orange-100 transition active:scale-95 flex items-center justify-center gap-1.5">
+                                <i class="ph-bold ph-x-circle"></i> <span class="hidden sm:inline">Cancel Booking</span>
+                            </button>
                         </div>
                     </div>
                 </div>`;
@@ -1417,6 +1421,9 @@
                         <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                             ${searchBarHtml}
                             ${!state.isLockedMode ? `
+                            <button onclick="openCancelBooking(null)" class="text-sm font-semibold text-orange-600 hover:text-orange-800 flex items-center gap-1 whitespace-nowrap px-4 py-2 rounded-xl hover:bg-orange-50 transition w-full sm:w-auto justify-center border border-orange-200 bg-orange-50/50">
+                                <i class="ph-bold ph-x-circle"></i> My Bookings
+                            </button>
                             <button onclick="setView('LabView'); state.selectedLab=null; renderApp()" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 whitespace-nowrap px-4 py-2 rounded-xl hover:bg-blue-50 transition w-full sm:w-auto justify-center">
                                 Switch Lab <i class="ph-bold ph-caret-down"></i>
                             </button>` : ''}
@@ -1887,7 +1894,7 @@
                     <td class="px-6 py-4 text-right">
                         ${isHistory 
                             ? `<div class="flex flex-col items-end">
-                                <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${b.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-red-100 text-red-700 border border-red-200'} mb-1">${b.status}</span>
+                                <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${b.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : b.status === 'Cancelled' ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'} mb-1">${b.status}</span>
                                 <div class="text-[9px] text-slate-400">Created: ${formatDateTime(b.timestampCreated)}</div>
                                 ${b.remarks ? `<div class="text-[10px] text-red-500 mt-1 max-w-[120px] truncate" title="${b.remarks}">${b.remarks}</div>` : ''}
                                 ${(b.status === 'Approved' || b.status === 'Rejected') ? `<button onclick="revokeBooking('${b.id}')" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 hover:underline mt-2">Revoke</button>` : ''}
@@ -1992,6 +1999,7 @@
                             <button onclick="setHistoryFilter('All')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='All'?'bg-slate-100 text-slate-800':'text-slate-400 hover:bg-slate-50'}">All</button>
                             <button onclick="setHistoryFilter('Approved')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Approved'?'bg-emerald-100 text-emerald-700':'text-slate-400 hover:bg-slate-50'}">Approved</button>
                             <button onclick="setHistoryFilter('Rejected')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Rejected'?'bg-red-100 text-red-700':'text-slate-400 hover:bg-slate-50'}">Rejected</button>
+                            <button onclick="setHistoryFilter('Cancelled')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Cancelled'?'bg-slate-100 text-slate-600':'text-slate-400 hover:bg-slate-50'}">Cancelled</button>
                         </div>
                         ` : ''}
                     </div>
@@ -5771,6 +5779,211 @@
         }
         
         // --- NEW: VERIFICATION LOGIC (Robust) ---
+        // --- CANCEL BOOKING ---
+        function openCancelBooking(eqId) {
+            const overlay = getById('modal-overlay');
+            const content = getById('modal-content');
+
+            content.innerHTML = `
+                <div class="bg-orange-500 text-white p-6 relative overflow-hidden">
+                    <div class="absolute -right-6 -top-6 w-24 h-24 bg-orange-300 rounded-full blur-2xl opacity-50"></div>
+                    <h3 class="text-xl font-bold relative z-10">Cancel Booking</h3>
+                    <p class="text-orange-100 text-sm relative z-10">${eqId ? 'Verify your phone to find your bookings' : 'Find your bookings by phone number'}</p>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number <span class="text-red-500">*</span></label>
+                        <input type="tel" id="cancel-phone-input" placeholder="e.g. 0123456789" autofocus
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-400 text-sm text-slate-700 transition">
+                        <p class="text-[10px] text-slate-400 mt-1">Enter the phone number you used when booking.</p>
+                    </div>
+                    <div id="cancel-bookings-list" class="hidden space-y-2 max-h-64 overflow-y-auto"></div>
+                    <div id="cancel-reason-section" class="hidden space-y-3">
+                        <div class="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                            <label class="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Cancellation Reason <span class="text-red-500">*</span></label>
+                            <textarea id="cancel-reason-input" placeholder="Why are you cancelling this booking?" required
+                                class="w-full p-3 bg-white border border-orange-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-400 text-sm text-slate-700 h-20 resize-none"></textarea>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex gap-3">
+                        <button type="button" onclick="closeModal()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-lg transition">Close</button>
+                        <button type="button" id="cancel-search-btn" onclick="searchMyBookings('${eqId || ''}')"
+                            class="flex-1 py-3 bg-orange-500 text-white font-bold rounded-lg shadow-lg hover:bg-orange-600 transition flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-magnifying-glass"></i> Find My Bookings
+                        </button>
+                    </div>
+                </div>`;
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                content.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function searchMyBookings(eqFilterId) {
+            const phoneInput = getById('cancel-phone-input');
+            const phone = (phoneInput.value || '').trim();
+            if (!phone) { showToast('Please enter your phone number.', 'error'); return; }
+
+            const searchBtn = getById('cancel-search-btn');
+            searchBtn.innerHTML = `<i class="ph-bold ph-spinner animate-spin-slow"></i> Searching...`;
+            searchBtn.disabled = true;
+
+            google.script.run
+                .withSuccessHandler(function(results) {
+                    searchBtn.innerHTML = `<i class="ph-bold ph-magnifying-glass"></i> Find My Bookings`;
+                    searchBtn.disabled = false;
+
+                    const resultsContainer = getById('cancel-bookings-list');
+                    const reasonSection = getById('cancel-reason-section');
+
+                    // Filter by equipment if starting from a specific card
+                    let filtered = Array.isArray(results) ? results : [];
+                    if (eqFilterId) {
+                        const eq = state.equipment.find(e => e.id === eqFilterId);
+                        if (eq) {
+                            filtered = filtered.filter(b => b.equipmentName === eq.name && b.lab === eq.lab);
+                        }
+                    }
+
+                    if (filtered.length === 0) {
+                        resultsContainer.innerHTML = `
+                            <div class="text-center py-6 text-slate-400">
+                                <i class="ph-duotone ph-calendar-x text-3xl block mb-2 text-slate-300"></i>
+                                <p class="text-sm font-semibold">No active bookings found</p>
+                                <p class="text-xs mt-1">No Pending or Approved bookings match this phone number.</p>
+                            </div>`;
+                        resultsContainer.classList.remove('hidden');
+                        reasonSection.classList.add('hidden');
+                        return;
+                    }
+
+                    // Render booking list
+                    resultsContainer.innerHTML = filtered.map(b => {
+                        const rawDate = b.date.split('T')[0];
+                        const statusBg = b.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+                        return `
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-orange-300 transition group">
+                            <div class="flex items-start justify-between mb-2">
+                                <div>
+                                    <div class="font-bold text-slate-800 text-sm">${b.equipmentName}</div>
+                                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">${b.lab}</div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusBg}">${b.status}</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+                                <div><span class="text-slate-400">Date:</span> <span class="font-semibold text-slate-700">${rawDate}</span></div>
+                                <div><span class="text-slate-400">Slot:</span> <span class="font-semibold text-slate-700">${b.duration}</span></div>
+                                ${b.process ? `<div class="col-span-2"><span class="text-slate-400">Process:</span> <span class="font-semibold text-slate-700">${b.process}${b.variant ? ' > ' + b.variant : ''}</span></div>` : ''}
+                            </div>
+                            <button onclick="showCancelReason('${b.id}')"
+                                class="w-full py-2 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-100 transition flex items-center justify-center gap-1.5">
+                                <i class="ph-bold ph-x-circle"></i> Cancel This Booking
+                            </button>
+                        </div>`;
+                    }).join('');
+
+                    resultsContainer.classList.remove('hidden');
+                    reasonSection.classList.add('hidden');
+                })
+                .withFailureHandler(function(err) {
+                    searchBtn.innerHTML = `<i class="ph-bold ph-magnifying-glass"></i> Find My Bookings`;
+                    searchBtn.disabled = false;
+                    showToast('Search failed: ' + (err.message || 'Unknown error'), 'error');
+                })
+                .handleFrontendAction('FindMyBookings', { phone: phone });
+        }
+
+        let _cancelTargetBookingId = null;
+
+        function showCancelReason(bookingId) {
+            _cancelTargetBookingId = bookingId;
+            const reasonSection = getById('cancel-reason-section');
+            const reasonInput = getById('cancel-reason-input');
+            reasonInput.value = '';
+            reasonSection.classList.remove('hidden');
+            reasonSection.scrollIntoView({ behavior: 'smooth' });
+
+            // Add confirm button below reason
+            if (!getById('cancel-confirm-btn')) {
+                const confirmBtn = document.createElement('button');
+                confirmBtn.id = 'cancel-confirm-btn';
+                confirmBtn.type = 'button';
+                confirmBtn.className = 'w-full py-3 bg-red-600 text-white font-bold rounded-lg shadow-lg hover:bg-red-500 transition flex items-center justify-center gap-2 mt-2';
+                confirmBtn.innerHTML = '<i class="ph-bold ph-check-circle"></i> Confirm Cancellation';
+                confirmBtn.onclick = executeCancel;
+                reasonSection.appendChild(confirmBtn);
+            }
+        }
+
+        function executeCancel() {
+            if (_cancelTargetBookingId === null) return;
+            if (demoBlockWrite()) return;
+
+            const reasonInput = getById('cancel-reason-input');
+            const reason = (reasonInput.value || '').trim();
+            if (!reason) { showToast('Please enter a cancellation reason.', 'error'); return; }
+
+            const booking = state.bookings.find(b => b.id === _cancelTargetBookingId);
+            if (!booking) { showToast('Booking not found.', 'error'); return; }
+
+            // Client-side slot validation (for Approved bookings)
+            if (booking.status === 'Approved') {
+                const now = new Date();
+                const rawDate = booking.date.split('T')[0];
+                const [y, m, d] = rawDate.split('-').map(Number);
+                const slotEnd = new Date(y, m - 1, d);
+                if (booking.duration === '8am-1pm') slotEnd.setHours(13, 0, 0, 0);
+                else if (booking.duration === '2pm-5pm' || booking.duration === '1pm-5pm') slotEnd.setHours(17, 0, 0, 0);
+                else if (booking.duration === '1 Day') slotEnd.setHours(17, 0, 0, 0);
+                else if (booking.duration === '2 Days') { slotEnd.setDate(slotEnd.getDate() + 1); slotEnd.setHours(17, 0, 0, 0); }
+                else slotEnd.setHours(17, 0, 0, 0);
+
+                if (now > slotEnd) {
+                    showToast('Cannot cancel — the booking slot has already ended.', 'error');
+                    return;
+                }
+            }
+
+            const cancelledTimestamp = new Date().toISOString();
+
+            // Update local state
+            const idx = state.bookings.findIndex(b => b.id === _cancelTargetBookingId);
+            if (idx > -1) {
+                state.bookings[idx].status = 'Cancelled';
+                state.bookings[idx].remarks = 'Cancelled by user: ' + reason;
+                state.bookings[idx].timestampActioned = cancelledTimestamp;
+            }
+
+            // Also end any active session for this booking
+            const activeLogIdx = state.logs.findIndex(l =>
+                l.equipmentName === booking.equipmentName &&
+                l.lab === booking.lab &&
+                _sameBookingUser(l, booking) &&
+                l.action === 'Usage' &&
+                !l.sessionEnded
+            );
+            if (activeLogIdx > -1) {
+                state.logs[activeLogIdx].sessionEnded = true;
+                state.logs[activeLogIdx].action += ' (Cancelled)';
+                backgroundSync('Usage', state.logs[activeLogIdx]);
+            }
+
+            // Sync to backend
+            backgroundSync('CancelBooking', {
+                bookingId: _cancelTargetBookingId,
+                reason: reason,
+                cancelledTimestamp: cancelledTimestamp
+            });
+
+            showToast(`Booking for ${booking.equipmentName} has been cancelled.`, 'success');
+            _cancelTargetBookingId = null;
+            closeModal();
+            renderApp();
+        }
+
         function verifyCheckIn(bookingId, equipmentId) {
             if (demoBlockWrite()) return;   // demo: no check-ins / overrides
             const phoneInput = getById('verify-phone-input');
