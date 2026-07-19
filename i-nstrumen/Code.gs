@@ -1069,9 +1069,18 @@ function findMyBookings(payload) {
 // ==========================================
 
 function getSmartMatchEquipment(payload) {
-  const userPrompt = String((payload && payload.userPrompt) || '').trim();
+  // ── Global kill switch: Config sheet setting "smartMatchAI: off" disables all AI calls ──
+  if (_isAIDisabled()) {
+    return { error: true, reply: 'AI assistant is currently disabled by the administrator.', matches: [] };
+  }
+
+  const rawPrompt  = String((payload && payload.userPrompt) || '').trim();
+  const userPrompt = _sanitizeForAI(rawPrompt);
   const history    = Array.isArray(payload && payload.conversationHistory)
-                     ? payload.conversationHistory.slice(-6) : [];
+                     ? payload.conversationHistory.slice(-6).map(function(m) {
+                         return { role: m.role, text: _sanitizeForAI(String(m.text || '')) };
+                       })
+                     : [];
   const mode       = String((payload && payload.mode) || 'restricted').trim();
   const isAdvisory = mode === 'advisory';
 
@@ -1111,6 +1120,43 @@ function getSmartMatchEquipment(payload) {
 }
 
 // ── System instructions ──
+
+// ── Kill switch check — reads "smartMatchAI" from Config sheet E2:F.
+//    Set value to "off"/"disabled"/"false" to disable. Anything else (or missing) = enabled.
+//    Cached 5 minutes so it doesn't slow down every chat request.
+function _isAIDisabled() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get('smart_match_ai_disabled');
+    if (cached !== null) return cached === 'true';
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.CONFIG);
+    var data = sheet.getRange('E2:F').getValues();
+    var disabled = false;
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim().toLowerCase() === 'smartmatchai') {
+        var v = String(data[i][1] || '').trim().toLowerCase();
+        disabled = (v === 'off' || v === 'disabled' || v === 'false' || v === '0');
+        break;
+      }
+    }
+    try { cache.put('smart_match_ai_disabled', String(disabled), 300); } catch(e) {}
+    return disabled;
+  } catch(e) {
+    return false; // fail-open: if we can't read config, AI stays enabled
+  }
+}
+
+// ── Strip PII before sending to external AI: emails, phone numbers, matric IDs ──
+function _sanitizeForAI(text) {
+  if (!text) return '';
+  var s = String(text);
+  s = s.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]');           // emails
+  s = s.replace(/(\+?6?0?1)[0-9][0-9]{7,8}\b/g, '[phone]');                               // Malaysian mobile
+  s = s.replace(/\+?\d[\d\s().-]{8,}\d/g, '[phone]');                                     // other long numbers
+  s = s.replace(/\b[A-Za-z]?\d{6,}[A-Za-z]?\b/g, '[id]');                                 // matric-style IDs
+  return s;
+}
 
 function _RESTRICTED_SYS(context) {
   return 'CRITICAL — RESPOND ONLY WITH VALID JSON. No markdown, no tables, no code fences, no text outside the JSON object.\n' +

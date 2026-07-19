@@ -936,6 +936,12 @@
                     </div>
                 </div>
 
+                <!-- Privacy notice -->
+                <div class="mb-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] text-slate-500 leading-relaxed flex items-start gap-2">
+                    <i class="ph-bold ph-shield-check text-slate-400 flex-shrink-0 mt-0.5"></i>
+                    <span><strong>Privacy:</strong> AI mode sends your questions to external AI services (Google/Mistral/Groq). Don't include personal data or confidential project details. Use <strong>Inventory mode</strong> for fully local search. Personal identifiers are automatically stripped before sending.</span>
+                </div>
+
                 <!-- Chat messages area -->
                 <div id="chat-messages" class="flex-1 overflow-y-auto mb-4 space-y-3 pr-1" style="min-height:200px;max-height:calc(100vh - 340px)">
                     <!-- Messages injected by renderChatMessages() -->
@@ -6098,26 +6104,24 @@
         // ══════════════════════════════════════════════════════════════════════
 
         const CHAT_STORAGE_KEY = 'instrumen_chat_v1';
-        const CHAT_MODE_KEY    = 'instrumen_chat_mode';
         const CHAT_COUNT_KEY   = 'instrumen_chat_count';
         let _chatHistory = [];
         let _chatSending = false;
-        let _chatMode = 'restricted';       // 'restricted' | 'advisory'
-        let _chatProvider = 'Gemini';        // active provider name
-        let _chatHealth = 'ok';              // 'ok' | 'fallback' | 'error'
+        let _chatMode = 'restricted';       // always defaults to restricted per session (privacy)
+        let _chatProvider = 'Gemini';
+        let _chatHealth = 'ok';
 
         function _chatLoadMode() {
-            try {
-                const saved = localStorage.getItem(CHAT_MODE_KEY);
-                if (saved === 'advisory' || saved === 'restricted') _chatMode = saved;
-            } catch(e) {}
+            // Mode is session-only — no localStorage. Always starts as 'restricted'.
+            _chatMode = 'restricted';
         }
         function _chatSetMode(mode) {
             _chatMode = mode;
-            try { localStorage.setItem(CHAT_MODE_KEY, mode); } catch(e) {}
             renderApp();
             _initChat();
-            showToast(mode === 'advisory' ? 'Knowledge+ mode — AI can explain equipment & suggest parameters.' : 'Inventory mode — AI matches to equipment list only.', 'info');
+            showToast(mode === 'advisory'
+                ? 'Knowledge+ mode — questions go to external AI services this session.'
+                : 'Inventory mode — fully local equipment matching.', 'info');
         }
         function _chatGetTodayCount() {
             try {
