@@ -1113,17 +1113,23 @@ function getSmartMatchEquipment(payload) {
 // ── System instructions ──
 
 function _RESTRICTED_SYS(context) {
-  return 'You are the i-Nstrumen Lab Assistant for IMEN (Institute of Microengineering and Nanoelectronics, UKM). ' +
-    'Match the user\'s requested process or fabrication need ONLY to equipment listed in the EQUIPMENT INVENTORY below. ' +
-    'Rules: (1) Never invent or suggest equipment not in the list. (2) If nothing matches, say so politely and suggest the closest alternative from the list if any. ' +
-    '(3) For multi-turn conversations, remember context from earlier messages. (4) Be concise and helpful. ' +
-    '(5) Always respond with valid JSON in this exact format: {"reply":"your conversational text here","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches"}]}. ' +
-    'If no matches, use an empty matches array. Do not wrap the JSON in markdown code fences.\n\n' +
+  return 'CRITICAL — RESPOND ONLY WITH VALID JSON. No markdown, no tables, no code fences, no text outside the JSON object.\n' +
+    'You are the i-Nstrumen Lab Assistant for IMEN (Institute of Microengineering and Nanoelectronics, UKM). ' +
+    'Match the user\'s requested process or fabrication need ONLY to equipment listed in the EQUIPMENT INVENTORY below.\n\n' +
+    'RULES:\n' +
+    '1. Never invent or suggest equipment not in the list.\n' +
+    '2. If nothing matches, say so politely and suggest the closest alternative from the list if any.\n' +
+    '3. For multi-turn conversations, remember context from earlier messages.\n' +
+    '4. Be concise and helpful.\n' +
+    '5. OUTPUT FORMAT — You MUST respond with exactly this JSON shape, nothing else:\n' +
+    '{"reply":"your conversational text here","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches"}]}\n' +
+    'If no matches, use an empty matches array: []\n\n' +
     'EQUIPMENT INVENTORY:\n' + context;
 }
 
 function _ADVISORY_SYS(context) {
-  return 'You are the i-Nstrumen Lab Assistant with deep expertise in semiconductor fabrication, ' +
+  return 'CRITICAL — RESPOND ONLY WITH VALID JSON. No markdown, no tables, no code fences, no text outside the JSON object.\n' +
+    'You are the i-Nstrumen Lab Assistant with deep expertise in semiconductor fabrication, ' +
     'thin film deposition, material characterization, and nano/micro-engineering equipment. ' +
     'You help researchers at IMEN UKM find the right lab tools and understand how to use them.\n\n' +
     'YOUR CAPABILITIES:\n' +
@@ -1132,9 +1138,10 @@ function _ADVISORY_SYS(context) {
     '3. PARAMETERS: If asked, suggest general operating parameters (voltages, temperatures, pressures, wavelengths, deposition rates) — these are REFERENCE GUIDELINES only, not exact SOPs.\n' +
     '4. WORKFLOWS: For multi-step processes (e.g., lithography → etching → deposition → characterization), outline the full equipment chain.\n' +
     '5. HONESTY: If a capability does not exist in our labs, state it clearly but mention if such tools are common in similar research facilities.\n' +
-    '6. DISCLAIMER: End your reply with exactly: "Advisory: These suggestions and parameters are for reference only. Always verify procedures, settings, and safety protocols with your lab PIC or equipment manual before operating any instrument."\n\n' +
-    'JSON FORMAT (always respond with exactly this shape, no markdown fences):\n' +
-    '{"reply":"your full response including explanation, parameters if relevant, and disclaimer","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches the request"}]}\n\n' +
+    '6. DISCLAIMER: End your reply text with: "Advisory: These suggestions and parameters are for reference only. Always verify procedures, settings, and safety protocols with your lab PIC or equipment manual before operating any instrument."\n\n' +
+    'OUTPUT FORMAT — You MUST respond with exactly this JSON shape, nothing else. Put ALL explanation inside the "reply" field as plain text (use \\n for line breaks):\n' +
+    '{"reply":"your full response including explanation, parameters if relevant, and disclaimer","matches":[{"name":"exact equipment name from list","lab":"lab name","reason":"why it matches the request"}]}\n' +
+    'If no matches, use an empty matches array: []\n\n' +
     'EQUIPMENT INVENTORY:\n' + context;
 }
 
@@ -1196,10 +1203,9 @@ function _callGemini(systemInstruction, userPrompt, history) {
       parts: [{ text: msg.text }]
     });
   });
-  // System instruction + user prompt as final user turn
   contents.push({
     role: 'user',
-    parts: [{ text: systemInstruction + '\n\nUser request: ' + userPrompt }]
+    parts: [{ text: userPrompt }]
   });
 
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
@@ -1207,8 +1213,9 @@ function _callGemini(systemInstruction, userPrompt, history) {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemInstruction }] },
       contents: contents,
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
     }),
     muteHttpExceptions: true
   });
@@ -1236,7 +1243,8 @@ function _callMistral(systemInstruction, userPrompt, history) {
       model: 'mistral-small-latest',
       messages: messages,
       temperature: 0.3,
-      max_tokens: 1024
+      max_tokens: 2048,
+      response_format: { type: 'json_object' }
     }),
     muteHttpExceptions: true
   });
@@ -1264,7 +1272,8 @@ function _callGroq(systemInstruction, userPrompt, history) {
       model: 'llama-3.3-70b-versatile',
       messages: messages,
       temperature: 0.3,
-      max_tokens: 1024
+      max_tokens: 2048,
+      response_format: { type: 'json_object' }
     }),
     muteHttpExceptions: true
   });
@@ -1370,6 +1379,11 @@ function _parseMatchResponse(raw) {
   // Strip markdown code fences if present
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
+  // If the response doesn't look like JSON at all, wrap as plain text reply
+  if (text.indexOf('{') !== 0) {
+    return { error: false, reply: text, matches: [] };
+  }
+
   try {
     const obj = JSON.parse(text);
     if (obj && typeof obj.reply === 'string') {
@@ -1385,7 +1399,13 @@ function _parseMatchResponse(raw) {
       return { error: false, reply: obj.reply, matches: matches };
     }
   } catch(e) {
-    // JSON parse failed — return raw text as reply, no matches
+    // JSON parse failed — try extracting reply field via regex
+    const replyMatch = text.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (replyMatch) {
+      return { error: false, reply: replyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'), matches: [] };
+    }
+    // Fallback: return raw text as reply
+    return { error: false, reply: text, matches: [] };
   }
   return { error: false, reply: text, matches: [] };
 }
