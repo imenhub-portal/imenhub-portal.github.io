@@ -50,24 +50,42 @@
         // Getter → every `google.script.run.…` expression gets a FRESH runner,
         // so two in-flight calls can never share/overwrite each other's handlers.
         Object.defineProperty(window.google.script, 'run', { get: makeRunner });
+
+        // ── EARLY FETCH ──────────────────────────────────────────────────────
+        // Kick off the slow getInitialData call NOW, so the 2-3s backend work
+        // overlaps with parsing the rest of this file and the CDN scripts below
+        // instead of running after them. initSystem() consumes this promise.
+        // (Only runs in GitHub Pages mode — native GAS returned early above.)
+        window.__initialDataPromise = fetch(API_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body:    JSON.stringify({ fn: 'getInitialData', args: [] })
+        }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+        // Mark rejections as handled until initSystem attaches the real handlers
+        // (prevents console "unhandled rejection" noise; the stored promise still
+        // rejects normally for its consumer).
+        window.__initialDataPromise.catch(function () {});
     })();
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>i-Nstrumen</title>
     
+    <!-- Warm up the connection to the Apps Script backend (used by the early fetch above) -->
+    <link rel="preconnect" href="https://script.google.com">
+
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- PDFMake Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.js"></script>
-    
+
+    <!-- PDFMake Library: loaded on demand by ensurePdfMake() the first time a
+         PDF is exported — the ~1MB embedded-font blob (vfs_fonts.js) was the
+         heaviest blocking asset on initial page load. -->
+
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
@@ -270,7 +288,29 @@
 
         // --- HELPER UTILS ---
         const getById = (id) => document.getElementById(id);
-        
+
+        // ── LAZY PDF LIBRARY LOADER ─────────────────────────────────────────
+        // pdfmake + its ~1MB embedded-font blob used to block first paint; they
+        // now load on the first PDF export only. Memoized — later exports reuse
+        // the already-loaded library instantly.
+        let _pdfMakePromise = null;
+        function ensurePdfMake() {
+            if (window.pdfMake && window.pdfMake.vfs) return Promise.resolve();
+            if (_pdfMakePromise) return _pdfMakePromise;
+            const loadScript = (src) => new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Failed to load ' + src));
+                document.head.appendChild(s);
+            });
+            showToast('Preparing PDF engine…', 'info');
+            _pdfMakePromise = loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js')
+                .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.js'))
+                .catch(e => { _pdfMakePromise = null; throw e; }); // allow retry after a network failure
+            return _pdfMakePromise;
+        }
+
         function checkUrlParams() {
             // Priority: Server Injected Params -> Client URL Params
             // This ensures links work even if iframe strips the URL
@@ -3128,8 +3168,13 @@
                     };
 
                     // Use getBase64() — blob: URLs are blocked by GAS CSP; data URIs work
-                    pdfMake.createPdf(docDefinition).getBase64(b64 => {
-                        triggerDownload('data:application/pdf;base64,' + b64, `IMEN_${fileTag}.pdf`);
+                    ensurePdfMake().then(() => {
+                        pdfMake.createPdf(docDefinition).getBase64(b64 => {
+                            triggerDownload('data:application/pdf;base64,' + b64, `IMEN_${fileTag}.pdf`);
+                        });
+                    }).catch(e => {
+                        console.error(e);
+                        showToast("Error generating PDF: " + e.message, "error");
                     });
 
                 } catch (e) {
@@ -3382,8 +3427,13 @@
                         }
                     };
 
-                    pdfMake.createPdf(docDefinition).getBase64(b64 => {
-                        triggerDownload('data:application/pdf;base64,' + b64, `IMEN_Utilization_${fileTag}.pdf`);
+                    ensurePdfMake().then(() => {
+                        pdfMake.createPdf(docDefinition).getBase64(b64 => {
+                            triggerDownload('data:application/pdf;base64,' + b64, `IMEN_Utilization_${fileTag}.pdf`);
+                        });
+                    }).catch(e => {
+                        console.error(e);
+                        showToast("Error generating PDF: " + e.message, "error");
                     });
                 } catch (e) {
                     console.error(e);
@@ -3627,15 +3677,15 @@
             const periodSlug = periodLabel.replace(/[–\s,]/g, '_').replace(/_+/g, '_');
             const filename   = `IMEN_${periodType}_${labSlug}_${periodSlug}.pdf`;
 
-            try {
+            ensurePdfMake().then(() => {
                 pdfMake.createPdf(docDef).getBase64(b64 => {
                     const info = `<b>${periodType} Report Ready</b><br><span class="text-xs text-slate-500">${lab} · ${periodLabel}</span><br><span class="text-xs text-slate-400">${logs.length} log${logs.length!==1?'s':''} · ${noShowCount} no-show${noShowCount!==1?'s':''} · ${uniqueUsers} user${uniqueUsers!==1?'s':''}</span>`;
                     showDialog(buildDownloadDialog('data:application/pdf;base64,' + b64, filename, info), 'alert');
                 });
-            } catch (e) {
+            }).catch(e => {
                 console.error(e);
                 showToast('Error generating PDF: ' + e.message, 'error');
-            }
+            });
         }
 
         // ── PDF Download Credential Gate ──────────────────────────────────────────
@@ -6795,22 +6845,52 @@
         }
 
         // --- BACKEND INTEGRATION: INITIAL LOAD ---
-        function initSystem() {
-            // Show a loading state immediately
-            document.getElementById('main-content').innerHTML = `
-                <div class="flex flex-col items-center justify-center h-96 text-slate-400">
-                    <i class="ph-bold ph-spinner animate-spin text-4xl mb-4 text-brand-600"></i>
-                    <p>Connecting to Lab Database...</p>
-                </div>`;
+        // Stale-while-revalidate: the last successful getInitialData payload is
+        // cached in localStorage so repeat visits paint instantly; a background
+        // getInitialData then replaces state with live data (identical end state
+        // to a normal load). The backend stays the sole source of truth — every
+        // write still goes to Apps Script; this cache is display-only.
+        const DATA_CACHE_KEY = 'instrumen_data_v1';
+        let systemStarted = false; // ensures polling + member-load start exactly once
 
-            // Call AppScript (Assuming backend function is named 'getInitialData')
-            google.script.run
-                .withSuccessHandler(onDataLoaded)
-                .withFailureHandler(onLoadError)
-                .getInitialData();
+        function readDataCache() {
+            try {
+                const raw = localStorage.getItem(DATA_CACHE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (!parsed || parsed.v !== 1 || !parsed.data || !Array.isArray(parsed.data.equipment)) return null;
+                return parsed.data;
+            } catch (e) { return null; }
         }
 
-        function onDataLoaded(backendData) {
+        function writeDataCache(backendData) {
+            try {
+                localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ v: 1, savedAt: Date.now(), data: backendData }));
+            } catch (e) {
+                // Quota exceeded / storage disabled — caching must never break the app
+                try { localStorage.removeItem(DATA_CACHE_KEY); } catch (e2) {}
+            }
+        }
+
+        // Small non-blocking indicator shown while cached data is being refreshed
+        function showRefreshBadge(show) {
+            let badge = document.getElementById('data-refresh-badge');
+            if (show) {
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.id = 'data-refresh-badge';
+                    badge.className = 'fixed bottom-4 right-4 z-[70] flex items-center gap-2 bg-white/95 border border-slate-200 shadow-lg rounded-full px-3 py-1.5 text-xs text-slate-500';
+                    badge.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-brand-600"></i><span>Refreshing data…</span>';
+                    document.body.appendChild(badge);
+                }
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
+        // Single place backend data enters state — used by both the cached
+        // instant paint and the live refresh, so the end state is identical.
+        function applyBackendData(backendData) {
             // Map backend data to frontend state
             state.labs = backendData.labs || [];
             state.equipment = backendData.equipment || [];
@@ -6823,16 +6903,82 @@
             // Ensure techStaff array always exists
             if (!state.systemConfig.techStaff) state.systemConfig.techStaff = [];
             state.lastArchive = backendData.lastArchive;
-            
+
             // >> NEW LINE: CAPTURE THE REAL URL <<
-            state.appUrl = backendData.appUrl; 
-            
+            state.appUrl = backendData.appUrl;
+        }
+
+        function initSystem() {
+            const cached = readDataCache();
+            if (cached) {
+                // Instant paint from the last known data; live refresh follows below
+                applyBackendData(cached);
+                state.isLoading = false;
+                checkUrlParams();
+                renderApp();
+                showRefreshBadge(true);
+            } else {
+                // First visit (or cleared storage): same loading screen as always
+                document.getElementById('main-content').innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-96 text-slate-400">
+                        <i class="ph-bold ph-spinner animate-spin text-4xl mb-4 text-brand-600"></i>
+                        <p>Connecting to Lab Database...</p>
+                    </div>`;
+            }
+
+            // Live data: reuse the early fetch started in <head> (GitHub Pages
+            // mode) if it's still pending, else issue a normal call.
+            if (window.__initialDataPromise) {
+                const p = window.__initialDataPromise;
+                window.__initialDataPromise = null; // one-shot; manual refresh uses a live call
+                p.then(function (data) {
+                    if (data && data.ok) onFreshData(data.result);
+                    else onFreshError(new Error((data && data.error) || 'Unknown API error'));
+                }).catch(onFreshError);
+            } else {
+                google.script.run
+                    .withSuccessHandler(onFreshData)
+                    .withFailureHandler(onFreshError)
+                    .getInitialData();
+            }
+        }
+
+        function onFreshData(backendData) {
+            writeDataCache(backendData);
+            const firstRender = state.isLoading; // true only when nothing painted yet
+            applyBackendData(backendData);
             state.isLoading = false;
-            checkUrlParams();
-            renderApp();
-            startPolling();
-            // Start background cross-lab member load after 2s — page is fully rendered by then
-            setTimeout(_imenianLoadAllUsers, 2000);
+            showRefreshBadge(false);
+
+            if (firstRender) {
+                checkUrlParams();
+                renderApp();
+            } else {
+                // Cached view already on screen — swap in fresh data, but don't
+                // yank the UI out from under an active user (same guard as polling)
+                const isModalOpen = !getById('modal-overlay').classList.contains('hidden');
+                const regForm = getById('register-form');
+                const isRegistering = regForm && !regForm.classList.contains('hidden');
+                if (!isModalOpen && !isRegistering) renderApp();
+            }
+
+            if (!systemStarted) {
+                systemStarted = true;
+                startPolling();
+                // Start background cross-lab member load after 2s — page is fully rendered by then
+                setTimeout(_imenianLoadAllUsers, 2000);
+            }
+        }
+
+        function onFreshError(error) {
+            showRefreshBadge(false);
+            if (state.isLoading) {
+                // Nothing on screen yet — same offline screen as always
+                onLoadError(error);
+            } else {
+                // Cached view is showing; keep it usable and just report the failure
+                showToast("Database Connection Failed: " + ((error && error.message) || error), "error");
+            }
         }
 
         function onLoadError(error) {
