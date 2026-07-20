@@ -170,7 +170,7 @@
       </div>
       <div class="form-row">
         <div><label>Emel *</label><input type="email" name="email"  required></div>
-        <div><label>UKMPer *</label><input type="text"  name="ukmper" required></div>
+        <div><label>UKMPer / No. Matrik *</label><input type="text"  name="ukmper" required></div>
       </div>
       <div style="margin-bottom:15px;">
         <label>PTJ / Jabatan *</label>
@@ -253,8 +253,8 @@
   <!-- ══ TAB 1 — SEMAK STATUS ══ -->
   <div class="section">
     <div style="max-width:480px;margin:0 auto;text-align:center;">
-      <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Masukkan UKMPer atau emel untuk semak status tempahan.</p>
-      <input type="text" id="chkIn" placeholder="UKMPer / Emel" style="margin-bottom:10px;">
+      <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Masukkan UKMPer / No. Matrik atau emel untuk semak status tempahan.</p>
+      <input type="text" id="chkIn" placeholder="UKMPer / No. Matrik / Emel" style="margin-bottom:10px;">
       <button class="btn btn-main" style="margin-top:0;" onclick="checkStatus()">🔍 CARI</button>
       <div id="res" style="text-align:left;margin-top:20px;"></div>
     </div>
@@ -540,7 +540,7 @@ function resetBtn(btn) {
 // ══════════════════════════════════════════
 function checkStatus() {
   var q = document.getElementById('chkIn').value.trim();
-  if (!q) { myAlert('Sila masukkan UKMPer atau emel.', true); return; }
+  if (!q) { myAlert('Sila masukkan UKMPer / No. Matrik atau emel.', true); return; }
   ld(true);
   google.script.run
     .withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); })
