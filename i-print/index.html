@@ -1,31 +1,649 @@
 <!DOCTYPE html>
-<html lang="ms">
+<!--
+  SISTEM POSTER IMEN — Index.html
+  Paste this entire file into your Apps Script Index.html
+-->
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://script.google.com">
-    <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-    <link rel="dns-prefetch" href="https://script.google.com">
-    <title>Servis Cetak Poster | IMEN UKM</title>
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; background-color: #f4f7f6; }
-        #loading-screen { position: fixed; width: 100%; height: 100%; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-        .spinner { border: 8px solid #f3f3f3; border-top: 8px solid #005596; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loading-text { margin-top: 20px; font-size: 1.2rem; color: #333; }
-        iframe { width: 100%; height: 100%; border: none; display: none; }
-    </style>
+  <base target="_top">
+
+<script>
+// ── GITHUB-PAGES MODE SHIM ────────────────────────────────────────────────
+// Served from GitHub Pages there is no google.script.run (only Google's
+// sandbox provides it), so this rebuilds it on top of fetch() against the
+// Apps Script JSON API (doPost in Code.gs). Every existing
+// google.script.run call then works UNCHANGED in both environments.
+// On script.google.com the native object already exists and this does nothing.
+(function () {
+  if (window.google && window.google.script && window.google.script.run) return; // native GAS
+
+  var API_URL = 'https://script.google.com/macros/s/AKfycbwjO97_YWugdYIRpV6bT3Uv4uTbmM6Ob1axw9ASpk668ugB40O1DAxzBn2jTRp9rLxKTg/exec';
+  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus',
+                 'deleteRow', 'getAdminData', 'checkUserStatus'];
+
+  function makeRunner() {
+    var onOk  = function () {};
+    var onErr = function (e) { console.error('[API] ', e); };
+    var runner = {
+      withSuccessHandler: function (fn) { if (fn) onOk  = fn; return runner; },
+      withFailureHandler: function (fn) { if (fn) onErr = fn; return runner; },
+      withUserObject:     function ()   { return runner; }
+    };
+    API_FNS.forEach(function (name) {
+      runner[name] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        fetch(API_URL, {
+          method:  'POST',
+          // text/plain keeps this a CORS "simple request" (no preflight,
+          // which Apps Script cannot answer).
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body:    JSON.stringify({ fn: name, args: args })
+        })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (data) {
+          if (data && data.ok) onOk(data.result);
+          else onErr(new Error((data && data.error) || 'Unknown API error'));
+        })
+        .catch(function (e) { onErr(e); });
+      };
+    });
+    return runner;
+  }
+
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  // Getter → each `google.script.run.…` expression gets a FRESH runner, so
+  // concurrent calls cannot overwrite each other's handlers.
+  Object.defineProperty(window.google.script, 'run', { get: makeRunner });
+})();
+</script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; padding: 20px; color: #1e293b; margin: 0; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+
+    .nav-tabs { display: flex; gap: 10px; margin-bottom: 25px; background: #f1f5f9; padding: 5px; border-radius: 12px; }
+    .tab { flex: 1; text-align: center; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: 700; color: #64748b; transition: 0.2s; user-select: none; }
+    .tab.active { background: white; color: #0f172a; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+    .section { display: none; }
+    .section.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    label { font-weight: 700; font-size: 13px; margin-bottom: 5px; display: block; color: #475569; }
+    input, select, textarea { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 14px; transition: border-color 0.2s; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: #0f172a; }
+
+    .btn { padding: 8px 12px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 11px; margin-right: 5px; transition: transform 0.15s; font-family: inherit; }
+    .btn:hover { transform: scale(1.05); }
+    .btn-blue  { background: #eff6ff; color: #1d4ed8; }
+    .btn-green { background: #f0fdf4; color: #15803d; }
+    .btn-red   { background: #fef2f2; color: #b91c1c; }
+    .btn-main  { background: #0f172a; color: white; width: 100%; padding: 15px; margin-top: 20px; border-radius: 12px; font-size: 14px; font-weight: 800; }
+    .btn-main:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .badge { padding: 5px 11px; border-radius: 8px; font-weight: 800; font-size: 10px; text-transform: uppercase; display: inline-block; }
+    .badge-pending { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+    .badge-process { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .badge-reject  { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .badge-success { background: #f0fdf4; color: #15803d; border: 1px solid #22c55e; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8fafc; padding: 11px 12px; text-align: left; font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; }
+    td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; vertical-align: middle; }
+
+    /* Upload Zone */
+    .upload-zone { border: 2px dashed #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; position: relative; background: #fafafa; }
+    .upload-zone:hover, .upload-zone.drag { border-color: #0f172a; background: #f1f5f9; }
+    .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .uz-icon  { font-size: 28px; }
+    .uz-label { font-weight: 700; font-size: 13px; margin-top: 6px; }
+    .uz-sub   { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+    .uz-chosen { font-size: 12px; color: #0f172a; font-weight: 700; margin-top: 8px; background: #f0fdf4; border-radius: 8px; padding: 6px 10px; display: none; word-break: break-all; }
+
+    /* Progress */
+    .progress-wrap { display: none; margin-top: 12px; }
+    .progress-bar-bg   { background: #f1f5f9; border-radius: 99px; height: 12px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; width: 0%; border-radius: 99px; background: linear-gradient(90deg, #0f172a, #3b82f6); transition: width 0.3s ease; }
+    .progress-info   { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 5px; font-weight: 700; }
+    .progress-status { text-align: center; font-size: 12px; font-weight: 800; margin-top: 6px; color: #0f172a; min-height: 20px; }
+
+    .price-box { text-align: center; background: #f1f5f9; padding: 12px; border-radius: 10px; margin-bottom: 15px; }
+
+    #loader { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.85); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top-color: #0f172a; border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 10px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+    .modal-overlay.show { opacity: 1; }
+    .modal-box { background: white; padding: 32px; width: 90%; max-width: 420px; border-radius: 24px; text-align: center; transform: translateY(20px); transition: transform 0.3s; box-shadow: 0 20px 50px rgba(0,0,0,0.18); }
+    .modal-overlay.show .modal-box { transform: translateY(0); }
+    .modal-icon  { font-size: 42px; display: block; margin-bottom: 12px; }
+    .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #0f172a; }
+    .modal-msg   { font-size: 14px; color: #64748b; margin-bottom: 20px; line-height: 1.6; }
+    .modal-input { margin-bottom: 20px; display: none; }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-actions .btn { width: 100%; padding: 13px; font-size: 13px; margin: 0; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; text-align: center; }
+    @media (max-width: 500px) { .stat-grid { grid-template-columns: repeat(2,1fr); } }
+    .stat-card { padding: 12px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+    .stat-card b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; }
+  </style>
 </head>
 <body>
-    <div id="loading-screen">
-        <div class="spinner"></div>
-        <div class="loading-text">Memuatkan i-Print...</div>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <div style="font-weight:700;font-size:12px;color:#64748b;">SILA TUNGGU...</div>
+</div>
+
+<div id="cModal" class="modal-overlay">
+  <div class="modal-box">
+    <span id="mIcon"  class="modal-icon">🔔</span>
+    <div  id="mTitle" class="modal-title">Perhatian</div>
+    <div  id="mMsg"   class="modal-msg">...</div>
+    <input type="text" id="mInput" class="modal-input" placeholder="Sila masukkan maklumat...">
+    <div class="modal-actions">
+      <button id="mBtnCancel" class="btn btn-red"  onclick="closeM()">Batal</button>
+      <button id="mBtnOk"     class="btn btn-main" onclick="confirmM()">OK</button>
     </div>
-    <iframe id="app-frame" src="https://script.google.com/macros/s/AKfycbwjO97_YWugdYIRpV6bT3Uv4uTbmM6Ob1axw9ASpk668ugB40O1DAxzBn2jTRp9rLxKTg/exec" sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
-    <script>
-        const frame = document.getElementById('app-frame');
-        const loader = document.getElementById('loading-screen');
-        frame.onload = function() { loader.style.display = 'none'; frame.style.display = 'block'; };
-    </script>
+  </div>
+</div>
+
+<div class="container">
+  <div class="nav-tabs">
+    <div class="tab active" onclick="sw(0)">📋 Borang</div>
+    <div class="tab"        onclick="sw(1)">🔍 Semak Status</div>
+    <div class="tab"        onclick="sw(2)">🔐 Admin</div>
+  </div>
+
+  <!-- ══ TAB 0 — BORANG ══ -->
+  <div class="section active">
+    <form id="mainForm" onsubmit="submitForm(this); return false;">
+      <div class="form-row">
+        <div><label>Nama Penuh *</label><input type="text"  name="nama"   required></div>
+        <div><label>No. Telefon *</label><input type="tel"  name="tel"    required></div>
+      </div>
+      <div class="form-row">
+        <div><label>Emel *</label><input type="email" name="email"  required></div>
+        <div><label>UKMPer *</label><input type="text"  name="ukmper" required></div>
+      </div>
+      <div style="margin-bottom:15px;">
+        <label>PTJ / Jabatan *</label>
+        <input type="text" name="ptj" placeholder="Cth: IMEN, FKAB" required>
+      </div>
+      <div style="margin-bottom:15px;">
+        <label>Tajuk Poster *</label>
+        <textarea name="tujuan" rows="2" placeholder="Cth: Poster Makmal, Poster Hebahan Seminar" required></textarea>
+      </div>
+
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;">
+        <div>
+          <label>Saiz</label>
+          <select name="size" id="size" onchange="calcPrice()">
+            <option value="A1">A1</option>
+            <option value="A0">A0</option>
+          </select>
+        </div>
+        <div>
+          <label>Media</label>
+          <select name="media" id="media" onchange="calcPrice()">
+            <option value="High Glossy">High Glossy</option>
+            <option id="optPlain" value="Plain Paper">Plain Paper</option>
+          </select>
+        </div>
+        <div>
+          <label>Unit</label>
+          <input type="number" name="unit" id="unit" value="1" min="1" onchange="calcPrice()">
+        </div>
+      </div>
+
+      <div class="price-box">
+        <label>Harga Anggaran</label>
+        <div style="font-size:22px;font-weight:800;">RM <span id="priceDisplay">50.00</span></div>
+      </div>
+      <input type="hidden" name="harga_hidden" id="hh" value="50">
+
+      <div class="form-row">
+        <div>
+          <label>Kaedah Pembayaran</label>
+          <select name="bayaran" id="payMethod" onchange="toggleGeran(this)">
+            <option value="Cash">Cash</option>
+            <option value="Geran">Geran</option>
+          </select>
+          <input type="text" name="no_geran" id="inpGeran"
+                 placeholder="Masukkan No. Geran"
+                 style="display:none;margin-top:10px;border-color:#3b82f6;">
+        </div>
+        <div>
+          <label>Fail Poster (PDF / JPG / PNG) *</label>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput"
+                   accept="application/pdf,image/jpeg,image/png"
+                   onchange="onFileChosen(this)">
+            <div class="uz-icon">📁</div>
+            <div class="uz-label">Klik atau seret fail ke sini</div>
+            <div class="uz-sub">PDF · JPG · PNG</div>
+            <div class="uz-chosen" id="uzChosen"></div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress-wrap" id="progressWrap">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-info">
+              <span id="progChunk">0 MB</span>
+              <span id="progPct">0%</span>
+              <span id="progSize">0 MB</span>
+            </div>
+            <div class="progress-status" id="progStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-main" id="submitBtn">🚀 HANTAR TEMPAHAN</button>
+    </form>
+  </div>
+
+  <!-- ══ TAB 1 — SEMAK STATUS ══ -->
+  <div class="section">
+    <div style="max-width:480px;margin:0 auto;text-align:center;">
+      <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Masukkan UKMPer atau emel untuk semak status tempahan.</p>
+      <input type="text" id="chkIn" placeholder="UKMPer / Emel" style="margin-bottom:10px;">
+      <button class="btn btn-main" style="margin-top:0;" onclick="checkStatus()">🔍 CARI</button>
+      <div id="res" style="text-align:left;margin-top:20px;"></div>
+    </div>
+  </div>
+
+  <!-- ══ TAB 2 — ADMIN ══ -->
+  <div class="section">
+    <div id="loginBox" style="max-width:300px;margin:0 auto;text-align:center;">
+      <div style="font-size:40px;margin-bottom:16px;">🔐</div>
+      <input type="password" id="pass" placeholder="Kata Laluan Admin"
+             onkeydown="if(event.key==='Enter') loadAdmin()">
+      <button class="btn btn-main" onclick="loadAdmin()">MASUK</button>
+    </div>
+    <div id="dash" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <h3 style="margin:0;">📊 Admin Dashboard</h3>
+        <button class="btn" onclick="loadAdmin()" style="background:#e2e8f0;color:#0f172a;">🔄 Refresh</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card" style="background:#f1f5f9;">Semua<b id="cTot">0</b></div>
+        <div class="stat-card" style="background:#fff7ed;color:#c2410c;">Pending<b id="cP">0</b></div>
+        <div class="stat-card" style="background:#eff6ff;color:#1d4ed8;">Proses<b id="cPr">0</b></div>
+        <div class="stat-card" style="background:#f0fdf4;color:#15803d;">Siap<b id="cS">0</b></div>
+      </div>
+      <input type="text" id="sAdm" onkeyup="filterTable()" placeholder="🔍 Cari nama..." style="margin-bottom:12px;">
+      <div style="overflow-x:auto;"><table id="tbl"></table></div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ══════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════
+function sw(n) {
+  document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active', i===n); });
+  document.querySelectorAll('.section').forEach(function(s,i){ s.classList.toggle('active', i===n); });
+}
+function ld(on) { document.getElementById('loader').style.display = on ? 'flex' : 'none'; }
+function fmtMB(b) { return (b/1024/1024).toFixed(2) + ' MB'; }
+
+function calcPrice() {
+  var s = document.getElementById('size').value;
+  var m = document.getElementById('media').value;
+  var u = parseInt(document.getElementById('unit').value) || 1;
+  document.getElementById('optPlain').disabled = (s === 'A0');
+  if (s === 'A0' && m === 'Plain Paper') { document.getElementById('media').value = 'High Glossy'; m = 'High Glossy'; }
+  var p = (m === 'High Glossy') ? (s === 'A1' ? 50 : 80) : 30;
+  document.getElementById('priceDisplay').innerText = (p * u).toFixed(2);
+  document.getElementById('hh').value = p;
+}
+
+function toggleGeran(el) {
+  var inp = document.getElementById('inpGeran');
+  if (el.value === 'Geran') { inp.style.display = 'block'; inp.required = true; }
+  else { inp.style.display = 'none'; inp.value = ''; inp.required = false; }
+}
+
+function onFileChosen(input) {
+  var f = input.files[0];
+  if (!f) return;
+  var el = document.getElementById('uzChosen');
+  el.style.display = 'block';
+  el.innerText = '📎 ' + f.name + ' (' + fmtMB(f.size) + ')';
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progStatus').innerText = '';
+}
+
+// Drag-and-drop highlight
+(function(){
+  var uz = document.getElementById('uploadZone');
+  uz.addEventListener('dragover', function(e){ e.preventDefault(); uz.classList.add('drag'); });
+  uz.addEventListener('dragleave', function(){ uz.classList.remove('drag'); });
+  uz.addEventListener('drop', function(){ uz.classList.remove('drag'); });
+})();
+
+// ══════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════
+var _mCb = null;
+function showModal(title, msg, type, cb) {
+  var icons = { success:'✅', error:'⚠️', confirm:'❓', prompt:'✏️' };
+  document.getElementById('mIcon').innerText  = icons[type] || '🔔';
+  document.getElementById('mTitle').innerText = title;
+  document.getElementById('mMsg').innerText   = msg;
+  var inp  = document.getElementById('mInput');
+  var bCan = document.getElementById('mBtnCancel');
+  var bOk  = document.getElementById('mBtnOk');
+  inp.style.display = 'none'; bCan.style.display = 'none';
+  bOk.innerText = 'OK'; inp.value = ''; _mCb = cb || null;
+  if (type === 'confirm') { bCan.style.display = 'block'; bOk.innerText = 'Ya, Teruskan'; }
+  else if (type === 'prompt') { bCan.style.display = 'block'; inp.style.display = 'block'; bOk.innerText = 'Hantar'; setTimeout(function(){ inp.focus(); }, 120); }
+  var m = document.getElementById('cModal');
+  m.style.display = 'flex';
+  setTimeout(function(){ m.classList.add('show'); }, 10);
+}
+function closeM() {
+  var m = document.getElementById('cModal');
+  m.classList.remove('show');
+  setTimeout(function(){ m.style.display = 'none'; }, 300);
+}
+function confirmM() {
+  var inp = document.getElementById('mInput');
+  if (inp.style.display === 'block' && !inp.value.trim()) { inp.style.borderColor = 'red'; return; }
+  inp.style.borderColor = '#e2e8f0';
+  closeM();
+  if (_mCb) _mCb(inp.value.trim());
+}
+function myAlert(msg, isErr)  { showModal(isErr ? 'Ralat' : 'Berjaya ✅', msg, isErr ? 'error' : 'success'); }
+function myConfirm(msg, cb)   { showModal('Pengesahan', msg, 'confirm', cb); }
+function myPrompt(msg, cb)    { showModal('Maklumat Diperlukan', msg, 'prompt', cb); }
+
+// ══════════════════════════════════════════
+//  DIRECT-TO-DRIVE RESUMABLE UPLOAD
+//
+//  The old version base64'd the whole file through Apps Script in 500KB
+//  chunks parked in CacheService. That could not carry a print-quality
+//  poster: it read the ENTIRE file into memory via readAsArrayBuffer
+//  (enough to kill a phone tab on its own), base64 inflated it by 33%,
+//  CacheService evicted pieces at will, and Apps Script capped out at
+//  ~50MB when reassembling anyway.
+//
+//  Now: the server opens a Drive resumable session and returns only the
+//  session URI; the browser PUTs the File object straight to Google.
+//  The browser streams it — never held in memory, never base64'd, and
+//  Apps Script never touches the bytes. 100MB+ is fine.
+// ══════════════════════════════════════════
+var MAX_FILE_MB = 300; // generous ceiling; raise freely — no longer architectural
+
+function submitForm(f) {
+  var fileInput = document.getElementById('fileInput');
+  if (!fileInput.files[0]) { myAlert('Sila pilih fail untuk dimuat naik!', true); return; }
+
+  var file = fileInput.files[0];
+  if (file.size > MAX_FILE_MB * 1024 * 1024) {
+    myAlert('Fail terlalu besar (' + fmtMB(file.size) + '). Had maksimum ialah ' + MAX_FILE_MB + ' MB.', true);
+    return;
+  }
+  if (file.size === 0) { myAlert('Fail kosong. Sila pilih fail lain.', true); return; }
+
+  var btn = document.getElementById('submitBtn');
+  btn.disabled  = true;
+  btn.innerText = '⏳ Sedang memuat naik...';
+
+  var wrap  = document.getElementById('progressWrap');
+  var fill  = document.getElementById('progressFill');
+  var pDone = document.getElementById('progChunk');
+  var pPct  = document.getElementById('progPct');
+  var pSize = document.getElementById('progSize');
+  var pStat = document.getElementById('progStatus');
+
+  wrap.style.display = 'block';
+  fill.style.width   = '0%';
+  pPct.innerText     = '0%';
+  pDone.innerText    = '0 MB';
+  pSize.innerText    = fmtMB(file.size);
+  pStat.style.color  = '#0f172a';
+  pStat.innerText    = 'Menyediakan muat naik...';
+
+  var ui = { fill: fill, pDone: pDone, pPct: pPct, pStat: pStat, btn: btn };
+
+  // Step 1 — ask the server to open a Drive resumable session.
+  google.script.run
+    .withFailureHandler(function(err) { uploadFailed(ui, 'Gagal menyediakan muat naik: ' + err); })
+    .withSuccessHandler(function(res) {
+      if (!res || !res.ok) { uploadFailed(ui, (res && res.error) || 'Ralat tidak diketahui'); return; }
+      putFileToDrive(res.sessionUri, file, f, ui);
+    })
+    .startResumableUpload(file.name, file.type || 'application/octet-stream');
+}
+
+// Step 2 — stream the file straight to Google's upload endpoint.
+// XMLHttpRequest (not fetch) because only XHR reports upload progress.
+function putFileToDrive(sessionUri, file, formEl, ui) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('PUT', sessionUri, true);
+  xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+  xhr.upload.onprogress = function(e) {
+    if (!e.lengthComputable) return;
+    var pct = Math.round((e.loaded / e.total) * 100);
+    ui.fill.style.width = pct + '%';
+    ui.pPct.innerText   = pct + '%';
+    ui.pDone.innerText  = fmtMB(e.loaded);
+    ui.pStat.innerText  = '⬆️ Memuat naik... ' + pct + '%';
+  };
+
+  xhr.onload = function() {
+    if (xhr.status !== 200 && xhr.status !== 201) {
+      uploadFailed(ui, 'Muat naik gagal (HTTP ' + xhr.status + '). ' + (xhr.responseText || ''));
+      return;
+    }
+    var fileId;
+    try {
+      fileId = JSON.parse(xhr.responseText).id;
+    } catch (err) {
+      uploadFailed(ui, 'Respons Drive tidak difahami.');
+      return;
+    }
+    if (!fileId) { uploadFailed(ui, 'Drive tidak memulangkan ID fail.'); return; }
+
+    ui.fill.style.width = '100%';
+    ui.pPct.innerText   = '100%';
+    ui.pDone.innerText  = fmtMB(file.size);
+    ui.pStat.style.color = '#15803d';
+    ui.pStat.innerText   = '✅ Fail berjaya dimuat naik! Menyimpan data...';
+
+    saveBooking(formEl, file, fileId, ui);
+  };
+
+  xhr.onerror   = function() { uploadFailed(ui, 'Sambungan terputus semasa muat naik. Sila cuba semula.'); };
+  xhr.ontimeout = function() { uploadFailed(ui, 'Muat naik tamat masa. Sila cuba semula.'); };
+
+  xhr.send(file); // the File object streams; it is never loaded into memory
+}
+
+// Step 3 — file is in Drive, now write the booking row.
+function saveBooking(formEl, file, fileId, ui) {
+  var data = {
+    nama        : formEl.nama.value,
+    tel         : formEl.tel.value,
+    email       : formEl.email.value,
+    ukmper      : formEl.ukmper.value,
+    ptj         : formEl.ptj.value,
+    tujuan      : formEl.tujuan.value,
+    size        : formEl.size.value,
+    media       : formEl.media.value,
+    unit        : formEl.unit.value,
+    harga_hidden: formEl.harga_hidden.value,
+    bayaran     : formEl.bayaran.value,
+    no_geran    : formEl.no_geran ? formEl.no_geran.value : '',
+    fileId      : fileId,
+    fileMime    : file.type
+  };
+
+  google.script.run
+    .withFailureHandler(function(e) { ld(false); uploadFailed(ui, e.toString()); })
+    .withSuccessHandler(function(r) {
+      ld(false);
+      myAlert(r.message, r.status === 'error');
+      if (r.status !== 'error') {
+        formEl.reset();
+        document.getElementById('fileInput').value = '';
+        document.getElementById('uzChosen').style.display    = 'none';
+        document.getElementById('progressWrap').style.display = 'none';
+        document.getElementById('inpGeran').style.display     = 'none';
+        calcPrice();
+      }
+      resetBtn(ui.btn);
+    })
+    .processForm(data);
+}
+
+function uploadFailed(ui, msg) {
+  ui.pStat.style.color = '#b91c1c';
+  ui.pStat.innerText   = '❌ ' + msg;
+  myAlert(msg, true);
+  resetBtn(ui.btn);
+}
+
+function resetBtn(btn) {
+  btn.disabled  = false;
+  btn.innerText = '🚀 HANTAR TEMPAHAN';
+}
+
+// ══════════════════════════════════════════
+//  CHECK STATUS
+// ══════════════════════════════════════════
+function checkStatus() {
+  var q = document.getElementById('chkIn').value.trim();
+  if (!q) { myAlert('Sila masukkan UKMPer atau emel.', true); return; }
+  ld(true);
+  google.script.run
+    .withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); })
+    .withSuccessHandler(function(r){
+      ld(false);
+      var h = '';
+      if (!r.length) {
+        h = '<div style="text-align:center;color:#64748b;padding:30px;font-size:14px;">Tiada rekod dijumpai.</div>';
+      } else {
+        r.forEach(function(x){
+          var cls = x.status === 'Dalam Proses' ? 'badge-process'
+                  : x.status === 'Dah Boleh Collect' ? 'badge-success'
+                  : x.status === 'Ditolak' ? 'badge-reject' : 'badge-pending';
+          var extra = x.status === 'Ditolak'
+            ? '<br><small style="color:#b91c1c;margin-top:4px;display:block;">Sebab: ' + x.alasan + '</small>' : '';
+          h += '<div style="background:white;padding:16px;border-radius:12px;margin-bottom:10px;border:1px solid #e2e8f0;">' +
+               '<div style="font-weight:700;margin-bottom:6px;">' + x.tajuk + '</div>' +
+               '<span class="badge ' + cls + '">' + x.status + '</span>' + extra + '</div>';
+        });
+      }
+      document.getElementById('res').innerHTML = h;
+    })
+    .checkUserStatus(q);
+}
+
+// ══════════════════════════════════════════
+//  ADMIN
+// ══════════════════════════════════════════
+// Held after a successful login so admin actions can authenticate too.
+// updatePosterStatus/deleteRow are reachable over the public JSON API, so
+// they must prove admin rights themselves — the password prompt alone is
+// only a UI gate, not a lock.
+var _adminPass = '';
+
+function loadAdmin() {
+  ld(true);
+  _adminPass = document.getElementById('pass').value;
+  google.script.run
+    .withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); })
+    .withSuccessHandler(function(d){
+      ld(false);
+      if (d === 'UNAUTHORIZED') { myAlert('Kata laluan salah!', true); return; }
+
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('dash').style.display     = 'block';
+
+      var h = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Status</th><th>Geran</th><th>Tindakan</th></tr>';
+      var cT=0, cP=0, cPr=0, cS=0;
+
+      for (var i = 1; i < d.length; i++) {
+        cT++;
+        var id    = d[i][0];
+        var st    = d[i][11];
+        var cls   = 'badge-pending';
+        if      (st === 'Dalam Proses')      { cls = 'badge-process'; cPr++; }
+        else if (st === 'Dah Boleh Collect') { cls = 'badge-success'; cS++; }
+        else if (st === 'Ditolak')           { cls = 'badge-reject'; }
+        else                                  { cP++; }
+
+        var eid = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        h += '<tr>' +
+          '<td style="color:#94a3b8;font-weight:700;">' + i + '</td>' +
+          '<td><div style="font-weight:700;">' + d[i][2] + '</div>' +
+              '<div style="font-size:11px;color:#64748b;">' + d[i][15] + '</div>' +
+              '<div style="font-size:11px;color:#94a3b8;">' + d[i][1] + '</div></td>' +
+          '<td><b>' + d[i][6] + '</b><br><small style="color:#64748b;">' + d[i][7] + ' ×' + d[i][16] + '</small></td>' +
+          '<td><span class="badge ' + cls + '">' + st + '</span></td>' +
+          '<td><small>' + d[i][14] + '</small></td>' +
+          '<td>' +
+            '<button class="btn btn-blue"  onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')">Proses</button>' +
+            '<button class="btn btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')">Siap</button>' +
+            '<button class="btn btn-red"   onclick="rejectRow(\'' + eid + '\')">Tolak</button>' +
+            '<a href="' + d[i][10] + '" target="_blank" style="font-size:16px;margin:0 4px;text-decoration:none;" title="Lihat Fail">📄</a>' +
+            '<span onclick="delRow(\'' + eid + '\')" style="cursor:pointer;font-size:13px;color:#fca5a5;font-weight:800;" title="Padam">✕</span>' +
+          '</td></tr>';
+      }
+
+      document.getElementById('tbl').innerHTML = h;
+      document.getElementById('cTot').innerText = cT;
+      document.getElementById('cP').innerText   = cP;
+      document.getElementById('cPr').innerText  = cPr;
+      document.getElementById('cS').innerText   = cS;
+    })
+    .getAdminData(document.getElementById('pass').value);
+}
+
+function updStatus(id, status, reason) {
+  ld(true);
+  google.script.run
+    .withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); })
+    .withSuccessHandler(function(res){ ld(false); if (res.startsWith('ERROR')) myAlert(res, true); else loadAdmin(); })
+    .updatePosterStatus(id, status, reason, _adminPass);
+}
+
+function rejectRow(id) {
+  myPrompt('Nyatakan sebab penolakan (wajib):', function(reason){ if (reason) updStatus(id, 'Ditolak', reason); });
+}
+
+function delRow(id) {
+  myConfirm('Padam rekod ini secara kekal?', function(){
+    ld(true);
+    google.script.run
+      .withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); })
+      .withSuccessHandler(function(res){ ld(false); if (res.startsWith('ERROR')) myAlert(res, true); else loadAdmin(); })
+      .deleteRow(id, _adminPass);
+  });
+}
+
+function filterTable() {
+  var v  = document.getElementById('sAdm').value.toUpperCase();
+  var tr = document.getElementById('tbl').getElementsByTagName('tr');
+  for (var i = 1; i < tr.length; i++) {
+    var td = tr[i].getElementsByTagName('td')[1];
+    if (td) tr[i].style.display = td.innerText.toUpperCase().indexOf(v) > -1 ? '' : 'none';
+  }
+}
+</script>
 </body>
 </html>
