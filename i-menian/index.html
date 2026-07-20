@@ -70,12 +70,42 @@
         // Getter → every `google.script.run.…` expression gets a FRESH runner, so
         // two in-flight calls can never share/overwrite each other's handlers.
         Object.defineProperty(window.google.script, 'run', { get: makeRunner });
+
+        // ── EARLY FETCH ──────────────────────────────────────────────────────
+        // Kick off the slow getInitialData call NOW so the multi-second backend
+        // work overlaps downloading React/Babel and transforming the JSX below,
+        // instead of starting only after all of that finishes. The App's mount
+        // effect consumes this promise instead of issuing its own first call.
+        // The boot call ALWAYS uses an empty token (AUTH_TOKEN stays '' until a
+        // verify handler sets it), so args must match that exactly — otherwise
+        // the app would consume a payload it never asked for.
+        window.__initialDataPromise = fetch(API_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body:    JSON.stringify({ fn: 'getInitialData', args: [''] })
+        }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+        // Mark rejections handled until the app attaches its real handlers; the
+        // stored promise still rejects normally for its consumer.
+        window.__initialDataPromise.catch(function () {});
     })();
     </script>
+    <!-- Warm up every origin the boot path touches: the backend (early fetch
+         above) and the three CDNs serving the blocking assets below. -->
+    <link rel="preconnect" href="https://script.google.com">
+    <link rel="preconnect" href="https://script.googleusercontent.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
     <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- @babel/standalone is by far the heaviest asset on this page (~1.5 MB) and
+         nothing can be painted until it arrives. `async` lets HTML parsing and the
+         other downloads proceed while it loads; the boot() shim at the end of
+         <body> already waits for window.Babel, so arrival order doesn't matter. -->
+    <script async src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f2f2f7; color: #1c1c1e; text-align: left; }
@@ -596,6 +626,63 @@
             </div>
         );
 
+        // ── REFERENCE-DATA CACHE (stale-while-revalidate) ────────────────────
+        // Repeat visits paint the landing page from this cache instead of waiting
+        // on the backend, then the live payload silently replaces it.
+        //
+        // ONLY the two non-personal collections are persisted: `labs` and
+        // `supervisors`. `applications`, `staff` and `lab_users` carry applicant
+        // PII (Name / Email / Phone) and are NEVER written to disk — they always
+        // come from the live fetch, exactly as before. That matches the backend's
+        // existing PDPA stance (Code.gs strips IC before it reaches the browser);
+        // localStorage would otherwise leave the applicant registry sitting on
+        // any shared lab PC long after the tab closed.
+        //
+        // Display-only: every write still goes straight to Apps Script.
+        const REF_CACHE_KEY = 'imenian_ref_v1';
+
+        function readRefCache() {
+            try {
+                const raw = localStorage.getItem(REF_CACHE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                if (!parsed || parsed.v !== 1 || !parsed.data) return null;
+                if (!Array.isArray(parsed.data.labs) || !Array.isArray(parsed.data.supervisors)) return null;
+                return parsed.data;
+            } catch (e) { return null; }
+        }
+
+        function writeRefCache(data) {
+            try {
+                if (!data || !Array.isArray(data.labs)) return;
+                localStorage.setItem(REF_CACHE_KEY, JSON.stringify({
+                    v: 1,
+                    savedAt: Date.now(),
+                    data: { labs: data.labs, supervisors: data.supervisors || [] }
+                }));
+            } catch (e) {
+                // Quota exceeded / storage disabled — caching must never break the app
+                try { localStorage.removeItem(REF_CACHE_KEY); } catch (e2) {}
+            }
+        }
+
+        // Non-blocking "Refreshing…" pill shown while cached data is being revalidated.
+        // Imperative DOM rather than JSX so it cannot perturb the app's render tree.
+        function showRefreshBadge(show) {
+            let badge = document.getElementById('data-refresh-badge');
+            if (show) {
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.id = 'data-refresh-badge';
+                    badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:70;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.06);box-shadow:0 4px 14px rgba(0,0,0,.08);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:500;color:#8e8e93';
+                    badge.innerHTML = '<span style="width:12px;height:12px;border:2px solid #e5e5ea;border-top-color:#007aff;border-radius:50%;display:inline-block;animation:spin 1s linear infinite"></span><span>Refreshing…</span>';
+                    document.body.appendChild(badge);
+                }
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
         const App = () => {
             const [viewMode, setViewMode] = useState('landing');
             const [userRole, setUserRole] = useState(null);
@@ -618,7 +705,7 @@
             const [assessmentTarget, setAssessmentTarget] = useState(null);
             const [assessmentLocked, setAssessmentLocked] = useState(null);
             const showToast = (msg, type = 'info') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
-            const refreshData = () => { if (typeof google === 'undefined') return; setIsLoading(true); google.script.run.withSuccessHandler((data) => { setDb(data); setIsLoading(false); }).withFailureHandler(()=>setIsLoading(false)).getInitialData(AUTH_TOKEN); };
+            const refreshData = () => { if (typeof google === 'undefined') return; setIsLoading(true); google.script.run.withSuccessHandler((data) => { setDb(data); writeRefCache(data); setIsLoading(false); }).withFailureHandler(()=>setIsLoading(false)).getInitialData(AUTH_TOKEN); };
 
             // ── Staff auth helpers ──
             const openStaffLogin = (role) => {
@@ -677,9 +764,16 @@
 
             useEffect(() => {
                 if (typeof google === 'undefined') { setIsLoading(false); return; }
+
+                // One-shot: the <head> early fetch already issued this exact call
+                // (GitHub Pages mode). Native GAS has no such promise → normal call.
+                const earlyData = window.__initialDataPromise;
+                window.__initialDataPromise = null;
+
                 readUrlParams((params) => {
-                    google.script.run.withSuccessHandler((data) => {
+                    const applyInitialData = (data) => {
                         setDb(data || { staff: [], labs: [], applications: [], lab_users: [], supervisors: [] });
+                        if (data) writeRefCache(data);
                         if (params.appId) {
                             const target = data.applications.find(a => a.ID === params.appId);
                             if (target) {
@@ -739,7 +833,34 @@
                             if (params.lab) setLabFilter(params.lab);
                         }
                         setIsLoading(false);
-                    }).getInitialData(AUTH_TOKEN);
+                        showRefreshBadge(false);
+                    };
+
+                    // Stale-while-revalidate: with no deep-link params there is
+                    // nothing to route on, so paint the landing view immediately
+                    // from cached reference data while the live payload lands.
+                    // Deep links (?appId= / ?role=) deliberately still wait for
+                    // live data — a routing decision must never be made against
+                    // cached content (applications is empty in the cache).
+                    if (!params.appId && !params.role) {
+                        const cached = readRefCache();
+                        if (cached) {
+                            setDb({ staff: [], labs: cached.labs, applications: [], lab_users: [], supervisors: cached.supervisors });
+                            setIsLoading(false);
+                            showRefreshBadge(true);
+                        }
+                    }
+
+                    if (earlyData) {
+                        earlyData
+                            .then((res) => {
+                                if (res && res.ok) applyInitialData(res.result);
+                                else { showRefreshBadge(false); console.error('[API] ', (res && res.error) || 'Unknown API error'); }
+                            })
+                            .catch((e) => { showRefreshBadge(false); console.error('[API] ', e); });
+                    } else {
+                        google.script.run.withSuccessHandler(applyInitialData).getInitialData(AUTH_TOKEN);
+                    }
                 });
             }, []);
 
@@ -2356,7 +2477,10 @@
     <script>
       (function () {
         function boot() {
-          if (!window.Babel) { setTimeout(boot, 50); return; }
+          // Babel now loads async, so it may arrive after this runs. React/ReactDOM
+          // are still ordered blocking scripts, but they're checked too so the
+          // transformed code can never eval before its globals exist.
+          if (!window.Babel || !window.React || !window.ReactDOM) { setTimeout(boot, 50); return; }
           try {
             var src = document.getElementById('app-src').textContent;
             var out = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]] }).code;
