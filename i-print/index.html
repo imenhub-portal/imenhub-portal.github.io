@@ -290,6 +290,14 @@
 // ══════════════════════════════════════════
 //  UTILITIES
 // ══════════════════════════════════════════
+// Escape user-controlled data before innerHTML — form input and sheet
+// cells are attacker-controlled; without this a crafted <script> in the
+// "nama" field would run in every browser that renders it.
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 function sw(n) {
   document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active', i===n); });
   document.querySelectorAll('.section').forEach(function(s,i){ s.classList.toggle('active', i===n); });
@@ -319,7 +327,7 @@ function onFileChosen(input) {
   if (!f) return;
   var el = document.getElementById('uzChosen');
   el.style.display = 'block';
-  el.innerText = '📎 ' + f.name + ' (' + fmtMB(f.size) + ')';
+  el.innerText = '📎 ' + f.name + ' (' + fmtMB(f.size) + ')'; // innerText — not parsed as HTML, safe
   document.getElementById('progressWrap').style.display = 'none';
   document.getElementById('progressFill').style.width = '0%';
   document.getElementById('progStatus').innerText = '';
@@ -555,10 +563,10 @@ function checkStatus() {
                   : x.status === 'Dah Boleh Collect' ? 'badge-success'
                   : x.status === 'Ditolak' ? 'badge-reject' : 'badge-pending';
           var extra = x.status === 'Ditolak'
-            ? '<br><small style="color:#b91c1c;margin-top:4px;display:block;">Sebab: ' + x.alasan + '</small>' : '';
+            ? '<br><small style="color:#b91c1c;margin-top:4px;display:block;">Sebab: ' + esc(x.alasan) + '</small>' : '';
           h += '<div style="background:white;padding:16px;border-radius:12px;margin-bottom:10px;border:1px solid #e2e8f0;">' +
-               '<div style="font-weight:700;margin-bottom:6px;">' + x.tajuk + '</div>' +
-               '<span class="badge ' + cls + '">' + x.status + '</span>' + extra + '</div>';
+               '<div style="font-weight:700;margin-bottom:6px;">' + esc(x.tajuk) + '</div>' +
+               '<span class="badge ' + cls + '">' + esc(x.status) + '</span>' + extra + '</div>';
         });
       }
       document.getElementById('res').innerHTML = h;
@@ -603,17 +611,17 @@ function loadAdmin() {
         var eid = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         h += '<tr>' +
           '<td style="color:#94a3b8;font-weight:700;">' + i + '</td>' +
-          '<td><div style="font-weight:700;">' + d[i][2] + '</div>' +
-              '<div style="font-size:11px;color:#64748b;">' + d[i][15] + '</div>' +
-              '<div style="font-size:11px;color:#94a3b8;">' + d[i][1] + '</div></td>' +
-          '<td><b>' + d[i][6] + '</b><br><small style="color:#64748b;">' + d[i][7] + ' ×' + d[i][16] + '</small></td>' +
-          '<td><span class="badge ' + cls + '">' + st + '</span></td>' +
-          '<td><small>' + d[i][14] + '</small></td>' +
+          '<td><div style="font-weight:700;">' + esc(d[i][2]) + '</div>' +
+              '<div style="font-size:11px;color:#64748b;">' + esc(d[i][15]) + '</div>' +
+              '<div style="font-size:11px;color:#94a3b8;">' + esc(d[i][1]) + '</div></td>' +
+          '<td><b>' + esc(d[i][6]) + '</b><br><small style="color:#64748b;">' + esc(d[i][7]) + ' ×' + esc(d[i][16]) + '</small></td>' +
+          '<td><span class="badge ' + cls + '">' + esc(st) + '</span></td>' +
+          '<td><small>' + esc(d[i][14]) + '</small></td>' +
           '<td>' +
             '<button class="btn btn-blue"  onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')">Proses</button>' +
             '<button class="btn btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')">Siap</button>' +
             '<button class="btn btn-red"   onclick="rejectRow(\'' + eid + '\')">Tolak</button>' +
-            '<a href="' + d[i][10] + '" target="_blank" style="font-size:16px;margin:0 4px;text-decoration:none;" title="Lihat Fail">📄</a>' +
+            '<a href="' + esc(d[i][10]) + '" target="_blank" style="font-size:16px;margin:0 4px;text-decoration:none;" title="Lihat Fail">📄</a>' +
             '<span onclick="delRow(\'' + eid + '\')" style="cursor:pointer;font-size:13px;color:#fca5a5;font-weight:800;" title="Padam">✕</span>' +
           '</td></tr>';
       }
