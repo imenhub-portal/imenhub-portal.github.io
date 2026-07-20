@@ -425,7 +425,10 @@ function submitForm(f) {
       if (!res || !res.ok) { uploadFailed(ui, (res && res.error) || 'Ralat tidak diketahui'); return; }
       putFileToDrive(res.sessionUri, file, f, ui);
     })
-    .startResumableUpload(file.name, file.type || 'application/octet-stream');
+    // Origin is passed so Google returns a session that is CORS-enabled for
+    // this page; without it the file transfers fully and the response is then
+    // blocked, which surfaces as a "connection dropped" error at 100%.
+    .startResumableUpload(file.name, file.type || 'application/octet-stream', window.location.origin);
 }
 
 // Step 2 — stream the file straight to Google's upload endpoint.
@@ -435,9 +438,15 @@ function putFileToDrive(sessionUri, file, formEl, ui) {
   xhr.open('PUT', sessionUri, true);
   xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
+  // Tracks whether the body finished transferring. If it did and we STILL land
+  // in onerror, the bytes arrived and it was the response that got blocked —
+  // a different fault from a genuine mid-transfer drop, so say so plainly.
+  var sentFully = false;
+
   xhr.upload.onprogress = function(e) {
     if (!e.lengthComputable) return;
     var pct = Math.round((e.loaded / e.total) * 100);
+    if (e.loaded >= e.total) sentFully = true;
     ui.fill.style.width = pct + '%';
     ui.pPct.innerText   = pct + '%';
     ui.pDone.innerText  = fmtMB(e.loaded);
@@ -467,7 +476,11 @@ function putFileToDrive(sessionUri, file, formEl, ui) {
     saveBooking(formEl, file, fileId, ui);
   };
 
-  xhr.onerror   = function() { uploadFailed(ui, 'Sambungan terputus semasa muat naik. Sila cuba semula.'); };
+  xhr.onerror = function() {
+    uploadFailed(ui, sentFully
+      ? 'Fail sampai ke Drive tetapi respons disekat (CORS). Pastikan Code.gs terkini telah di-deploy sebagai versi baharu.'
+      : 'Sambungan terputus semasa muat naik. Sila cuba semula.');
+  };
   xhr.ontimeout = function() { uploadFailed(ui, 'Muat naik tamat masa. Sila cuba semula.'); };
 
   xhr.send(file); // the File object streams; it is never loaded into memory
