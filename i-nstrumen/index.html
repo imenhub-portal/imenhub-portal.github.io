@@ -253,6 +253,7 @@
             },
 
             adminAuthenticated: false,
+            adminToken: null,
             picEmail: null,
             picName: null,
             picLabs: [],
@@ -3749,57 +3750,42 @@
             e.preventDefault();
             const input  = getById('pdf-auth-input');
             const hint   = getById('pdf-auth-hint');
-            const entered      = (input.value || '').trim();
-            const enteredLower = entered.toLowerCase();
+            const entered = (input.value || '').trim();
 
-            const MASTER_CREDS = {
-                '023775':               'Dr Ahmad Razif',
-                'imenmakmal@gmail.com': 'Master Admin',
-                'rhonira@ukm.edu.my':   'Dr Rhonira'
-            };
-
-            // Master credentials → full access
-            if (MASTER_CREDS[enteredLower]) {
-                state.adminAuthenticated = true;
-                state.picEmail = enteredLower;
-                state.picName  = MASTER_CREDS[enteredLower];
-                state.picLabs  = [...state.labs];
-                state.picSelectedLab = 'All';
-                closeModal();
-                _executePdfDownload(period);
-                return;
-            }
-
-            // Lab coordinator lookup
-            const matched = (state.systemConfig.coordinators || []).filter(c =>
-                c.email && c.email.trim().toLowerCase() === enteredLower
-            );
-
-            if (matched.length > 0) {
-                const labsForCred = matched.map(c => c.lab).filter(Boolean);
-                if (labsForCred.includes(state.selectedLab)) {
-                    // Valid credential + correct lab → elevate session + download
-                    state.adminAuthenticated = true;
-                    state.picEmail = matched[0].email;
-                    state.picName  = matched[0].name || 'PIC';
-                    state.picLabs  = labsForCred;
-                    state.picSelectedLab = 'All';
-                    closeModal();
-                    _executePdfDownload(period);
-                } else {
-                    // Valid person, wrong lab
-                    if (hint) {
-                        hint.textContent = `⚠ Your credential is not authorised for ${state.selectedLab}.`;
-                        hint.classList.remove('hidden');
+            google.script.run
+                .withSuccessHandler((response) => {
+                    if (!response || !response.success) {
+                        if (hint) { hint.textContent = '⚠ Credential not recognised or not authorised for this lab.'; hint.classList.remove('hidden'); }
+                        input.value = '';
+                        input.focus();
+                        return;
                     }
-                    input.value = '';
-                    input.focus();
-                }
-            } else {
-                if (hint) hint.classList.remove('hidden');
-                input.value = '';
-                input.focus();
-            }
+                    // Credential is real (server-verified) — but is it authorised
+                    // for THIS lab specifically? Master always is; a PIC only if
+                    // their labs include the one being viewed.
+                    if (response.role === 'master' || response.labs.includes(state.selectedLab)) {
+                        state.adminAuthenticated = true;
+                        state.adminToken = response.token;
+                        state.picEmail = response.email;
+                        state.picName  = response.displayName;
+                        state.picLabs  = response.labs;
+                        state.picSelectedLab = 'All';
+                        closeModal();
+                        _executePdfDownload(period);
+                    } else {
+                        // Valid person, wrong lab
+                        if (hint) {
+                            hint.textContent = `⚠ Your credential is not authorised for ${state.selectedLab}.`;
+                            hint.classList.remove('hidden');
+                        }
+                        input.value = '';
+                        input.focus();
+                    }
+                })
+                .withFailureHandler((err) => {
+                    showToast('Network error: ' + err.message, 'error');
+                })
+                .handleFrontendAction('AdminLogin', { credential: entered });
         }
 
         function _executePdfDownload(period) {
@@ -4597,8 +4583,6 @@
             setTimeout(() => {
                 overlay.classList.remove('opacity-0');
                 content.classList.remove('scale-95', 'opacity-0');
-                // Pre-load i-Menian member list if this modal has the name-search field
-                if (eq && eq.lab) _imenianLoadUsers(eq.lab);
             }, 10);
         }
 
@@ -4694,6 +4678,13 @@
         }
 
 		// --- BACKEND INTEGRATION: SYNC HELPER ---
+        // Actions that require a logged-in PIC/Master session server-side —
+        // must match Code.gs's ADMIN_ONLY_ACTIONS + LAB_SCOPED_ACTIONS.
+        const ADMIN_GATED_ACTIONS = [
+            'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
+            'EditCoordinator', 'EditTechStaff', 'Archive', 'UpdateBooking'
+        ];
+
         function backgroundSync(actionType, payload) {
             // HARD SAFETY NET: in demo mode, nothing ever reaches the Google Sheet.
             // This is the single write path to the database, so blocking here makes
@@ -4703,15 +4694,33 @@
                 showToast('Demo mode — saving is disabled to protect live data.', 'error');
                 return;
             }
-            console.log("Syncing to sheet:", actionType, payload);
+
+            // Attach the session token for actions the server requires it for —
+            // the server independently validates this; it doesn't trust anything
+            // else the client claims about who's logged in.
+            const finalPayload = ADMIN_GATED_ACTIONS.includes(actionType)
+                ? { ...payload, __adminToken: state.adminToken }
+                : payload;
+
+            console.log("Syncing to sheet:", actionType, finalPayload);
 
             google.script.run
                 .withSuccessHandler((response) => {
-                    // NEW: Check if the backend actually succeeded
+                    // Check if the backend actually succeeded
                     if (response && response.success === false) {
+                        const msg = (response.error || '').toLowerCase();
+                        if (msg.includes('session') || msg.includes('log in') || msg.includes('not authorized')) {
+                            // Session expired/invalid — soft logout instead of the
+                            // generic reload, since nothing was actually corrupted.
+                            showToast(response.error, 'error');
+                            state.adminAuthenticated = false;
+                            state.adminToken = null;
+                            renderApp();
+                            return;
+                        }
                         alert("⚠️ CRITICAL ERROR: Data NOT saved to Google Sheet!\n\nReason: " + response.error);
-                        // Optional: Reload page to restore the deleted item to the screen
-                        location.reload(); 
+                        // Reload page to restore the deleted item to the screen
+                        location.reload();
                     } else {
                         console.log("Backend confirmed success:", response);
                     }
@@ -4720,7 +4729,7 @@
                     console.error("Sync Failed", err);
                     alert("⚠️ NETWORK ERROR: " + err.message);
                 })
-                .handleFrontendAction(actionType, payload);}
+                .handleFrontendAction(actionType, finalPayload);}
 		
 		
        function handleSubmit(e, mode, identifier) {
@@ -5799,53 +5808,47 @@
             </div>`;
         }
 
+        // Credentials are verified server-side (adminLogin() in Code.gs) — the
+        // client no longer holds the master PIN/emails or decides who's an
+        // admin; it just relays the entered credential and applies whatever
+        // session the server hands back.
         function verifyAdminEmail(e) {
             e.preventDefault();
             const input = document.getElementById('admin-email-input');
             const hint  = document.getElementById('admin-gate-hint');
+            const btn   = e.target.querySelector('button[type="submit"]');
             const entered = (input.value || '').trim();
-            const enteredLower = entered.toLowerCase();
+            if (btn) setLoading(btn, true);
 
-            // Master credentials — full access to all labs
-            const MASTER_CREDS = {
-                '023775':              'Dr Ahmad Razif',
-                'imenmakmal@gmail.com':'Master Admin',
-                'rhonira@ukm.edu.my':  'Dr Rhonira'
-            };
-            if (MASTER_CREDS[enteredLower]) {
-                state.adminAuthenticated = true;
-                state.picEmail = enteredLower;
-                state.picName  = MASTER_CREDS[enteredLower];
-                state.picLabs  = [...state.labs]; // all labs
-                state.picSelectedLab = 'All';
-                if (hint) hint.classList.add('hidden');
-                renderApp();
-                return;
-            }
-
-            // Normal coordinator lookup
-            const allMatched = state.systemConfig.coordinators.filter(c =>
-                c.email && c.email.trim().toLowerCase() === enteredLower
-            );
-
-            if (allMatched.length > 0) {
-                state.adminAuthenticated = true;
-                state.picEmail = allMatched[0].email;
-                state.picName  = allMatched[0].name || 'PIC';
-                state.picLabs  = allMatched.map(c => c.lab).filter(Boolean);
-                state.picSelectedLab = 'All';
-                if (hint) hint.classList.add('hidden');
-                renderApp();
-            } else {
-                if (hint) hint.classList.remove('hidden');
-                input.value = '';
-                input.focus();
-                showToast('Access denied.', 'error');
-            }
+            google.script.run
+                .withSuccessHandler((response) => {
+                    if (btn) setLoading(btn, false);
+                    if (response && response.success) {
+                        state.adminAuthenticated = true;
+                        state.adminToken = response.token;
+                        state.picEmail = response.email;
+                        state.picName  = response.displayName;
+                        state.picLabs  = response.labs;
+                        state.picSelectedLab = 'All';
+                        if (hint) hint.classList.add('hidden');
+                        renderApp();
+                    } else {
+                        if (hint) hint.classList.remove('hidden');
+                        input.value = '';
+                        input.focus();
+                        showToast('Access denied.', 'error');
+                    }
+                })
+                .withFailureHandler((err) => {
+                    if (btn) setLoading(btn, false);
+                    showToast('Network error: ' + err.message, 'error');
+                })
+                .handleFrontendAction('AdminLogin', { credential: entered });
         }
 
         function adminSignOut() {
             state.adminAuthenticated = false;
+            state.adminToken = null;
             state.picEmail = null;
             state.picName  = null;
             state.picLabs  = [];
@@ -6095,11 +6098,13 @@
                 showToast("Booking Expired. You missed the check-in window.", "error");
                 closeModal();
                 
-                // Trigger 'Not Attend' Update
-                backgroundSync('UpdateBooking', { 
-                    id: bookingId, 
-                    status: 'Not Attend', 
-                    remarks: `Auto-rejected: Arrived late at ${now.toLocaleTimeString()}` 
+                // Trigger 'Not Attend' update — public self-service action (no
+                // login), so it goes through MarkNoShow, not the PIC-gated
+                // UpdateBooking. The server independently re-checks the window
+                // has actually passed before applying this.
+                backgroundSync('MarkNoShow', {
+                    id: bookingId,
+                    remarks: `Auto-rejected: Arrived late at ${now.toLocaleTimeString()}`
                 });
                 return;
             }
@@ -6436,65 +6441,20 @@
 
         // ══════════════════════════════════════════════════════════════════════════
         // i-MENIAN CROSSBRIDGE — name search + identity confirmation strip
-        // Strategy: HYBRID
-        //   • Input is usable immediately — never blocked/disabled
-        //   • Background pre-load runs silently after modal opens
-        //   • If user types BEFORE pre-load finishes → targeted GAS search (debounced)
-        //   • If user types AFTER pre-load finishes  → instant client-side filter
-        //   • GAS-side CacheService means subsequent modals for same lab are fast
+        // Strategy: ON-DEMAND SERVER-SIDE SEARCH
+        //   • Nothing is pre-fetched — the full cross-lab directory used to be
+        //     downloaded to the browser the moment a booking modal opened, for
+        //     ANY visitor, logged in or not. That's a privacy problem (another
+        //     organization's full member list — name/email/phone/matric — in
+        //     an anonymous visitor's browser), so the fuzzy match now runs
+        //     server-side and only the small set of matches is ever returned.
+        //   • Debounced per keystroke; GAS-side CacheService (Code.gs) still
+        //     keeps the underlying directory fetch fast on repeat searches.
         // ══════════════════════════════════════════════════════════════════════════
 
-        let _imenianUsers      = [];    // ALL users across all labs (cross-lab)
-        let _imenianReady      = false; // true once background load completes
-        let _imenianLoading    = false; // singleton flag — prevents double-load
         let _imenianSelected   = false;
         let _imenianDebounce   = null;
-        let _imenianPendingQ   = null;  // query typed while pre-loading
         let _imenianPhotoCache = {};    // {matric: base64DataUrl}
-
-        // ── Fuzzy match: all words in query must appear somewhere in the name.
-        //    Strips connectors (bin/binti/bt/a/l etc.) before comparing so that
-        //    "ahmad abu" matches "Ahmad bin Abu Bakar" correctly.
-        function _imenianFuzzyMatch(query, name) {
-            const strip = s => s.toLowerCase()
-                .replace(/\b(bin|binti|bte|bt|b\.?|a\/l|a\/p)\b/gi, ' ')
-                .replace(/\s+/g, ' ').trim();
-            const qNorm   = strip(query);
-            const nNorm   = strip(name);
-            const qTokens = qNorm.split(' ').filter(t => t.length > 0);
-            return qTokens.every(qt => nNorm.includes(qt));
-        }
-
-        // ── Singleton background loader — fires once, usually 2s after app loads.
-        //    Calling it again while loading or after load completes is a no-op.
-        function _imenianLoadAllUsers() {
-            if (_imenianReady || _imenianLoading) return;
-            _imenianLoading = true;
-
-            google.script.run
-                .withSuccessHandler(data => {
-                    _imenianUsers   = Array.isArray(data) ? data : [];
-                    _imenianReady   = true;
-                    _imenianLoading = false;
-                    // Update placeholder on any open search input
-                    const inp = document.getElementById('imenian-search-input');
-                    if (inp && inp.placeholder.includes('…'))
-                        inp.placeholder = `Type at least 4 letters of your name…`;
-                    // Re-run any query the user typed while loading
-                    if (_imenianPendingQ) {
-                        const pq = _imenianPendingQ;
-                        _imenianPendingQ = null;
-                        imenianSearch(pq, '');
-                    }
-                })
-                .withFailureHandler(() => {
-                    _imenianLoading = false; // allow retry next modal open
-                })
-                .handleFrontendAction('GetAllIMenianUsers', {});
-        }
-
-        // Thin wrapper so existing call-sites (openModal, selectLab) still work
-        function _imenianLoadUsers(lab) { _imenianLoadAllUsers(); }
 
         // Called on every keystroke — cross-lab, fuzzy, 4-char minimum
         function imenianSearch(query, lab) {
@@ -6508,24 +6468,23 @@
                 return;
             }
 
-            // ── Path A: list ready → instant fuzzy filter ──
-            if (_imenianReady && _imenianUsers.length > 0) {
-                const results = _imenianUsers
-                    .filter(u => _imenianFuzzyMatch(query.trim(), u.name))
-                    .slice(0, 12);
-                _imenianShowDropdown(results, lab);
-                return;
-            }
-
-            // ── Path B: still loading → show spinner, wait for background load ──
-            //    No extra GAS call — _imenianLoadAllUsers is already in flight.
-            _imenianPendingQ = query;
             if (dropdown) {
                 dropdown.innerHTML = `<div class="p-3 text-xs text-slate-400 flex items-center gap-2">
-                    <i class="ph-bold ph-spinner animate-spin"></i> Loading member list, please wait…</div>`;
+                    <i class="ph-bold ph-spinner animate-spin"></i> Searching…</div>`;
                 dropdown.classList.remove('hidden');
             }
-            _imenianLoadAllUsers(); // no-op if already loading, triggers load if first call
+
+            const q = query.trim();
+            _imenianDebounce = setTimeout(() => {
+                google.script.run
+                    .withSuccessHandler(results => {
+                        _imenianShowDropdown(Array.isArray(results) ? results : [], lab);
+                    })
+                    .withFailureHandler(() => {
+                        if (dropdown) dropdown.innerHTML = `<div class="p-3 text-xs text-red-400">Search failed — try again.</div>`;
+                    })
+                    .handleFrontendAction('SearchAllLabsIMenian', { query: q });
+            }, 300);
         }
 
         // Renders the dropdown list of matching users
@@ -6965,8 +6924,6 @@
             if (!systemStarted) {
                 systemStarted = true;
                 startPolling();
-                // Start background cross-lab member load after 2s — page is fully rendered by then
-                setTimeout(_imenianLoadAllUsers, 2000);
             }
         }
 

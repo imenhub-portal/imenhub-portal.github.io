@@ -14,6 +14,128 @@ const SHEET_IDS = {
   CONFIG: 'Config'
 };
 
+// ── ADMIN AUTH ───────────────────────────────────────────────────────────
+// Master credentials are NOT hardcoded here. This file (like index.html) is
+// pushed to the public GitHub repo as part of the project's cross-device sync
+// workflow, so anything written literally in this file is just as public as
+// it would be in index.html. Instead, the real values live ONLY in this Apps
+// Script project's Script Properties (Project Settings → Script Properties in
+// the Apps Script editor — never committed to git), the same place the AI
+// provider keys (GEMINI_KEY etc.) already live.
+//
+// ⚠️ ONE-TIME SETUP required after deploying this file: in the Apps Script
+// editor, add a Script Property named MASTER_CREDS_JSON with a value like:
+//   {"023775":"Dr Ahmad Razif","imenmakmal@gmail.com":"Master Admin","rhonira@ukm.edu.my":"Dr Rhonira"}
+// Until that property is set, master login will not match anything (fails
+// closed, not open — PIC/coordinator-email login is unaffected either way).
+function getMasterCreds() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty('MASTER_CREDS_JSON') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+// PropertiesService (not CacheService — its max TTL is 6h) so sessions can
+// last a full 8h workday; expiry is checked manually against expiresAt.
+const ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
+const ADMIN_TOKEN_PREFIX = 'admintok_';
+
+// Actions that require ANY valid logged-in PIC/Master session (matches
+// today's actual behavior — no per-lab restriction on these in the UI).
+const ADMIN_ONLY_ACTIONS = [
+  'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
+  'EditCoordinator', 'EditTechStaff', 'Archive'
+];
+// Actions that require a valid session AND (Master OR the booking's own lab)
+// — matches the existing UI intent (pending-approvals list is already
+// filtered to the PIC's own lab).
+const LAB_SCOPED_ACTIONS = ['UpdateBooking'];
+
+function adminLogin(credential) {
+  const entered = String(credential || '').trim();
+  const enteredLower = entered.toLowerCase();
+
+  let role, labs, displayName, email;
+  const masterCreds = getMasterCreds();
+
+  if (masterCreds[enteredLower]) {
+    role = 'master';
+    displayName = masterCreds[enteredLower];
+    email = enteredLower;
+    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.CONFIG);
+    labs = configSheet.getRange("A2:A").getValues().flat().filter(l => l && l.toString().trim() !== '');
+  } else {
+    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.CONFIG);
+    const coordJson = configSheet.getRange("C2").getValue();
+    let coordinators = [];
+    try { coordinators = JSON.parse(coordJson); } catch (e) { coordinators = []; }
+    const matched = coordinators.filter(c => c.email && c.email.trim().toLowerCase() === enteredLower);
+    if (matched.length === 0) {
+      return { success: false, error: 'Access denied.' };
+    }
+    role = 'pic';
+    displayName = matched[0].name || 'PIC';
+    email = matched[0].email;
+    labs = matched.map(c => c.lab).filter(Boolean);
+  }
+
+  const token = Utilities.getUuid();
+  const session = { role: role, labs: labs, displayName: displayName, email: email, expiresAt: Date.now() + ADMIN_TOKEN_TTL_MS };
+  PropertiesService.getScriptProperties().setProperty(ADMIN_TOKEN_PREFIX + token, JSON.stringify(session));
+
+  return { success: true, token: token, role: role, labs: labs, displayName: displayName, email: email };
+}
+
+// Returns the session {role, labs, displayName, email} if the token is valid
+// and unexpired, otherwise null.
+function validateAdminToken(token) {
+  if (!token) return null;
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(ADMIN_TOKEN_PREFIX + token);
+  if (!raw) return null;
+  let session;
+  try { session = JSON.parse(raw); } catch (e) { return null; }
+  if (!session.expiresAt || Date.now() > session.expiresAt) {
+    try { props.deleteProperty(ADMIN_TOKEN_PREFIX + token); } catch (e) {}
+    return null;
+  }
+  return session;
+}
+
+// Looks up which lab a booking belongs to, by id — used to scope
+// LAB_SCOPED_ACTIONS to a PIC's own lab(s).
+function getBookingLabById(bookingId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  const labCol = headers.indexOf('lab');
+  if (idCol === -1 || labCol === -1) return null;
+  const targetId = String(bookingId).trim();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]).trim() === targetId) return data[i][labCol];
+  }
+  return null;
+}
+
+// Ported from index.html's _imenianFuzzyMatch — kept identical so search
+// results are unchanged, just computed server-side now. All words in the
+// query must appear somewhere in the name; connector words are stripped
+// first (bin/binti/bt/a/l etc.) so "ahmad abu" matches "Ahmad bin Abu Bakar".
+function _fuzzyMatchName(query, name) {
+  var strip = function (s) {
+    return String(s).toLowerCase()
+      .replace(/\b(bin|binti|bte|bt|b\.?|a\/l|a\/p)\b/gi, ' ')
+      .replace(/\s+/g, ' ').trim();
+  };
+  var qNorm = strip(query), nNorm = strip(name);
+  var qTokens = qNorm.split(' ').filter(function (t) { return t.length > 0; });
+  return qTokens.every(function (qt) { return nNorm.indexOf(qt) !== -1; });
+}
+
 // --- SERVING THE APP ---
 function doGet(e) {
   // JSON API mode — used by external tools for live sync
@@ -101,8 +223,80 @@ function doPost(e) {
 // 1. PUBLIC API
 // ==========================================
 
+// ── PERF: short-lived server cache of the initial payload ──────────────────
+// getSystemData() re-reads four sheets on every call (the 3-4s "Connecting to
+// Lab Database" wait). The finished payload is cached for 45s — gzipped and
+// chunked to fit CacheService's ~100KB/key limit — and busted by every
+// data-changing action (see finally block of handleFrontendAction), so a
+// freshly-booted client is never staler than the 60s polling channel already
+// allows, and a user's own write always invalidates before their next load.
+// NOTE: doGet's ?format=json path still calls getSystemData() directly and is
+// therefore always live/uncached.
+const SYSDATA_CACHE_PREFIX = 'sysdata_v1';
+const SYSDATA_CACHE_TTL    = 45;     // seconds
+const SYSDATA_CHUNK_SIZE   = 90000;  // base64 chars per key (< 100KB CacheService limit)
+const SYSDATA_MAX_CHUNKS   = 20;     // safety bound (also used by invalidation)
+
+// Actions in handleFrontendAction that write sheet data — each busts the cache.
+// (The i-Menian Crossbridge actions and read-only lookups like FindMyBookings /
+// GetSmartMatch are deliberately absent.)
+const SYSDATA_MUTATING_ACTIONS = [
+  'Usage', 'Book', 'UpdateBooking', 'Report', 'CancelBooking', 'MarkNoShow',
+  'EditEquipment', 'DeleteEquipment',
+  'EditLab', 'AddLab', 'DeleteLab',
+  'EditCoordinator', 'EditTechStaff', 'Archive'
+];
+
 function getInitialData() {
-  return getSystemData(); 
+  const cache = CacheService.getScriptCache();
+
+  // Cache hit → decode and return (any problem falls through to a live read)
+  try {
+    const metaRaw = cache.get(SYSDATA_CACHE_PREFIX + '_meta');
+    if (metaRaw) {
+      const meta = JSON.parse(metaRaw);
+      const keys = [];
+      for (let i = 0; i < meta.chunks; i++) keys.push(SYSDATA_CACHE_PREFIX + '_' + i);
+      const got = cache.getAll(keys);
+      let b64 = '';
+      let complete = true;
+      for (let i = 0; i < meta.chunks; i++) {
+        const part = got[SYSDATA_CACHE_PREFIX + '_' + i];
+        if (!part) { complete = false; break; } // partial eviction → treat as miss
+        b64 += part;
+      }
+      if (complete) {
+        const gzBlob = Utilities.newBlob(Utilities.base64Decode(b64), 'application/x-gzip');
+        return JSON.parse(Utilities.ungzip(gzBlob).getDataAsString());
+      }
+    }
+  } catch (e) { /* fall through to live read */ }
+
+  // Cache miss → live read, then store (best-effort; must never break the load)
+  const data = getSystemData();
+  try {
+    const json   = JSON.stringify(data);
+    const b64    = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(json)).getBytes());
+    const chunks = Math.ceil(b64.length / SYSDATA_CHUNK_SIZE);
+    if (chunks > 0 && chunks <= SYSDATA_MAX_CHUNKS) {
+      const toPut = {};
+      for (let i = 0; i < chunks; i++) {
+        toPut[SYSDATA_CACHE_PREFIX + '_' + i] = b64.substr(i * SYSDATA_CHUNK_SIZE, SYSDATA_CHUNK_SIZE);
+      }
+      toPut[SYSDATA_CACHE_PREFIX + '_meta'] = JSON.stringify({ chunks: chunks, ts: Date.now() });
+      cache.putAll(toPut, SYSDATA_CACHE_TTL);
+    }
+  } catch (e) { /* caching is optional */ }
+  return data;
+}
+
+function invalidateSystemDataCache() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const keys = [SYSDATA_CACHE_PREFIX + '_meta'];
+    for (let i = 0; i < SYSDATA_MAX_CHUNKS; i++) keys.push(SYSDATA_CACHE_PREFIX + '_' + i);
+    cache.removeAll(keys);
+  } catch (e) { /* best-effort */ }
 }
 
 function handleFrontendAction(actionType, payload) {
@@ -111,12 +305,33 @@ function handleFrontendAction(actionType, payload) {
   if (!acquired) {
     return { success: false, error: "Server busy. Please try again in a moment." };
   }
-  
+
+  // ── AUTHORIZATION ──────────────────────────────────────────────────────
+  // ADMIN_ONLY_ACTIONS / LAB_SCOPED_ACTIONS require a session token issued by
+  // adminLogin(); the client can no longer just set a local boolean and call
+  // these directly (e.g. via devtools) — the server independently verifies.
+  if (ADMIN_ONLY_ACTIONS.indexOf(actionType) !== -1 || LAB_SCOPED_ACTIONS.indexOf(actionType) !== -1) {
+    const session = validateAdminToken(payload && payload.__adminToken);
+    if (!session) {
+      lock.releaseLock();
+      return { success: false, error: 'Session expired. Please log in again.' };
+    }
+    if (LAB_SCOPED_ACTIONS.indexOf(actionType) !== -1 && session.role !== 'master') {
+      const targetLab = getBookingLabById(payload && payload.id);
+      if (!targetLab || session.labs.indexOf(targetLab) === -1) {
+        lock.releaseLock();
+        return { success: false, error: 'Not authorized for this lab.' };
+      }
+    }
+  }
+
   try {
     switch (actionType) {
+      case 'AdminLogin': return adminLogin(payload && payload.credential);
       case 'Usage': return saveLog(payload);
       case 'Book': return saveBooking(payload);
-      case 'UpdateBooking': return updateBooking(payload); 
+      case 'UpdateBooking': return updateBooking(payload);
+      case 'MarkNoShow': return markNoShow(payload);
       case 'Report': {
         const result = saveLog(payload.log);
         // Apply explicit equipment update (supports partial process-level maintenance)
@@ -308,53 +523,67 @@ function handleFrontendAction(actionType, payload) {
         return bResult;
       }
 
-      case 'GetAllIMenianUsers': {
-        // Returns ALL users across every lab — no lab filter, no photos.
-        // Used for cross-lab name search. Deduplicated by email.
+      case 'SearchAllLabsIMenian': {
+        // Cross-lab name search (a supervisor can be registered under a
+        // different lab than the one being booked, so this intentionally
+        // isn't lab-filtered). Used to ship the FULL directory (name, email,
+        // phone, matric, supervisor — every person, every lab) to any
+        // anonymous visitor's browser the moment a booking modal opened.
+        // Now: the full directory is still fetched/cached server-side (same
+        // cost as before), but only the small set of results matching the
+        // typed query is ever returned to the client.
+        var sqQuery = ((payload && payload.query) || '').trim();
+        if (sqQuery.length < 4) return [];
+
         var allCacheKey = 'imenian_all_users';
         var allCache    = CacheService.getScriptCache();
         var allCached   = allCache.get(allCacheKey);
-        if (allCached) return JSON.parse(allCached);
+        var aResults;
 
-        var aSS    = SpreadsheetApp.openById('16mqyApWABuMmYUumLXOLsAzVLwwu9V4MlQs73RYZgNY');
-        var aSheet = aSS.getSheets()[0];
-        var aHdr   = aSheet.getRange(1, 1, 1, aSheet.getLastColumn()).getValues()[0];
+        if (allCached) {
+          aResults = JSON.parse(allCached);
+        } else {
+          var aSS    = SpreadsheetApp.openById('16mqyApWABuMmYUumLXOLsAzVLwwu9V4MlQs73RYZgNY');
+          var aSheet = aSS.getSheets()[0];
+          var aHdr   = aSheet.getRange(1, 1, 1, aSheet.getLastColumn()).getValues()[0];
 
-        var aN = aHdr.indexOf('Name');
-        var aE = aHdr.indexOf('Email');
-        var aP = aHdr.indexOf('Phone');
-        var aM = aHdr.indexOf('StudentID');
-        var aC = aHdr.indexOf('Category');
-        var aS = aHdr.indexOf('SupervisorName');
-        var aL = aHdr.indexOf('LabName');
+          var aN = aHdr.indexOf('Name');
+          var aE = aHdr.indexOf('Email');
+          var aP = aHdr.indexOf('Phone');
+          var aM = aHdr.indexOf('StudentID');
+          var aC = aHdr.indexOf('Category');
+          var aS = aHdr.indexOf('SupervisorName');
+          var aL = aHdr.indexOf('LabName');
 
-        var aLastRow = aSheet.getLastRow();
-        var aLastCol = aSheet.getLastColumn();
-        var aAll     = aSheet.getRange(2, 1, aLastRow - 1, aLastCol).getValues();
+          var aLastRow = aSheet.getLastRow();
+          var aLastCol = aSheet.getLastColumn();
+          var aAll     = aSheet.getRange(2, 1, aLastRow - 1, aLastCol).getValues();
 
-        var aSeen    = {};
-        var aResults = [];
+          var aSeen = {};
+          aResults  = [];
 
-        for (var ai = 0; ai < aAll.length; ai++) {
-          var aRow = aAll[ai];
-          var aNm  = (aRow[aN] || '').toString().trim();
-          var aEm  = (aRow[aE] || '').toString().trim().toLowerCase();
-          if (!aNm || !aEm) continue;
-          if (aSeen[aEm])   continue; // deduplicate by email
-          aSeen[aEm] = true;
-          aResults.push({
-            name:       aNm,
-            email:      aEm,
-            phone:      (aRow[aP] || '').toString(),
-            matric:     (aRow[aM] || '').toString(),
-            category:   (aRow[aC] || '').toString(),
-            supervisor: (aRow[aS] || '').toString(),
-            lab:        (aRow[aL] || '').toString().trim()
-          });
+          for (var ai = 0; ai < aAll.length; ai++) {
+            var aRow = aAll[ai];
+            var aNm  = (aRow[aN] || '').toString().trim();
+            var aEm  = (aRow[aE] || '').toString().trim().toLowerCase();
+            if (!aNm || !aEm) continue;
+            if (aSeen[aEm])   continue; // deduplicate by email
+            aSeen[aEm] = true;
+            aResults.push({
+              name:       aNm,
+              email:      aEm,
+              phone:      (aRow[aP] || '').toString(),
+              matric:     (aRow[aM] || '').toString(),
+              category:   (aRow[aC] || '').toString(),
+              supervisor: (aRow[aS] || '').toString(),
+              lab:        (aRow[aL] || '').toString().trim()
+            });
+          }
+
+          try { allCache.put(allCacheKey, JSON.stringify(aResults), 1800); } catch(e) {}
         }
 
-        try { allCache.put(allCacheKey, JSON.stringify(aResults), 1800); } catch(e) {}
-        return aResults;
+        return aResults.filter(function(u) { return _fuzzyMatchName(sqQuery, u.name); }).slice(0, 12);
       }
 
       case 'GetLabData': {
@@ -426,6 +655,10 @@ function handleFrontendAction(actionType, payload) {
   } catch (e) {
     return { success: false, error: e.toString() };
   } finally {
+    // Bust the cached initial payload after any data-changing action so the
+    // next load reflects the write immediately. (Over-busting when a write
+    // failed is harmless — just one extra cache miss.)
+    if (SYSDATA_MUTATING_ACTIONS.indexOf(actionType) !== -1) invalidateSystemDataCache();
     lock.releaseLock();
   }
 }
@@ -455,36 +688,45 @@ function fetchUpdates(lastClientTimestamp) {
 
 function getSystemData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const eqData = getDataAsObjects(ss.getSheetByName(SHEET_IDS.EQUIPMENT));
+  // PERF: look up the timezone once and pass it into the helpers (was one
+  // getParent().getSpreadsheetTimeZone() round-trip per helper call)
+  const tz = ss.getSpreadsheetTimeZone();
+  const eqData = getDataAsObjects(ss.getSheetByName(SHEET_IDS.EQUIPMENT), tz);
   eqData.forEach(eq => {
     try { eq.processCapabilities = JSON.parse(eq.processCapabilities || '[]'); } catch(e) { eq.processCapabilities = []; }
     try { eq.materialsOptions = JSON.parse(eq.materialsOptions || '[]'); } catch(e) { eq.materialsOptions = []; }
   });
 
-  const bookData = getDataAsObjects(ss.getSheetByName(SHEET_IDS.BOOKINGS));
-  const logData = getLastNRowsAsObjects(ss.getSheetByName(SHEET_IDS.LOGS), 5000);
-  
-  const configSheet = ss.getSheetByName(SHEET_IDS.CONFIG);
-  const rawLabs = configSheet.getRange("A2:A").getValues().flat();
-  const labs = rawLabs.filter(l => l && l.toString().trim() !== '');
+  const bookData = getDataAsObjects(ss.getSheetByName(SHEET_IDS.BOOKINGS), tz);
+  const logData = getLastNRowsAsObjects(ss.getSheetByName(SHEET_IDS.LOGS), 5000, tz);
 
-  const coordJson = configSheet.getRange("C2").getValue();
+  const configSheet = ss.getSheetByName(SHEET_IDS.CONFIG);
+  // PERF: one batched read of A:F replaces 4 separate range reads
+  // (A2:A labs, C2 coordinators, D2 techStaff, E2:F settings) — same values.
+  const cfgValues = configSheet.getRange(1, 1, Math.max(configSheet.getLastRow(), 2), 6).getValues();
+
+  const labs = [];
+  for (let r = 1; r < cfgValues.length; r++) {
+    const l = cfgValues[r][0];
+    if (l && l.toString().trim() !== '') labs.push(l);
+  }
+
+  const coordJson = cfgValues[1][2]; // C2
   let coordinators = [];
   try { coordinators = JSON.parse(coordJson); } catch (e) { coordinators = []; }
 
   // NEW — Technical Staff (global, all labs)
-  const techStaffJson = configSheet.getRange("D2").getValue();
+  const techStaffJson = cfgValues[1][3]; // D2
   let techStaff = [];
   try { techStaff = JSON.parse(techStaffJson); } catch (e) { techStaff = []; }
 
-  const rawSettings = configSheet.getRange("E2:F").getValues();
   const systemConfig = { officialEmail: 'imenmakmal@imen.ukm.edu.my', coordinators: coordinators };
   let lastArchive = null;
 
-  rawSettings.forEach(row => {
-    if (row[0] === 'officialEmail' && row[1]) systemConfig.officialEmail = row[1];
-    if (row[0] === 'lastArchive' && row[1]) lastArchive = row[1];
-  });
+  for (let r = 1; r < cfgValues.length; r++) { // E2:F settings rows
+    if (cfgValues[r][4] === 'officialEmail' && cfgValues[r][5]) systemConfig.officialEmail = cfgValues[r][5];
+    if (cfgValues[r][4] === 'lastArchive' && cfgValues[r][5]) lastArchive = cfgValues[r][5];
+  }
 
   // ⬇️ UPDATED: Uses the Hardcoded URL
   const appUrl = WEB_APP_URL; 
@@ -868,6 +1110,47 @@ function updateBooking(idOrObj, status) {
     }
   }
   return { success: false, error: "ID not found" };
+}
+
+// Public (no login required) — the self-service path when a walk-in researcher
+// arrives after their check-in window has closed (see verifyCheckIn in
+// index.html). Split out from UpdateBooking so that action can be gated to
+// PIC/Master only, while this one stays open — but re-validates server-side
+// that the window has genuinely passed, so it can't be used to cancel/no-show
+// an active booking early. Delegates to updateBooking() for the actual write
+// so persistence + notification email stay identical to before the split.
+function markNoShow(payload) {
+  const id = payload && payload.id;
+  const remarks = (payload && payload.remarks) || 'Auto-rejected: missed check-in window';
+  if (!id) return { success: false, error: 'Missing booking id.' };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
+  const booking = getDataAsObjects(sheet).find(b => String(b.id).trim() === String(id).trim());
+  if (!booking) return { success: false, error: 'Booking not found.' };
+
+  if (!_isBookingWindowExpired(booking)) {
+    return { success: false, error: 'Booking window has not expired yet.' };
+  }
+
+  return updateBooking({ id: id, status: 'Not Attend', remarks: remarks });
+}
+
+// Mirrors the slot-end calculation in verifyCheckIn (index.html) so the
+// server never just trusts the client's claim that check-in was missed.
+function _isBookingWindowExpired(booking) {
+  const rawDate = String(booking.date).split('T')[0];
+  const bookingEnd = new Date(rawDate);
+  const duration = booking.duration || '';
+  if (duration === '8am-1pm') {
+    bookingEnd.setHours(13, 0, 0, 0);
+  } else if (duration === '2 Days') {
+    bookingEnd.setDate(bookingEnd.getDate() + 1);
+    bookingEnd.setHours(17, 0, 0, 0);
+  } else {
+    // '2pm-5pm', '1pm-5pm' (legacy), '1 Day', and any other/unknown value
+    bookingEnd.setHours(17, 0, 0, 0);
+  }
+  return new Date() > bookingEnd;
 }
 
 function cancelBooking(payload) {
@@ -2265,34 +2548,50 @@ function updateSheetColumn(ss, sheetName, colName, oldVal, newVal) {
 
 // --- ROBUST DATA FETCHING HELPERS ---
 
-function getDataAsObjects(sheet) {
+// PERF: Utilities.formatDate crosses the JS↔Java bridge on EVERY call — with
+// thousands of Date cells per load that dominated getSystemData's runtime.
+// When the spreadsheet timezone equals the script timezone, V8's own Date
+// getters already evaluate in that same timezone, so plain getters produce the
+// IDENTICAL "yyyy-MM-dd'T'HH:mm:ss" string far faster. If the timezones ever
+// differ, we fall back to the original Utilities.formatDate — output unchanged.
+function makeDateFormatter(tz) {
+  if (tz === Session.getScriptTimeZone()) {
+    const pad = n => (n < 10 ? '0' : '') + n;
+    return d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+  return d => Utilities.formatDate(d, tz, "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+function getDataAsObjects(sheet, tzOpt) {
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
-  
+
   const headers = data[0];
   const objects = [];
-  const tz = sheet.getParent().getSpreadsheetTimeZone();
-  
+  const tz = tzOpt || sheet.getParent().getSpreadsheetTimeZone();
+  const formatDateCell = makeDateFormatter(tz);
+
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row.every(cell => cell === "")) continue;
-    
+
     const obj = {};
     for (let j = 0; j < headers.length; j++) {
       let val = row[j];
-      
+
       if (val instanceof Date) {
-        val = Utilities.formatDate(val, tz, "yyyy-MM-dd'T'HH:mm:ss");
+        val = formatDateCell(val);
       }
       if (val && typeof val === 'object' && val.toString() === 'Exception') {
-         val = ""; 
+         val = "";
       }
-      
+
       if (headers[j] === 'userPhone' || headers[j] === 'userId' || headers[j] === 'id') {
           val = String(val);
       }
-      
+
       obj[headers[j]] = val;
     }
     objects.push(obj);
@@ -2300,20 +2599,21 @@ function getDataAsObjects(sheet) {
   return objects;
 }
 
-function getLastNRowsAsObjects(sheet, n) {
+function getLastNRowsAsObjects(sheet, n, tzOpt) {
   if (!sheet) return [];
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return [];
-  
+
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const startRow = Math.max(2, lastRow - n + 1);
   const numRows = lastRow - startRow + 1;
-  
+
   if (numRows < 1) return [];
 
-  const data = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues().reverse(); 
+  const data = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues().reverse();
   const objects = [];
-  const tz = sheet.getParent().getSpreadsheetTimeZone();
+  const tz = tzOpt || sheet.getParent().getSpreadsheetTimeZone();
+  const formatDateCell = makeDateFormatter(tz);
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -2322,14 +2622,14 @@ function getLastNRowsAsObjects(sheet, n) {
     const obj = {};
     for (let j = 0; j < headers.length; j++) {
       let val = row[j];
-      
+
       if (val instanceof Date) {
-        val = Utilities.formatDate(val, tz, "yyyy-MM-dd'T'HH:mm:ss");
+        val = formatDateCell(val);
       }
       if (headers[j] === 'userPhone' || headers[j] === 'userId' || headers[j] === 'id') {
           val = String(val);
       }
-      
+
       obj[headers[j]] = val;
     }
     objects.push(obj);
