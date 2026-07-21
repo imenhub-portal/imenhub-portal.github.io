@@ -132,6 +132,30 @@
     @media (max-width: 500px) { .stat-grid { grid-template-columns: repeat(2,1fr); } }
     .stat-card { padding: 12px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; }
     .stat-card b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; }
+
+    /* Tajuk expand/collapse */
+    .tajuk-short { display: inline; cursor: pointer; }
+    .tajuk-short:hover { color: #0f172a; text-decoration: underline; }
+    .tajuk-full  { display: none; color: #334155; }
+    .tajuk-full.open { display: block; margin-top: 6px; padding: 8px 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; white-space: pre-wrap; line-height: 1.6; animation: fadeIn 0.2s ease; }
+    .tajuk-toggle { display: inline-block; font-size: 10px; font-weight: 800; color: #3b82f6; cursor: pointer; margin-left: 4px; user-select: none; }
+    .tajuk-toggle:hover { color: #1d4ed8; }
+
+    /* Action buttons — compact icon group with divider */
+    .act-group { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .act-btn { width: 32px; height: 32px; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.18s ease; line-height: 1; }
+    .act-btn:active { transform: scale(0.9); }
+    .act-btn-blue  { background: #eff6ff; }
+    .act-btn-blue:hover  { background: #dbeafe; }
+    .act-btn-green { background: #f0fdf4; }
+    .act-btn-green:hover { background: #dcfce7; }
+    .act-btn-red   { background: #fef2f2; }
+    .act-btn-red:hover  { background: #fee2e2; }
+    .act-btn-file  { background: #f8fafc; border: 1px solid #e2e8f0; text-decoration: none; }
+    .act-btn-file:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .act-btn-del   { background: transparent; color: #fca5a5; font-size: 11px; font-weight: 800; width: 22px; height: 22px; }
+    .act-btn-del:hover { background: #fef2f2; color: #dc2626; }
+    .act-sep { width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; align-self: center; display: inline-block; }
   </style>
 </head>
 <body>
@@ -626,21 +650,39 @@ function loadAdmin() {
         }
 
         var eid = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        // — Tajuk: truncate + click-to-reveal —
+        var tajukRaw = String(d[i][15] || '');
+        var MAXLEN = 48;
+        var tajukShort = tajukRaw.length > MAXLEN ? tajukRaw.slice(0, MAXLEN) + '…' : tajukRaw;
+        var tajukCell  = '';
+        if (tajukRaw.length > MAXLEN) {
+          tajukCell = '<div>' +
+            '<span class="tajuk-short" onclick="toggleTajuk(' + i + ')" title="Klik untuk lihat tajuk penuh">' + esc(tajukShort) + '</span>' +
+            ' <span id="tjt-' + i + '" class="tajuk-toggle" onclick="toggleTajuk(' + i + ')">Lagi...</span>' +
+          '</div>' +
+          '<div id="tjf-' + i + '" class="tajuk-full">' + esc(tajukRaw) + '</div>';
+        } else {
+          tajukCell = '<div style="font-size:12px;color:#475569;line-height:1.5;max-width:180px;word-break:break-word;">' + esc(tajukRaw) + '</div>';
+        }
+
         h += '<tr>' +
           '<td style="color:#94a3b8;font-weight:700;">' + i + '</td>' +
           '<td><div style="font-weight:700;">' + esc(d[i][2]) + '</div>' +
-              '<div style="font-size:11px;color:#64748b;">' + esc(d[i][15]) + '</div>' +
-              '<div style="font-size:11px;color:#94a3b8;">' + esc(d[i][1]) + '</div></td>' +
+              tajukCell +
+              '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + esc(d[i][1]) + '</div></td>' +
           '<td><b>' + esc(d[i][6]) + '</b><br><small style="color:#64748b;">' + esc(d[i][7]) + ' ×' + esc(d[i][16]) + '</small></td>' +
           '<td><b>RM ' + tot + '</b><br><small style="color:#94a3b8;">@RM' + unitP + ' ×' + qty + '</small></td>' +
           '<td><span class="badge ' + cls + '">' + esc(st) + '</span></td>' +
           '<td>' + bayaranCell + '</td>' +
           '<td>' +
-            '<button class="btn btn-blue"  onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')">Proses</button>' +
-            '<button class="btn btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')">Siap</button>' +
-            '<button class="btn btn-red"   onclick="rejectRow(\'' + eid + '\')">Tolak</button>' +
-            '<a href="' + esc(d[i][10]) + '" target="_blank" style="font-size:16px;margin:0 4px;text-decoration:none;" title="Lihat Fail">📄</a>' +
-            '<span onclick="delRow(\'' + eid + '\')" style="cursor:pointer;font-size:13px;color:#fca5a5;font-weight:800;" title="Padam">✕</span>' +
+            '<div class="act-group" title="Ubah Status">' +
+              '<button class="act-btn act-btn-blue"  onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')" title="Tanda Dalam Proses">🔄</button>' +
+              '<button class="act-btn act-btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')" title="Tanda Siap — Dah Boleh Collect">✅</button>' +
+              '<button class="act-btn act-btn-red"   onclick="rejectRow(\'' + eid + '\')" title="Tolak Permohonan">❌</button>' +
+              '<span class="act-sep"></span>' +
+              '<a href="' + esc(d[i][10]) + '" target="_blank" class="act-btn act-btn-file" title="Lihat Fail Poster">📄</a>' +
+              '<button class="act-btn act-btn-del" onclick="delRow(\'' + eid + '\')" title="Padam Rekod Kekal">✕</button>' +
+            '</div>' +
           '</td></tr>';
       }
 
@@ -673,6 +715,15 @@ function delRow(id) {
       .withSuccessHandler(function(res){ ld(false); if (res.startsWith('ERROR')) myAlert(res, true); else loadAdmin(); })
       .deleteRow(id, _adminPass);
   });
+}
+
+function toggleTajuk(rowIdx) {
+  var full = document.getElementById('tjf-' + rowIdx);
+  var link = document.getElementById('tjt-' + rowIdx);
+  if (!full) return;
+  var isOpen = full.classList.contains('open');
+  if (isOpen) { full.classList.remove('open'); if (link) link.innerText = 'Lagi...'; }
+  else        { full.classList.add('open');    if (link) link.innerText = 'Tutup'; }
 }
 
 function filterTable() {
