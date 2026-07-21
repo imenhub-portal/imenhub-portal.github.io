@@ -519,9 +519,9 @@
         <div class="b-card-body">
           
                     <div class="spec-hero" style="border-radius:14px; overflow:hidden; border:1px solid var(--border); background:#0b1220; position:relative; box-shadow:var(--shadow-sm);">
-            <div style="position:absolute; top:8px; left:8px; z-index:2; background:rgba(255,255,255,.92); backdrop-filter:blur(6px); border:1px solid #e2e8f0; padding:4px 10px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.02em;">📐 Visual saiz sebenar — bayang saiz poster</div>
+            <div id="specBadge" style="position:absolute; top:8px; left:8px; z-index:2; background:rgba(255,255,255,.92); backdrop-filter:blur(6px); border:1px solid #e2e8f0; padding:4px 10px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.02em;">📐 Visual saiz sebenar — bayang saiz poster</div>
             <img id="imgPosterSize" src="assets/poster-size.webp" alt="Visual saiz poster A1 vs A0" loading="lazy" style="width:100%; height:auto; display:block; max-height:320px; object-fit:contain; background:#0b1220; padding:32px 12px 12px;">
-            <div style="position:absolute; right:8px; bottom:8px; background:rgba(15,23,42,.88); color:#fff; padding:4px 10px; border-radius:999px; font-size:9.5px; font-weight:700; font-family:var(--mono);">A0 = 2× luas A1</div>
+            <div id="specNote" style="position:absolute; right:8px; bottom:8px; background:rgba(15,23,42,.88); color:#fff; padding:4px 10px; border-radius:999px; font-size:9.5px; font-weight:700; font-family:var(--mono);">A0 = 2× luas A1</div>
           </div>
           <div style="height:14px"></div>
 
@@ -766,15 +766,13 @@ function setLang(l){
   for(var id in phMap){ var e=document.getElementById(id); if(e) e.placeholder = phMap[id]; }
   // upload title
   var upTitle = document.querySelector('.uz-label'); if(upTitle) upTitle.innerText = t.up_title;
-  // spec titles
-  var specBadge = document.querySelector('.spec-hero div, [class*=\"Visual saiz\"]');
-  // try to find spec title pill
-  var pills = document.querySelectorAll('div');
-  pills.forEach(function(d){
-    if(d.innerText && d.innerText.indexOf('Visual saiz sebenar')>-1) d.innerHTML = t.spec_title.replace('📐 ','📐 ');
-    if(d.innerText && d.innerText.indexOf('A0 = 2× luas')>-1) d.innerText = t.spec_note;
-    if(d.innerText && d.innerText.indexOf('A0 = 2×')>-1) d.innerText = t.spec_note;
-  });
+  // spec titles — target the exact badge/caption by id (never scan all divs:
+  // matching by innerText would also match every ANCESTOR of the badge, and
+  // overwriting an ancestor's innerHTML wipes the whole page).
+  var specBadgeEl = document.getElementById('specBadge');
+  if(specBadgeEl && t.spec_title) specBadgeEl.innerText = t.spec_title;
+  var specNoteEl = document.getElementById('specNote');
+  if(specNoteEl && t.spec_note) specNoteEl.innerText = t.spec_note;
   // submit
   var submit = document.getElementById('submitBtn');
   if(submit){ submit.innerHTML = t.btn_submit + ' <span class="ctaPrice">'+ (document.getElementById('ctaPrice')?document.getElementById('ctaPrice').innerText:'RM 50.00') + '</span>'; }
