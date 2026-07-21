@@ -1101,6 +1101,10 @@
                 const effectivelyDown = isMaintenance || isFullyDown(eq);
                 const showStart = !effectivelyDown && !isInUse;
                 const showBook = !effectivelyDown && (mode === 'booking' || mode === 'both');
+                // Walk-in-only equipment never generates a booking record (usage
+                // starts immediately), so there's nothing to cancel — independent
+                // of maintenance status, unlike showBook.
+                const showCancelBooking = (mode === 'booking' || mode === 'both');
                 
                 return `
                 <div class="bg-white rounded-2xl sm:rounded-[2rem] border border-slate-200 shadow-md shadow-slate-300/50 overflow-hidden hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-row sm:flex-col items-stretch h-full group hover:-translate-y-1 relative">
@@ -1176,9 +1180,11 @@
                                 <i class="ph-bold ph-warning-circle"></i> <span class="hidden sm:inline">Report Issue</span>
                             </button>
 
+                            ${showCancelBooking ? `
                             <button onclick="openCancelBooking('${eq.id}')" title="Cancel Booking" aria-label="Cancel Booking" class="basis-auto sm:basis-full grow-0 py-2 sm:py-3 px-2.5 sm:px-4 rounded-lg sm:rounded-xl bg-white border border-slate-200 text-slate-500 font-semibold text-xs sm:text-sm xl:text-xs whitespace-nowrap hover:text-orange-600 hover:bg-orange-50 hover:border-orange-100 transition active:scale-95 flex items-center justify-center gap-1.5">
                                 <i class="ph-bold ph-x-circle"></i> <span class="hidden sm:inline">Cancel Booking</span>
                             </button>
+                            ` : ''}
                         </div>
                     </div>
                 </div>`;
