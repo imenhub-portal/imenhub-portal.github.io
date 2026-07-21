@@ -1884,6 +1884,15 @@
             </div>`;
         }
 
+        // Per-row "Show more" state for the Booking Requests Details column —
+        // module-level so it survives renderApp() re-renders (e.g. every poll).
+        let _expandedBookingDetails = new Set();
+        function toggleBookingDetail(id) {
+            if (_expandedBookingDetails.has(id)) _expandedBookingDetails.delete(id);
+            else _expandedBookingDetails.add(id);
+            renderApp();
+        }
+
         function renderAdmin() {
             // --- ACCESS GATE --- (demo mode unlocks the view; writes are still blocked)
             if (!state.adminAuthenticated && !state.demoMode) return renderAdminGate();
@@ -1905,7 +1914,7 @@
             );
             const pending = bookings.filter(b => b.status === 'Pending');
             let history = bookings.filter(b => b.status !== 'Pending');
-            
+
             if (state.adminHistoryFilter !== 'All') {
                 history = history.filter(b => b.status === state.adminHistoryFilter);
             }
@@ -1913,72 +1922,97 @@
                 history = history.filter(b => b.date.startsWith(state.adminHistoryMonth));
             }
 
+            // Per-status counts for the current month (independent of adminHistoryFilter,
+            // so the summary chips and filter-button counts always show the full
+            // breakdown regardless of which filter is currently selected).
+            const historyMonthScoped = bookings.filter(b =>
+                b.status !== 'Pending' && (!state.adminHistoryMonth || b.date.startsWith(state.adminHistoryMonth))
+            );
+            const historyCounts = {
+                All:       historyMonthScoped.length,
+                Approved:  historyMonthScoped.filter(b => b.status === 'Approved').length,
+                Rejected:  historyMonthScoped.filter(b => b.status === 'Rejected').length,
+                Cancelled: historyMonthScoped.filter(b => b.status === 'Cancelled').length,
+            };
+
             // --- ADMIN TABLE ROW RENDERER ---
-            const renderRow = (b, isHistory = false) => `
-                <tr class="hover:bg-slate-50 transition border-b border-slate-100 last:border-0 group">
-                    <td class="px-6 py-4">
+            const renderRow = (b, isHistory = false) => {
+                // Real equipment photo when available (same photo-or-icon-fallback
+                // convention used in the SmartMatch chat results), never a blank space.
+                const eqMatch = state.equipment.find(e => e.name === b.equipmentName && e.lab === b.lab);
+                const avatarHtml = (eqMatch && eqMatch.imageUrl)
+                    ? `<div class="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-slate-200"><img src="${eqMatch.imageUrl}" class="w-full h-full object-cover" onerror="this.parentElement.outerHTML='<div class=\\'w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0\\'><i class=\\'ph-duotone ph-flask\\'></i></div>'"></div>`
+                    : `<div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0"><i class="ph-duotone ph-flask"></i></div>`;
+
+                const isComplete = !!b.paymentType;
+                const payChipHtml = b.paymentType
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
+                        ${b.paymentType === 'Grant'  ? 'bg-blue-50 text-blue-700' : ''}
+                        ${b.paymentType === 'Cash'   ? 'bg-emerald-50 text-emerald-700' : ''}
+                        ${b.paymentType === 'Others' ? 'bg-slate-100 text-slate-600' : ''}
+                       "><i class="ph-fill ${b.paymentType === 'Grant' ? 'ph-medal' : b.paymentType === 'Cash' ? 'ph-money' : 'ph-dots-three-circle'}"></i>${b.paymentType}${b.paymentRef ? ` <span class="font-mono font-normal opacity-70">· ${b.paymentRef}</span>` : ''}</span>`
+                    : `<span class="inline-flex items-center gap-1 text-[10px] text-amber-600 font-semibold"><i class="ph-fill ph-warning-circle"></i>No payment info</span>`;
+
+                const expanded = _expandedBookingDetails.has(b.id);
+
+                return `
+                <tr class="hover:bg-slate-50/70 transition border-b border-slate-100 last:border-0 group">
+                    <td class="px-5 py-3.5 align-top">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg shadow-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                ${b.equipmentName.charAt(0)}
-                            </div>
-                            <div>
-                                <div class="font-bold text-slate-800 text-sm">${b.equipmentName}</div>
-                                <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">${b.lab}</div>
-                                ${b.process ? `<span class="inline-block mt-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] rounded border border-slate-200">${b.process} ${b.variant ? ` › ${b.variant}` : ''}</span>` : ''}
+                            ${avatarHtml}
+                            <div class="min-w-0">
+                                <div class="font-semibold text-slate-800 text-[13px] leading-tight">${b.equipmentName}</div>
+                                <div class="text-[9.5px] text-slate-400 font-bold uppercase tracking-wide mt-0.5">${b.lab}</div>
+                                ${b.process ? `<div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><i class="ph-bold ph-arrow-right text-[8px]"></i>${b.process}${b.variant ? ` › ${b.variant}` : ''}</div>` : ''}
                             </div>
                         </div>
                     </td>
-                    <td class="px-6 py-4">
-                        <div class="font-bold text-slate-800 text-sm">${b.userName}</div>
-                        <div class="text-xs text-blue-500 font-medium">${b.userEmail || 'No Email'}</div>
-                        <div class="text-[10px] text-slate-400 mt-0.5">${b.affiliation} (${b.userId})</div>
+                    <td class="px-5 py-3.5 align-top">
+                        <div class="font-semibold text-slate-800 text-[13px] leading-tight">${b.userName}</div>
+                        <div class="text-[11px] text-blue-500 mt-0.5">${b.userEmail || 'No Email'}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${b.affiliation} · ${b.userId}</div>
                     </td>
-                    <td class="px-6 py-4">
-                        <div class="flex items-center gap-1.5 text-slate-700 text-sm font-medium">
-                            <i class="ph-bold ph-calendar-blank text-slate-400"></i> ${formatBookingDate(b.date)}
+                    <td class="px-5 py-3.5 align-top tabular-nums">
+                        <div class="flex items-center gap-1.5 text-slate-700 text-xs font-medium">
+                            <i class="ph-bold ph-calendar-blank text-indigo-200"></i> ${formatBookingDate(b.date)}
                         </div>
-                        <div class="flex items-center gap-1.5 text-slate-500 text-xs mt-1">
-                            <i class="ph-bold ph-clock text-slate-400"></i> ${b.duration}
+                        <div class="flex items-center gap-1.5 text-slate-400 text-[11px] mt-1">
+                            <i class="ph-bold ph-clock text-indigo-200"></i> ${b.duration}
                         </div>
                     </td>
-                    <td class="px-6 py-4">
-                        <div class="flex flex-wrap gap-1">
-                            <span class="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-500">Sup: ${b.supervisor}</span>
-                            <span class="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-500">Qty: ${b.samples}</span>
+                    <td class="px-5 py-3.5 align-top max-w-[190px]">
+                        <div class="flex items-center gap-1.5 mb-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full ${isComplete ? 'bg-emerald-500' : 'bg-amber-500'} shrink-0" title="${isComplete ? 'Complete' : 'Incomplete'}"></span>
+                            ${payChipHtml}
                         </div>
-                        <div class="mt-1 text-xs text-slate-600 truncate max-w-[150px]" title="${b.materials}">
-                            <span class="text-slate-400">Mat:</span> ${b.materials}
+                        <button onclick="toggleBookingDetail('${b.id}')" class="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1">
+                            ${expanded ? 'Show less' : 'Show more'} <i class="ph-bold ph-caret-down text-[9px] transition-transform ${expanded ? 'rotate-180' : ''}"></i>
+                        </button>
+                        ${expanded ? `
+                        <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500 leading-relaxed">
+                            <div><span class="text-slate-400">Supervisor</span> ${b.supervisor}</div>
+                            <div><span class="text-slate-400">Quantity</span> ${b.samples}</div>
+                            <div><span class="text-slate-400">Material</span> ${b.materials}</div>
                         </div>
-                        ${b.paymentType ? `
-                        <div class="mt-2 flex items-center gap-1.5">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border
-                                ${b.paymentType === 'Grant'  ? 'bg-blue-50   text-blue-700   border-blue-200'  : ''}
-                                ${b.paymentType === 'Cash'   ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}
-                                ${b.paymentType === 'Others' ? 'bg-slate-50  text-slate-600  border-slate-200' : ''}
-                            ">
-                                <i class="ph-fill ${b.paymentType === 'Grant' ? 'ph-medal' : b.paymentType === 'Cash' ? 'ph-money' : 'ph-dots-three-circle'}"></i>
-                                ${b.paymentType}
-                            </span>
-                            ${b.paymentRef ? `<span class="text-[10px] font-mono text-slate-500 truncate max-w-[90px]" title="${b.paymentRef}">${b.paymentRef}</span>` : ''}
-                        </div>
-                        ` : `<div class="mt-2"><span class="text-[10px] text-red-400 font-bold">⚠ No payment info</span></div>`}
+                        ` : ''}
                     </td>
-                    <td class="px-6 py-4 text-right">
-                        ${isHistory 
-                            ? `<div class="flex flex-col items-end">
-                                <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${b.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : b.status === 'Cancelled' ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-red-100 text-red-700 border border-red-200'} mb-1">${b.status}</span>
-                                <div class="text-[9px] text-slate-400">Created: ${formatDateTime(b.timestampCreated)}</div>
-                                ${b.remarks ? `<div class="text-[10px] text-red-500 mt-1 max-w-[120px] truncate" title="${b.remarks}">${b.remarks}</div>` : ''}
-                                ${(b.status === 'Approved' || b.status === 'Rejected') ? `<button onclick="revokeBooking('${b.id}')" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 hover:underline mt-2">Revoke</button>` : ''}
+                    <td class="px-5 py-3.5 align-top text-right">
+                        ${isHistory
+                            ? `<div class="flex flex-col items-end gap-1">
+                                <span class="px-2.5 py-1 rounded-full text-[9.5px] font-bold uppercase tracking-wider ${b.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : b.status === 'Cancelled' ? 'bg-slate-100 text-slate-500' : 'bg-red-50 text-red-700'}">${b.status}</span>
+                                <div class="text-[9px] text-slate-300 tabular-nums">${formatDateTime(b.timestampCreated)}</div>
+                                ${b.remarks ? `<div class="text-[10px] text-red-400 max-w-[130px] text-right leading-snug">${b.remarks}</div>` : ''}
+                                ${(b.status === 'Approved' || b.status === 'Rejected') ? `<button onclick="revokeBooking('${b.id}')" class="text-[10px] font-semibold text-slate-300 hover:text-slate-500 mt-1">Revoke</button>` : ''}
                                </div>`
                             : `<div class="flex items-center justify-end gap-2">
-                                <button onclick="handleReject('${b.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 flex items-center justify-center transition" title="Reject"><i class="ph-bold ph-x"></i></button>
+                                <button onclick="handleReject('${b.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition" title="Reject"><i class="ph-bold ph-x"></i></button>
                                 <button onclick="handleApprove('${b.id}')" class="px-3 h-8 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 font-bold text-xs shadow-md shadow-emerald-200 transition flex items-center gap-1"><i class="ph-bold ph-check"></i> Approve</button>
                                </div>`
                         }
                     </td>
                 </tr>
-            `;
+                `;
+            };
 
             // --- 3-STAGE PROCESS LIST RENDERER ---
             const processListHtml = state.tempProcessConfig.length > 0 
@@ -2046,7 +2080,7 @@
                 </div>` : ''}
 
                 <div class="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="bg-gradient-to-r from-indigo-50 via-white to-white border-b border-indigo-50 p-5 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="bg-gradient-to-r from-indigo-50 via-white to-white border-b border-indigo-50 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-wrap">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl shadow-inner">
                                 <i class="ph-duotone ph-calendar-check"></i>
@@ -2063,28 +2097,47 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        ${state.adminTab === 'history' ? `
-                        <div class="flex bg-white rounded-xl border border-slate-200 p-1 items-center gap-2 shadow-sm">
-                            <input type="month" value="${state.adminHistoryMonth}" onchange="setHistoryMonth(this.value)" class="p-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 bg-slate-50 outline-none focus:border-indigo-500">
-                            <div class="h-4 w-px bg-slate-200 mx-1"></div>
-                            <button onclick="setHistoryFilter('All')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='All'?'bg-slate-100 text-slate-800':'text-slate-400 hover:bg-slate-50'}">All</button>
-                            <button onclick="setHistoryFilter('Approved')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Approved'?'bg-emerald-100 text-emerald-700':'text-slate-400 hover:bg-slate-50'}">Approved</button>
-                            <button onclick="setHistoryFilter('Rejected')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Rejected'?'bg-red-100 text-red-700':'text-slate-400 hover:bg-slate-50'}">Rejected</button>
-                            <button onclick="setHistoryFilter('Cancelled')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Cancelled'?'bg-slate-100 text-slate-600':'text-slate-400 hover:bg-slate-50'}">Cancelled</button>
+
+                        <div class="flex gap-2 flex-wrap">
+                            <div class="bg-indigo-50 rounded-xl px-3.5 py-2 min-w-[64px] text-center">
+                                <div class="text-base font-bold text-indigo-700 tabular-nums leading-tight">${pending.length}</div>
+                                <div class="text-[9px] font-bold uppercase tracking-wide text-indigo-400">Pending</div>
+                            </div>
+                            <div class="bg-emerald-50 rounded-xl px-3.5 py-2 min-w-[64px] text-center">
+                                <div class="text-base font-bold text-emerald-700 tabular-nums leading-tight">${historyCounts.Approved}</div>
+                                <div class="text-[9px] font-bold uppercase tracking-wide text-emerald-400">Approved</div>
+                            </div>
+                            <div class="bg-red-50 rounded-xl px-3.5 py-2 min-w-[64px] text-center">
+                                <div class="text-base font-bold text-red-700 tabular-nums leading-tight">${historyCounts.Rejected}</div>
+                                <div class="text-[9px] font-bold uppercase tracking-wide text-red-400">Rejected</div>
+                            </div>
+                            <div class="bg-slate-50 rounded-xl px-3.5 py-2 min-w-[64px] text-center">
+                                <div class="text-base font-bold text-slate-600 tabular-nums leading-tight">${historyCounts.Cancelled}</div>
+                                <div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Cancelled</div>
+                            </div>
                         </div>
-                        ` : ''}
                     </div>
-                    
+
+                    ${state.adminTab === 'history' ? `
+                    <div class="px-5 py-3 bg-slate-50/60 border-b border-slate-100 flex items-center gap-2 flex-wrap">
+                        <input type="month" value="${state.adminHistoryMonth}" onchange="setHistoryMonth(this.value)" class="p-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 bg-white outline-none focus:border-indigo-500">
+                        <div class="h-4 w-px bg-slate-200 mx-1"></div>
+                        <button onclick="setHistoryFilter('All')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='All'?'bg-slate-800 text-white':'text-slate-400 hover:bg-slate-100'}">All <span class="opacity-60">${historyCounts.All}</span></button>
+                        <button onclick="setHistoryFilter('Approved')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Approved'?'bg-emerald-100 text-emerald-700':'text-slate-400 hover:bg-slate-100'}">Approved <span class="opacity-60">${historyCounts.Approved}</span></button>
+                        <button onclick="setHistoryFilter('Rejected')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Rejected'?'bg-red-100 text-red-700':'text-slate-400 hover:bg-slate-100'}">Rejected <span class="opacity-60">${historyCounts.Rejected}</span></button>
+                        <button onclick="setHistoryFilter('Cancelled')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${state.adminHistoryFilter==='Cancelled'?'bg-slate-100 text-slate-600':'text-slate-400 hover:bg-slate-100'}">Cancelled <span class="opacity-60">${historyCounts.Cancelled}</span></button>
+                    </div>
+                    ` : ''}
+
                     <div class="max-h-[500px] overflow-y-auto">
                          <table class="w-full text-sm text-left">
                             <thead class="text-xs text-slate-400 bg-slate-50 uppercase tracking-wider sticky top-0 shadow-sm z-10">
                                 <tr>
-                                    <th class="px-6 py-3 font-semibold">Equipment / Process</th>
-                                    <th class="px-6 py-3 font-semibold">User Profile</th>
-                                    <th class="px-6 py-3 font-semibold">Schedule</th>
-                                    <th class="px-6 py-3 font-semibold">Details</th>
-                                    <th class="px-6 py-3 text-right font-semibold">Action</th>
+                                    <th class="px-5 py-2.5 font-semibold">Equipment / Process</th>
+                                    <th class="px-5 py-2.5 font-semibold">User Profile</th>
+                                    <th class="px-5 py-2.5 font-semibold">Schedule</th>
+                                    <th class="px-5 py-2.5 font-semibold">Details</th>
+                                    <th class="px-5 py-2.5 text-right font-semibold">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
