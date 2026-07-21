@@ -455,26 +455,27 @@
     <form id="mainForm" onsubmit="submitForm(this); return false;" style="display:flex; flex-direction:column; gap:16px;">
       <!-- 1. Maklumat Pemohon -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">👤</div><div><div class="b-card-title">1. Maklumat Pemohon</div><div class="b-card-sub">Untuk notifikasi status &amp; hubungi semula • WA format Malaysia</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">👤</div><div><div class="b-card-title">1. Maklumat Pemohon</div>        <div class="b-card-sub"><span style="display:inline-flex;gap:6px;align-items:center"><i style="width:20px;height:20px;border-radius:6px;background:var(--paper-3);border:1px solid var(--border);display:grid;place-items:center;font-size:11px">💬</i> WA + <i style="width:20px;height:20px;border-radius:6px;background:var(--paper-3);border:1px solid var(--border);display:grid;place-items:center;font-size:11px">✉️</i> Emel</span></div></div></div>
         <div class="b-card-body">
           <div class="form-row">
-            <div><div style="display:flex; gap:8px; align-items:center;"><label for="inpNama" style="margin-bottom:0">Nama Penuh *</label><span style="font-size:10px; font-weight:700; padding:3px 7px; border-radius:999px; background:var(--paper-3); border:1px solid var(--border); color:var(--muted);">WA + Emel</span></div><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama penuh seperti KP" style="margin-top:6px"></div>
-            <div><div style="display:flex; gap:8px; align-items:center;"><label for="inpTel" style="margin-bottom:0">No. Telefon *</label><span class="b-hint" id="telHint"></span></div><input type="tel" id="inpTel" name="tel" required inputmode="tel" autocomplete="tel" placeholder="012-345 6789" style="margin-top:6px"><div class="b-field-note">Admin akan klik terus ke WhatsApp anda (tab baru).</div></div>
+            <div><label for="inpNama">Nama *</label><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama" style="margin-top:2px"></div>
+            <div><div style="display:flex; gap:6px; align-items:center;"><label for="inpTel" style="margin-bottom:0">Telefon *</label><span class="b-hint" id="telHint"></span></div><input type="tel" id="inpTel" name="tel" required inputmode="tel" autocomplete="tel" placeholder="012-345 6789" style="margin-top:2px"></div>
           </div>
           <div class="form-row">
-            <div><label for="inpEmail">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="nama@ukm.edu.my"></div>
-            <div><label for="inpUk">UKMPer / No. Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456 / 123456 / UKMPer"></div>
+            <div><label for="inpEmail">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="emel@ukm.edu.my"></div>
+            <div><label for="inpUk">UKMPer / Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
           </div>
-          <div><label for="inpPtj">PTJ / Jabatan *</label><input type="text" id="inpPtj" name="ptj" required placeholder="Cth: IMEN, FKAB, FST"></div>
-          <div style="margin-top:14px;"><label for="inpTujuan">Tajuk Poster *</label><textarea id="inpTujuan" name="tujuan" rows="3" required placeholder="Cth: Poster Makmal Nanoteknologi — Kajian 2026 (tajuk panjang auto potong di admin)"></textarea><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px;">0 aksara</div></div>
+          <div class="form-row" style="margin-bottom:0">
+            <div><label for="inpPtj">PTJ *</label><input type="text" id="inpPtj" name="ptj" required placeholder="IMEN"></div>
+            <div><label for="inpTujuan">Tajuk *</label><input type="text" id="inpTujuan" name="tujuan" required placeholder="Tajuk poster"><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px; font-size:10px; opacity:.7;">0</div></div>
+          </div>
         </div>
       </div>
 
       <!-- 2. Spesifikasi -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title">2. Spesifikasi Cetakan</div><div class="b-card-sub">Pilih saiz kertas &amp; media — harga berubah langsung</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title">2. Spesifikasi</div><div class="b-card-sub">📐 A1/A0 • ✨ Glossy/Plain • 🔢 Qty</div></div></div>
         <div class="b-card-body">
-          <label>Saiz Poster</label>
           <div class="size-grid" id="sizeCards">
             <div class="size-card sel" data-size="A1" onclick="pickSize('A1')">
               <div class="size-art"><div class="size-paper"><i>A1</i></div></div>
@@ -487,7 +488,7 @@
           </div>
           <select name="size" id="size" onchange="calcPrice()" style="display:none"><option value="A1">A1</option><option value="A0">A0</option></select>
 
-          <div style="margin-top:16px;"><label>Media Cetakan</label>
+          <div style="margin-top:14px;"><label>Media</label>
             <div class="media-row" id="mediaPills">
               <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')">
                 <div class="media-art glossy"></div>
@@ -501,51 +502,45 @@
           </div>
           <select name="media" id="media" onchange="calcPrice()" style="display:none"><option value="High Glossy">High Glossy</option><option id="optPlain" value="Plain Paper">Plain Paper</option></select>
 
-          <div style="margin-top:16px;"><label>Unit / Kuantiti</label>
-            <div class="qty-row"><button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button><input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input"><button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button><span class="b-hint" style="margin-left:6px">Maks 99 • Cetak berkelompok lebih jimat (harga tetap per unit buat masa ini)</span></div>
-          </div>
+          <div style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><label style="margin:0">Unit</label><div class="qty-row" style="margin:0"><button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button><input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input"><button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button></div><span class="b-hint">≤99</span></div>
           <input type="hidden" name="harga_hidden" id="hh" value="50">
         </div>
       </div>
 
       <!-- 3. Harga & Bayaran -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title">3. Harga &amp; Bayaran</div><div class="b-card-sub">Anggaran automatik — bukan invois akhir kedai</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title">3. Harga &amp; Bayaran</div><div class="b-card-sub">💵 Cash • 🎓 Geran • 📦 Aras 4</div></div></div>
         <div class="b-card-body">
           <div class="invoice" id="invoiceBox">
-            <div class="invoice-head"><b>Ringkasan Merch</b><span style="font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.06em; text-transform:uppercase;">Anggaran kedai</span></div>
-            <div class="invoice-body">
-              <div class="inv-row"><span id="invSpec">A1 • High Glossy</span><span id="invUnitP" style="font-family:var(--mono)">@RM50</span></div>
-              <div class="inv-row muted"><span id="invQty">1 unit</span><span id="invSub">RM 50.00</span></div>
-              <div class="inv-total"><b>Jumlah Anggaran</b><span class="rm" id="priceDisplay">RM 50.00</span></div>
-              <div class="inv-row muted" style="margin-top:8px;">💡 Termasuk cetakan sahaja. Laminasi / mounting tanya urusetia.</div>
+            <div class="invoice-head"><b>🧾 Jumlah</b><span class="rm" id="priceDisplay" style="font-size:16px">RM 50.00</span></div>
+            <div class="invoice-body" style="padding:10px 14px">
+              <div class="inv-row" style="font-size:12px; font-family:var(--mono)"><span id="invSpec">A1 • High Glossy</span><span id="invUnitP">@RM50</span></div>
+              <div class="inv-row muted"><span id="invQty">1 ×</span><span id="invSub">RM 50.00</span></div>
             </div>
           </div>
-          <div style="margin-top:16px;"><label>Kaedah Pembayaran</label>
-            <div class="pay-seg" id="paySeg"><div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b>💵 Cash — Aras 4</b><small>Bayar tunai semasa ambil di pejabat En. Hazde</small></div><div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b>🎓 Geran — No. diperlukan</b><small>Wajib isi no. geran, urusan dokumen di pejabat</small></div></div>
+          <div style="margin-top:12px;">
+            <div class="pay-seg" id="paySeg"><div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b>💵 Cash</b></div><div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b>🎓 Geran</b></div></div>
             <select name="bayaran" id="payMethod" onchange="toggleGeran(this)" style="display:none"><option value="Cash">Cash</option><option value="Geran">Geran</option></select>
-            <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran (cth: GG-2024-001 / NN-XXX)"></div>
+            <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran"></div>
           </div>
-          <div class="trust-row"><span class="trust ok">🔒 Fail sulit — Drive terhad</span><span class="trust">✅ Pra-semak 300dpi•bleed</span><span class="trust">💬 WA admin 1 klik</span><span class="trust">📦 Siap 2–3 hari</span></div>
+          <div class="trust-row" style="margin-top:10px"><span class="trust">🔒</span><span class="trust">✅ 300dpi</span><span class="trust">💬 WA</span><span class="trust">📦 2–3 hari</span></div>
         </div>
       </div>
 
       <!-- 4. Fail Poster -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">📎</div><div><div class="b-card-title">4. Fail Poster</div><div class="b-card-sub">PDF berbenam font disyorkan • Cetakan merch-grade</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">📎</div><div><div class="b-card-title">4. Fail Poster</div><div class="b-card-sub">📄 PDF • 🖼️ JPG • 🖼️ PNG • ≤300MB</div></div></div>
         <div class="b-card-body">
           <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Muat naik fail poster">
             <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" onchange="onFileChosen(this)">
-            <div class="uz-top"><div class="uz-icon">📄</div><div class="uz-dots"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag)"></span><span class="dot" style="background:var(--c-yellow)"></span><span class="dot" style="background:var(--c-key)"></span></div><span style="font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);">CMYK ready</span></div>
-            <div class="uz-label">Seret fail ke sini atau klik untuk pilih — PDF/JPG/PNG</div>
-            <div class="uz-sub">Reka bentuk siap cetak, 300dpi, embed font, RGB/CMYK diterima. Logo IMEN tidak pecah.</div>
-            <div class="uz-specs"><span class="uz-spec">PDF • JPG • PNG</span><span class="uz-spec">≤ 300 MB</span><span class="uz-spec">300dpi ideal</span><span class="uz-spec">A0/A1 @100%</span><span class="uz-spec" style="background:var(--orange-soft); color:#9a3412; border-color:#fed7aa;">Merch-grade</span></div>
+            <div class="uz-top"><div class="uz-icon">📤</div><div class="uz-dots"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag)"></span><span class="dot" style="background:var(--c-yellow)"></span><span class="dot" style="background:var(--c-key)"></span></div></div>
+            <div class="uz-label">KLIK / SERET FAIL KE SINI</div>
+            <div class="uz-specs"><span class="uz-spec">PDF</span><span class="uz-spec">JPG</span><span class="uz-spec">PNG</span><span class="uz-spec">300dpi</span></div>
             <div class="uz-chosen" id="uzChosen"></div>
           </div>
           <div class="progress-wrap" id="progressWrap"><div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div><div class="progress-info"><span id="progChunk">0 MB</span><span id="progPct">0%</span><span id="progSize">0 MB</span></div><div class="progress-status" id="progStatus"></div></div>
-          <div class="b-field-note" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;"><span>✅ Min 150dpi, ideal 300dpi</span><span>✅ Bleed 3mm digalakkan</span><span>✅ Benam font dalam PDF</span><span>✅ Saiz canvas 1:1 A0/A1</span></div>
-          <button class="btn btn-main cta-main" id="submitBtn" type="submit">🚀 Hantar Tempahan — <span id="ctaPrice">RM 50.00</span></button>
-          <div class="cta-foot">Tekan hantar = fail terus ke Drive IMEN tanpa melalui Apps Script (resumable). Dengan menghantar, anda bersetuju fail disemak pra-cetak.</div>
+          <div class="b-field-note" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:10.5px;"><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#f0fdf4;border:1px solid #bbf7d0;display:grid;place-items:center;font-size:10px">✓</span>300dpi</span><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#eff6ff;border:1px solid #bfdbfe;display:grid;place-items:center;font-size:10px">↔</span>3mm bleed</span><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#fff7ed;border:1px solid #fed7aa;display:grid;place-items:center;font-size:10px">🔤</span>Embed font</span><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#f5f3ff;border:1px solid #ddd6fe;display:grid;place-items:center;font-size:10px">◧</span>A0/A1 1:1</span></div>
+          <button class="btn btn-main cta-main" id="submitBtn" type="submit">🚀 HANTAR — <span id="ctaPrice">RM 50.00</span></button>
         </div>
       </div>
       <div class="price-box" style="display:none"><span id="priceDisplayLegacy">50.00</span></div>
