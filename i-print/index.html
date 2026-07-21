@@ -295,8 +295,10 @@
     }
 
     .media-info b{ font-size:12.5px; font-weight:800; color:var(--ink); letter-spacing:-.01em; display:block; }
-    .media-info span{ font-size:11px; font-weight:700; color:var(--muted); font-family:var(--mono); margin-top:2px; display:block; }
-    .media-pill.sel .media-info span{ color:var(--ink); }
+    .media-desc{ font-size:11px; font-weight:500; color:var(--muted); margin-top:4px; display:block; line-height:1.35; }
+    .media-price{ font-size:11px; font-weight:800; color:var(--ink); font-family:var(--mono); margin-top:6px; display:inline-flex; padding:3px 8px; border-radius:999px; background:var(--paper-3); border:1px solid var(--border); }
+    .media-pill.sel .media-price{ background:var(--ink); color:#fff; border-color:var(--ink); }
+    .media-pill.sel .media-info span.media-desc{ color:var(--ink-3); }
 
     .qty-row{ display:flex; align-items:center; gap:10px; margin-top:10px; }
     .qty-btn{ width:42px; height:42px; border-radius:13px; border:1.5px solid var(--border); background:var(--paper); cursor:pointer; font-size:20px; font-weight:700; display:grid; place-items:center; transition:.15s var(--ease); }
@@ -488,15 +490,15 @@
           </div>
           <select name="size" id="size" onchange="calcPrice()" style="display:none"><option value="A1">A1</option><option value="A0">A0</option></select>
 
-          <div style="margin-top:14px;"><label>Media</label>
+          <div style="margin-top:16px;"><label>Media — <span id="mediaSizeHint" style="font-weight:600; text-transform:none; letter-spacing:0; color:var(--muted); font-size:11px;">A1 • RM 50 / unit</span></label>
             <div class="media-row" id="mediaPills">
               <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')">
                 <div class="media-art glossy"></div>
-                <div class="media-info"><b>High Glossy</b><span>RM 50 / 80</span></div>
+                <div class="media-info"><b>High Glossy</b><span class="media-desc">Berkilat • Warna vivid • Sesuai poster & foto — pilihan kedai merch</span><span class="media-price" data-m="High Glossy">RM 50</span></div>
               </div>
               <div class="media-pill" id="pillPlain" data-media="Plain Paper" onclick="pickMedia('Plain Paper')">
                 <div class="media-art plain"></div>
-                <div class="media-info"><b>Plain Paper</b><span>RM 30</span></div>
+                <div class="media-info"><b>Plain Paper</b><span class="media-desc">Matte ekonomi • Sesuai draf & dalaman • RM 30 — tidak tersedia untuk A0</span><span class="media-price" data-m="Plain Paper">RM 30</span></div>
               </div>
             </div>
           </div>
@@ -649,12 +651,28 @@ function calcPrice(){
   var s= selS ? selS.value : 'A1'; var m= selM ? selM.value : 'High Glossy';
   var uEl=document.getElementById('unit'); var u=1; if(uEl){ u=parseInt(uEl.value,10); if(!u||u<1) u=1; if(u>99) u=99; }
   var optPlain=document.getElementById('optPlain'); if(optPlain) optPlain.disabled=(s==='A0');
-  var pillPlain=document.getElementById('pillPlain'); if(pillPlain){ pillPlain.style.opacity=(s==='A0')?'.45':''; pillPlain.style.pointerEvents=(s==='A0')?'none':''; }
+  var pillPlain=document.getElementById('pillPlain'); if(pillPlain){ pillPlain.style.opacity=(s==='A0')?'.38':''; pillPlain.style.pointerEvents=(s==='A0')?'none':''; }
   if(s==='A0' && m==='Plain Paper'){ if(selM) selM.value='High Glossy'; m='High Glossy'; }
-  var p = (m==='High Glossy') ? (s==='A1'?50:80) : 30; var total=p*u;
 
+  // price matrix with size dependency
+  var priceGlossy = (s==='A1'?50:80);
+  var pricePlain  = 30;
+  var p = (m==='High Glossy') ? priceGlossy : pricePlain;
+  var total = p * u;
+
+  // visuals
   document.querySelectorAll('.size-card').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-size')===s); });
   document.querySelectorAll('.media-pill').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-media')===m); });
+
+  // update media price badges to reflect size
+  var glossyEl = document.querySelector('.media-price[data-m="High Glossy"]');
+  var plainEl  = document.querySelector('.media-price[data-m="Plain Paper"]');
+  if(glossyEl) glossyEl.innerText = 'RM ' + priceGlossy + ' — ' + s;
+  if(plainEl)  plainEl.innerText  = 'RM ' + pricePlain  + ' — A1 sahaja';
+
+  var hintEl = document.getElementById('mediaSizeHint');
+  if(hintEl) hintEl.innerText = s + ' • RM ' + p + ' / unit';
+
   var b=document.getElementById('payMethod') ? document.getElementById('payMethod').value : 'Cash';
   document.querySelectorAll('.pay-opt').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-bayaran')===b); });
 
@@ -669,9 +687,8 @@ function calcPrice(){
 
   var telEl=document.getElementById('inpTel'); var hint=document.getElementById('telHint');
   if(telEl && hint){ var raw=telEl.value||''; var n=normalizePhoneMY(raw); if(!raw) hint.innerText=''; else if(!n) hint.innerText='⚠️ No tidak sah'; else hint.innerText='✓ WA: '+n; }
-  var tj=document.getElementById('inpTujuan'); var cc=document.getElementById('tujuanCount'); if(tj&&cc) cc.innerText=tj.value.length+' aksara';
+  var tj=document.getElementById('inpTujuan'); var cc=document.getElementById('tujuanCount'); if(tj&&cc) cc.innerText=tj.value.length+'';
 
-  // steps active state (based on scroll-ish simple: if first card filled, mark done)
   try{
     var hasNama = (document.getElementById('inpNama')||{}).value;
     var steps = document.querySelectorAll('.b-steps .b-step');
