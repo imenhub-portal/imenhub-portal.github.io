@@ -423,9 +423,9 @@
 </head>
 <body>
 
-<div id="loader"><div class="spinner"></div><div style="font-weight:700;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">Memuatkan…</div></div>
+<div id="loader"><div class="spinner"></div><div data-bm="Memuatkan…" data-bi="Loading…" style="font-weight:700;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">Memuatkan…</div></div>
 
-<div id="cModal" class="modal-overlay"><div class="modal-box"><span id="mIcon" class="modal-icon">🔔</span><div id="mTitle" class="modal-title">Perhatian</div><div id="mMsg" class="modal-msg">...</div><input type="text" id="mInput" class="modal-input" placeholder="Sila masukkan…"><div class="modal-actions"><button id="mBtnCancel" class="btn btn-red" onclick="closeM()">Batal</button><button id="mBtnOk" class="btn btn-main" onclick="confirmM()" style="margin-top:0">OK</button></div></div></div>
+<div id="cModal" class="modal-overlay"><div class="modal-box"><span id="mIcon" class="modal-icon">🔔</span><div id="mTitle" class="modal-title">Perhatian</div><div id="mMsg" class="modal-msg">...</div><input type="text" id="mInput" class="modal-input" placeholder="Sila masukkan…"><div class="modal-actions"><button id="mBtnCancel" class="btn btn-red" data-bm="Batal" data-bi="Cancel" onclick="closeM()">Batal</button><button id="mBtnOk" class="btn btn-main" onclick="confirmM()" style="margin-top:0">OK</button></div></div></div>
 
 <div class="container">
   <div class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
@@ -450,12 +450,12 @@
     <div class="b-hero">
       <div class="b-hero-grid">
         <div>
-          <h1>Servis Cetakan <em>Poster</em></h1>
+          <h1 data-bm="Servis Cetakan <em>Poster</em>" data-bi="<em>Poster</em> Printing Service">Servis Cetakan <em>Poster</em></h1>
           <div class="b-steps">
-            <div class="b-step active"><span class="num">1</span> Pemohon</div><div class="b-step-line"></div>
-            <div class="b-step"><span class="num">2</span> Spesifikasi</div><div class="b-step-line"></div>
-            <div class="b-step"><span class="num">3</span> Bayaran</div><div class="b-step-line"></div>
-            <div class="b-step"><span class="num">4</span> Fail</div>
+            <div class="b-step active"><span class="num">1</span> <span data-bm="Pemohon" data-bi="Applicant">Pemohon</span></div><div class="b-step-line"></div>
+            <div class="b-step"><span class="num">2</span> <span data-bm="Spesifikasi" data-bi="Specs">Spesifikasi</span></div><div class="b-step-line"></div>
+            <div class="b-step"><span class="num">3</span> <span data-bm="Bayaran" data-bi="Payment">Bayaran</span></div><div class="b-step-line"></div>
+            <div class="b-step"><span class="num">4</span> <span data-bm="Fail" data-bi="File">Fail</span></div>
           </div>
           <div class="b-meta" style="margin-top:10px">
             <span class="b-pill"><span class="dot" style="background:var(--c-cyan)"></span> A1 • A0</span>
@@ -481,47 +481,46 @@
     <div class="b-loc">
         <div class="b-loc-icon">📍</div>
         <div class="b-loc-text">
-          <b>Pejabat Am IMEN, Aras 4</b>
-          <span>Kompleks Penyelidikan UKM</span>
+          <b data-bm="Pejabat Am IMEN, Aras 4" data-bi="General Office IMEN, Level 4">Pejabat Am IMEN, Aras 4</b>
+          <span data-bm="Kompleks Penyelidikan UKM" data-bi="Research Complex UKM">Kompleks Penyelidikan UKM</span>
         </div>
         <div class="b-loc-pills">
           <span class="b-loc-pill">🕘 9AM–5PM</span>
-          <span class="b-loc-pill">📦 Ambil di Aras 4</span>
+          <span class="b-loc-pill" data-bm="📦 Ambil di Aras 4" data-bi="📦 Pickup at Level 4">📦 Ambil di Aras 4</span>
           <span class="b-loc-pill">💬 WhatsApp admin</span>
         </div>
       </div>
     <form id="mainForm" onsubmit="submitForm(this); return false;" style="display:flex; flex-direction:column; gap:16px;">
 
       <!-- FORM CARDS -->
-      <form id="mainForm" onsubmit="submitForm(this); return false;" style="display:flex; flex-direction:column; gap:16px;">
       <!-- 1. Maklumat Pemohon -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">👤</div><div><div class="b-card-title">1. Maklumat Pemohon</div>        <div class="b-card-sub"><span style="display:inline-flex;gap:6px;align-items:center"><i style="width:20px;height:20px;border-radius:6px;background:var(--paper-3);border:1px solid var(--border);display:grid;place-items:center;font-size:11px">💬</i> WA + <i style="width:20px;height:20px;border-radius:6px;background:var(--paper-3);border:1px solid var(--border);display:grid;place-items:center;font-size:11px">✉️</i> Emel</span></div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">👤</div><div><div class="b-card-title" data-bm="1. Maklumat Pemohon" data-bi="1. Applicant Info">1. Maklumat Pemohon</div>        <div class="b-card-sub" data-bm="💬 WA + ✉️ Emel — untuk notifikasi" data-bi="💬 WA + ✉️ Email — for notifications">💬 WA + ✉️ Emel — untuk notifikasi</div></div></div>
         <div class="b-card-body">
           <div class="form-row">
-            <div><label for="inpNama">Nama *</label><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama" style="margin-top:2px"></div>
-            <div><div style="display:flex; gap:6px; align-items:center;"><label for="inpTel" style="margin-bottom:0">Telefon *</label><span class="b-hint" id="telHint"></span></div><input type="tel" id="inpTel" name="tel" required inputmode="tel" autocomplete="tel" placeholder="012-345 6789" style="margin-top:2px"></div>
+            <div><label for="inpNama" data-bm="Nama *" data-bi="Name *">Nama *</label><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama" data-bm-ph="Nama" data-bi-ph="Full name" style="margin-top:2px"></div>
+            <div><div style="display:flex; gap:6px; align-items:center;"><label for="inpTel" data-bm="Telefon *" data-bi="Phone *" style="margin-bottom:0">Telefon *</label><span class="b-hint" id="telHint"></span></div><input type="tel" id="inpTel" name="tel" required inputmode="tel" autocomplete="tel" placeholder="012-345 6789" style="margin-top:2px"></div>
           </div>
           <div class="form-row">
-            <div><label for="inpEmail">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="emel@ukm.edu.my"></div>
-            <div><label for="inpUk">UKMPer / Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
+            <div><label for="inpEmail" data-bm="Emel *" data-bi="Email *">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="emel@ukm.edu.my" data-bm-ph="emel@ukm.edu.my" data-bi-ph="email@ukm.edu.my"></div>
+            <div><label for="inpUk" data-bm="UKMPer / Matrik *" data-bi="UKMPer / Matrix *">UKMPer / Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
           </div>
           <div class="form-row" style="margin-bottom:0">
-            <div><label for="inpPtj">PTJ *</label><input type="text" id="inpPtj" name="ptj" required placeholder="IMEN"></div>
-            <div><label for="inpTujuan">Tajuk *</label><input type="text" id="inpTujuan" name="tujuan" required placeholder="Tajuk poster"><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px; font-size:10px; opacity:.7;">0</div></div>
+            <div><label for="inpPtj" data-bm="PTJ *" data-bi="Dept *">PTJ *</label><input type="text" id="inpPtj" name="ptj" required placeholder="IMEN"></div>
+            <div><label for="inpTujuan" data-bm="Tajuk *" data-bi="Title *">Tajuk *</label><input type="text" id="inpTujuan" name="tujuan" required placeholder="Tajuk poster" data-bm-ph="Tajuk poster" data-bi-ph="Poster title"><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px; font-size:10px; opacity:.7;">0</div></div>
           </div>
         </div>
       </div>
 
       <!-- 2. Spesifikasi -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title">2. Spesifikasi</div><div class="b-card-sub">📐 A1/A0 • ✨ Glossy/Plain • 🔢 Qty</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title" data-bm="2. Spesifikasi" data-bi="2. Specifications">2. Spesifikasi</div><div class="b-card-sub">📐 A1/A0 • ✨ Glossy/Plain • 🔢 Qty</div></div></div>
         <div class="b-card-body">
           
                     <div class="spec-hero" style="border-radius:14px; overflow:hidden; border:1px solid var(--border); background:#0b1220; position:relative; box-shadow:var(--shadow-sm);">
-            <div id="specBadge" style="position:absolute; top:8px; left:8px; z-index:2; background:rgba(255,255,255,.92); backdrop-filter:blur(6px); border:1px solid #e2e8f0; padding:4px 10px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.02em;">📐 Visual saiz sebenar — bayang saiz poster</div>
+            <div id="specBadge" data-bm="📐 Visual saiz sebenar — bayang saiz poster" data-bi="📐 Real size visual — imagine poster on wall" style="position:absolute; top:8px; left:8px; z-index:2; background:rgba(255,255,255,.92); backdrop-filter:blur(6px); border:1px solid #e2e8f0; padding:4px 10px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.02em;">📐 Visual saiz sebenar — bayang saiz poster</div>
             <img id="imgPosterSize" src="assets/poster-size.webp" alt="Visual saiz poster A1 vs A0" loading="lazy" style="width:100%; height:auto; display:block; max-height:320px; object-fit:contain; background:#0b1220; padding:32px 12px 12px;">
-            <div id="specNote" style="position:absolute; right:8px; bottom:8px; background:rgba(15,23,42,.88); color:#fff; padding:4px 10px; border-radius:999px; font-size:9.5px; font-weight:700; font-family:var(--mono);">A0 = 2× luas A1</div>
+            <div id="specNote" data-bm="A0 = 2× luas A1" data-bi="A0 = 2× A1 area" style="position:absolute; right:8px; bottom:8px; background:rgba(15,23,42,.88); color:#fff; padding:4px 10px; border-radius:999px; font-size:9.5px; font-weight:700; font-family:var(--mono);">A0 = 2× luas A1</div>
           </div>
           <div style="height:14px"></div>
 
@@ -543,49 +542,49 @@
             <div class="media-row" id="mediaPills">
               <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')">
                 <div class="media-art glossy"></div>
-                <div class="media-info"><b>High Glossy</b><span class="media-desc">Berkilat • Warna vivid • Sesuai poster & foto — pilihan kedai merch</span><span class="media-price" data-m="High Glossy">RM 50</span></div>
+                <div class="media-info"><b>High Glossy</b><span class="media-desc" data-bm="Berkilat • Warna vivid • Sesuai poster &amp; foto — pilihan kedai merch" data-bi="Glossy • Vivid colors • Great for posters &amp; photos — merch choice">Berkilat • Warna vivid • Sesuai poster &amp; foto — pilihan kedai merch</span><span class="media-price" data-m="High Glossy">RM 50</span></div>
               </div>
               <div class="media-pill" id="pillPlain" data-media="Plain Paper" onclick="pickMedia('Plain Paper')">
                 <div class="media-art plain"></div>
-                <div class="media-info"><b>Plain Paper</b><span class="media-desc">Matte ekonomi • Sesuai draf & dalaman • RM 30 — tidak tersedia untuk A0</span><span class="media-price" data-m="Plain Paper">RM 30</span></div>
+                <div class="media-info"><b>Plain Paper</b><span class="media-desc" data-bm="Matte ekonomi • Sesuai draf &amp; dalaman • RM 30 — tidak tersedia untuk A0" data-bi="Matte economy • Great for drafts &amp; internal • RM 30 — not available for A0">Matte ekonomi • Sesuai draf &amp; dalaman • RM 30 — tidak tersedia untuk A0</span><span class="media-price" data-m="Plain Paper">RM 30</span></div>
               </div>
             </div>
           </div>
           <select name="media" id="media" onchange="calcPrice()" style="display:none"><option value="High Glossy">High Glossy</option><option id="optPlain" value="Plain Paper">Plain Paper</option></select>
 
-          <div style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><label style="margin:0">Unit</label><div class="qty-row" style="margin:0"><button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button><input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input"><button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button></div><span class="b-hint">≤99</span></div>
+          <div style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><label style="margin:0" data-bm="Unit" data-bi="Quantity">Unit</label><div class="qty-row" style="margin:0"><button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button><input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input"><button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button></div><span class="b-hint">≤99</span></div>
           <input type="hidden" name="harga_hidden" id="hh" value="50">
         </div>
       </div>
 
       <!-- 3. Harga & Bayaran -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title">3. Harga &amp; Bayaran</div><div class="b-card-sub">💵 Cash • 🎓 Geran • 📦 Aras 4</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="3. Harga &amp; Bayaran" data-bi="3. Price &amp; Payment">3. Harga &amp; Bayaran</div><div class="b-card-sub" data-bm="💵 Cash • 🎓 Geran • 📦 Aras 4" data-bi="💵 Cash • 🎓 Grant • 📦 Level 4">💵 Cash • 🎓 Geran • 📦 Aras 4</div></div></div>
         <div class="b-card-body">
           <div class="invoice" id="invoiceBox">
-            <div class="invoice-head"><b>🧾 Jumlah</b><span class="rm" id="priceDisplay" style="font-size:16px">RM 50.00</span></div>
+            <div class="invoice-head"><b data-bm="🧾 Jumlah" data-bi="🧾 Total">🧾 Jumlah</b><span class="rm" id="priceDisplay" style="font-size:16px">RM 50.00</span></div>
             <div class="invoice-body" style="padding:10px 14px">
               <div class="inv-row" style="font-size:12px; font-family:var(--mono)"><span id="invSpec">A1 • High Glossy</span><span id="invUnitP">@RM50</span></div>
               <div class="inv-row muted"><span id="invQty">1 ×</span><span id="invSub">RM 50.00</span></div>
             </div>
           </div>
           <div style="margin-top:12px;">
-            <div class="pay-seg" id="paySeg"><div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b>💵 Cash</b></div><div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b>🎓 Geran</b></div></div>
+            <div class="pay-seg" id="paySeg"><div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b data-bm="💵 Cash" data-bi="💵 Cash">💵 Cash</b></div><div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b data-bm="🎓 Geran" data-bi="🎓 Grant">🎓 Geran</b></div></div>
             <select name="bayaran" id="payMethod" onchange="toggleGeran(this)" style="display:none"><option value="Cash">Cash</option><option value="Geran">Geran</option></select>
-            <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran"></div>
+            <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran" data-bm-ph="No. Geran" data-bi-ph="Grant No."></div>
           </div>
-          <div class="trust-row" style="margin-top:10px"><span class="trust">🔒</span><span class="trust">✅ 300dpi</span><span class="trust">💬 WA</span><span class="trust">📦 2–3 hari</span></div>
+          <div class="trust-row" style="margin-top:10px"><span class="trust">🔒</span><span class="trust">✅ 300dpi</span><span class="trust">💬 WA</span><span class="trust" data-bm="📦 2–3 hari" data-bi="📦 2–3 days">📦 2–3 hari</span></div>
         </div>
       </div>
 
       <!-- 4. Fail Poster -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">📎</div><div><div class="b-card-title">4. Fail Poster</div><div class="b-card-sub">📄 PDF • 🖼️ JPG • 🖼️ PNG • ≤300MB</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">📎</div><div><div class="b-card-title" data-bm="4. Fail Poster" data-bi="4. Poster File">4. Fail Poster</div><div class="b-card-sub">📄 PDF • 🖼️ JPG • 🖼️ PNG • ≤300MB</div></div></div>
         <div class="b-card-body">
           <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Muat naik fail poster">
             <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" onchange="onFileChosen(this)">
             <div class="uz-top"><div class="uz-icon">📤</div><div class="uz-dots"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag)"></span><span class="dot" style="background:var(--c-yellow)"></span><span class="dot" style="background:var(--c-key)"></span></div></div>
-            <div class="uz-label">KLIK / SERET FAIL KE SINI</div>
+            <div class="uz-label" data-bm="KLIK / SERET FAIL KE SINI" data-bi="CLICK / DRAG FILE HERE">KLIK / SERET FAIL KE SINI</div>
             <div class="uz-specs"><span class="uz-spec">PDF</span><span class="uz-spec">JPG</span><span class="uz-spec">PNG</span><span class="uz-spec">300dpi</span></div>
             <div class="uz-chosen" id="uzChosen"></div>
           </div>
@@ -602,11 +601,11 @@
   <div class="section">
     <div style="max-width:520px; margin:0 auto; text-align:center;">
       <div style="padding:18px; border-radius:16px; border:1px solid var(--border); background:linear-gradient(180deg, #fff, #f8fafc); margin-bottom:14px;">
-        <div style="font-size:16px; font-weight:800; letter-spacing:-.01em;">🔍 Semak Status Tempahan</div>
-        <div style="font-size:12px; color:var(--muted); margin-top:4px;">Masukkan UKMPer / No. Matrik atau emel yang sama semasa tempahan.</div>
+        <div style="font-size:16px; font-weight:800; letter-spacing:-.01em;" data-bm="🔍 Semak Status Tempahan" data-bi="🔍 Check Booking Status">🔍 Semak Status Tempahan</div>
+        <div style="font-size:12px; color:var(--muted); margin-top:4px;" data-bm="Masukkan UKMPer / No. Matrik atau emel yang sama semasa tempahan." data-bi="Enter the same UKMPer / Matrix number or email used when booking.">Masukkan UKMPer / No. Matrik atau emel yang sama semasa tempahan.</div>
       </div>
-      <input type="text" id="chkIn" placeholder="UKMPer / No. Matrik / Emel" style="margin-bottom:10px;">
-      <button class="btn btn-main" style="margin-top:0;" onclick="checkStatus()">🔍 CARI STATUS</button>
+      <input type="text" id="chkIn" placeholder="UKMPer / No. Matrik / Emel" data-bm-ph="UKMPer / No. Matrik / Emel" data-bi-ph="UKMPer / Matrix / Email" style="margin-bottom:10px;">
+      <button class="btn btn-main" style="margin-top:0;" onclick="checkStatus()" data-bm="🔍 CARI STATUS" data-bi="🔍 SEARCH STATUS">🔍 CARI STATUS</button>
       <div id="res" style="text-align:left; margin-top:18px;"></div>
     </div>
   </div>
@@ -616,50 +615,50 @@
     <div id="loginBox" style="max-width:320px; margin:0 auto; text-align:center;">
       <div style="width:56px; height:56px; border-radius:16px; background:var(--ink); display:grid; place-items:center; margin:0 auto 14px; color:#fff; font-size:24px; box-shadow:var(--shadow-ink);">🔐</div>
       <div style="font-weight:800; font-size:15px; letter-spacing:-.01em;">Admin IMEN</div>
-      <div style="font-size:11px; color:var(--muted); margin-top:2px;">Masuk dengan kata laluan urusetia</div>
-      <input type="password" id="pass" placeholder="Kata Laluan Admin" onkeydown="if(event.key==='Enter') loadAdmin()" style="margin-top:12px;">
-      <button class="btn btn-main" onclick="loadAdmin()">MASUK DASHBOARD</button>
+      <div style="font-size:11px; color:var(--muted); margin-top:2px;" data-bm="Masuk dengan kata laluan urusetia" data-bi="Login with staff password">Masuk dengan kata laluan urusetia</div>
+      <input type="password" id="pass" placeholder="Kata Laluan Admin" data-bm-ph="Kata Laluan Admin" data-bi-ph="Admin Password" onkeydown="if(event.key==='Enter') loadAdmin()" style="margin-top:12px;">
+      <button class="btn btn-main" onclick="loadAdmin()" data-bm="MASUK DASHBOARD" data-bi="ENTER DASHBOARD">MASUK DASHBOARD</button>
     </div>
     <div id="dash" style="display:none;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
-        <h3 style="margin:0; font-size:16px; font-weight:800; letter-spacing:-.01em;">📊 Admin Dashboard — Merch Ops</h3>
+        <h3 style="margin:0; font-size:16px; font-weight:800; letter-spacing:-.01em;" data-bm="📊 Papan Pemuka Admin — Merch Ops" data-bi="📊 Admin Dashboard — Merch Ops">📊 Papan Pemuka Admin — Merch Ops</h3>
         <button class="btn" onclick="loadAdmin()" style="background:var(--paper-3); color:var(--ink); border:1px solid var(--border);">🔄 Refresh</button>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
-        <div class="stat-card" style="background:var(--paper-3);">Semua<b id="cTot">0</b></div>
-        <div class="stat-card" style="background:var(--orange-soft); color:#9a3412; border-color:#fed7aa;">Pending<b id="cP">0</b></div>
-        <div class="stat-card" style="background:#eff6ff; color:#1d4ed8;">Proses<b id="cPr">0</b></div>
-        <div class="stat-card" style="background:var(--ok-soft); color:#15803d;">Siap<b id="cS">0</b></div>
-        <div class="stat-card" style="background:#f5f3ff; color:#6d28d9;">Diambil<b id="cCd">0</b></div>
+        <div class="stat-card" style="background:var(--paper-3);"><span data-bm="Semua" data-bi="All">Semua</span><b id="cTot">0</b></div>
+        <div class="stat-card" style="background:var(--orange-soft); color:#9a3412; border-color:#fed7aa;"><span data-bm="Pending" data-bi="Pending">Pending</span><b id="cP">0</b></div>
+        <div class="stat-card" style="background:#eff6ff; color:#1d4ed8;"><span data-bm="Proses" data-bi="Processing">Proses</span><b id="cPr">0</b></div>
+        <div class="stat-card" style="background:var(--ok-soft); color:#15803d;"><span data-bm="Siap" data-bi="Ready">Siap</span><b id="cS">0</b></div>
+        <div class="stat-card" style="background:#f5f3ff; color:#6d28d9;"><span data-bm="Diambil" data-bi="Collected">Diambil</span><b id="cCd">0</b></div>
       </div>
       <div class="adm-subtabs">
-        <div class="adm-subtab active" id="admSub0" onclick="swAdminTab(0)">🔥 Aktif <b id="cActive">0</b></div>
-        <div class="adm-subtab" id="admSub1" onclick="swAdminTab(1)">📜 Sejarah <b id="cHist">0</b></div>
+        <div class="adm-subtab active" id="admSub0" onclick="swAdminTab(0)"><span data-bm="🔥 Aktif" data-bi="🔥 Active">🔥 Aktif</span> <b id="cActive">0</b></div>
+        <div class="adm-subtab" id="admSub1" onclick="swAdminTab(1)"><span data-bm="📜 Sejarah" data-bi="📜 History">📜 Sejarah</span> <b id="cHist">0</b></div>
       </div>
       <div id="admActivePane" class="adm-pane">
-        <input type="text" id="sAdm" onkeyup="filterTable('tbl','sAdm')" placeholder="🔍 Cari nama, tajuk, PTJ…" style="margin-bottom:10px;">
+        <input type="text" id="sAdm" onkeyup="filterTable('tbl','sAdm')" placeholder="🔍 Cari nama, tajuk, PTJ…" data-bm-ph="🔍 Cari nama, tajuk, PTJ…" data-bi-ph="🔍 Search name, title, dept…" style="margin-bottom:10px;">
         <div id="actLegend" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; font-size:11px; font-weight:600; color:#475569;">
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#eff6ff; border-radius:7px;">🔄</span> Proses</span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f0fdf4; border-radius:7px;">✅</span> Siap</span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f5f3ff; border-radius:7px;">📦</span> Diambil</span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef2f2; border-radius:7px;">❌</span> Tolak</span>
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#eff6ff; border-radius:7px;">🔄</span> <span data-bm="Proses" data-bi="Processing">Proses</span></span>
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f0fdf4; border-radius:7px;">✅</span> <span data-bm="Siap" data-bi="Ready">Siap</span></span>
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f5f3ff; border-radius:7px;">📦</span> <span data-bm="Diambil" data-bi="Collected">Diambil</span></span>
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef2f2; border-radius:7px;">❌</span> <span data-bm="Tolak" data-bi="Rejected">Tolak</span></span>
           <span style="width:1px; height:16px; background:#e2e8f0; display:inline-block;"></span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#e6fffa; color:#128C7E; border-radius:7px; font-size:10px;">💬</span> WA tab baru</span>
+          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#e6fffa; color:#128C7E; border-radius:7px; font-size:10px;">💬</span> <span data-bm="WA tab baru" data-bi="WA new tab">WA tab baru</span></span>
           <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:7px; font-size:10px;">📞</span> Call</span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:7px;">📄</span> Fail</span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:#fca5a5; border-radius:7px; font-weight:800;">✕</span> Padam</span>
+          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:7px;">📄</span> <span data-bm="Fail" data-bi="File">Fail</span></span>
+          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:#fca5a5; border-radius:7px; font-weight:800;">✕</span> <span data-bm="Padam" data-bi="Delete">Padam</span></span>
         </div>
         <div style="overflow-x:auto;"><table id="tbl"></table></div>
       </div>
       <div id="admHistPane" class="adm-pane" style="display:none;">
-        <input type="text" id="sAdmHist" onkeyup="filterTable('tblHist','sAdmHist')" placeholder="🔍 Cari dalam sejarah…" style="margin-bottom:10px;">
+        <input type="text" id="sAdmHist" onkeyup="filterTable('tblHist','sAdmHist')" placeholder="🔍 Cari dalam sejarah…" data-bm-ph="🔍 Cari dalam sejarah…" data-bi-ph="🔍 Search history…" style="margin-bottom:10px;">
         <div id="actHistLegend" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:9px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; font-size:11px; font-weight:600; color:#92400e;">
-          <span>📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini.</span>
+          <span data-bm="📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini." data-bi="📦 Collected &amp; ❌ Rejected — completed, kept here.">📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini.</span>
           <span style="width:1px; height:16px; background:#fde68a; display:inline-block;"></span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef3c7; border-radius:7px;">↩️</span> Kembali ke Siap</span>
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef3c7; border-radius:7px;">↩️</span> <span data-bm="Kembali ke Siap" data-bi="Back to Ready">Kembali ke Siap</span></span>
         </div>
         <div style="overflow-x:auto;"><table id="tblHist"></table></div>
-        <div id="histEmpty" style="display:none; text-align:center; color:#94a3b8; padding:24px 12px; font-size:13px;">Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini.</div>
+        <div id="histEmpty" data-bm="Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini." data-bi="No history records yet. Mark a poster as <b>Collected</b> to move it here." style="display:none; text-align:center; color:#94a3b8; padding:24px 12px; font-size:13px;">Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini.</div>
       </div>
     </div>
   </div>
@@ -669,133 +668,43 @@
 <script>
 // ── i18n BM/BI ──
 var CUR_LANG = localStorage.getItem('ip_lang') || 'bm';
+// Static UI text now lives in data-bm / data-bi attributes on each element.
+// This dict only holds strings JS still has to build by hand.
 var I18N = {
-  bm: {
-    brand_sub: 'IMEN • UKM • A0/A1 • 300dpi • Print Lab',
-    tab_borang: '🖨️ Servis Cetakan Poster', tab_status: '🔍 Semak Status', tab_admin: '🔐 Admin',
-    m1: '1. Maklumat Pemohon', m1sub: 'WA + Emel — untuk notifikasi',
-    nama: 'Nama *', tel: 'Telefon *', emel: 'Emel *', uk: 'UKMPer / Matrik *', ptj: 'PTJ *', tajuk: 'Tajuk *',
-    ph_nama: 'Nama', ph_tel: '012-345 6789', ph_emel: 'emel@ukm.edu.my', ph_uk: 'A123456', ph_ptj: 'IMEN', ph_tajuk: 'Tajuk poster',
-    m2: '2. Spesifikasi', m2sub: '📐 A1/A0 • ✨ Glossy/Plain • 🔢 Qty',
-    media_label: 'Media', media_hint: 'A1 • RM 50 / unit',
-    qty: 'Unit', qty_hint: '≤99',
-    glossy_desc: 'Berkilat • Warna vivid • Pilihan kedai merch', plain_desc: 'Matte ekonomi • Draf • RM 30 — tiada A0',
-    m3: '3. Harga & Bayaran', m3sub: '💵 Cash • 🎓 Geran • 📦 Aras 4',
-    bayar_cash: '💵 Cash', bayar_geran: '🎓 Geran', geran_ph: 'No. Geran',
-    m4: '4. Fail Poster', m4sub: '📄 PDF • 🖼️ JPG • 🖼️ PNG • ≤300MB',
-    up_title: 'KLIK / SERET FAIL KE SINI', spec_title: '📐 Visual saiz sebenar — bayang saiz poster',
-    spec_note: 'A0 = 2× luas A1 • Contoh dipamer di dinding',
-    btn_submit: '🚀 HANTAR —', trust: ['🔒','✅ 300dpi','💬 WA','📦 2–3 hari'],
-    stat_title: 'Status', stat_ph: 'UKMPer / No. Matrik / Emel', stat_btn: '🔍 CARI STATUS',
-    admin_title: 'Admin IMEN', admin_sub: 'Masuk dengan kata laluan urusetia', admin_btn: 'MASUK DASHBOARD', pass_ph: 'Kata Laluan Admin',
-    loc_title: 'Pejabat Am IMEN, Aras 4', loc_sub: 'Kompleks Penyelidikan UKM', loc_hours: '🕘 9AM–5PM', loc_pick: '📦 Ambil di Aras 4', loc_wa: '💬 WhatsApp admin'
-  },
-  bi: {
-    brand_sub: 'IMEN • UKM • A0/A1 • 300dpi • Print Lab',
-    tab_borang: '🖨️ Poster Printing Service', tab_status: '🔍 Check Status', tab_admin: '🔐 Admin',
-    m1: '1. Applicant Info', m1sub: 'WA + Email — for notifications',
-    nama: 'Name *', tel: 'Phone *', emel: 'Email *', uk: 'UKMPer / Matrix *', ptj: 'Dept *', tajuk: 'Title *',
-    ph_nama: 'Full name', ph_tel: '012-345 6789', ph_emel: 'email@ukm.edu.my', ph_uk: 'A123456', ph_ptj: 'IMEN', ph_tajuk: 'Poster title',
-    m2: '2. Specifications', m2sub: '📐 A1/A0 • ✨ Glossy/Plain • 🔢 Qty',
-    media_label: 'Media', media_hint: 'A1 • RM 50 / unit',
-    qty: 'Quantity', qty_hint: '≤99',
-    glossy_desc: 'Glossy • Vivid colors • Merch choice', plain_desc: 'Matte economy • Draft • RM 30 — no A0',
-    m3: '3. Price & Payment', m3sub: '💵 Cash • 🎓 Grant • 📦 Level 4',
-    bayar_cash: '💵 Cash', bayar_geran: '🎓 Grant', geran_ph: 'Grant No.',
-    m4: '4. Poster File', m4sub: '📄 PDF • 🖼️ JPG • 🖼️ PNG • ≤300MB',
-    up_title: 'CLICK / DRAG FILE HERE', spec_title: '📐 Real size visual — imagine poster on wall',
-    spec_note: 'A0 = 2× A1 area • Wall mock example',
-    btn_submit: '🚀 SUBMIT —', trust: ['🔒','✅ 300dpi','💬 WA','📦 2–3 days'],
-    stat_title: 'Check Booking Status', stat_ph: 'UKMPer / Matrix / Email', stat_btn: '🔍 SEARCH STATUS',
-    admin_title: 'Admin IMEN', admin_sub: 'Login with staff password', admin_btn: 'ENTER DASHBOARD', pass_ph: 'Admin Password',
-    loc_title: 'General Office IMEN, Level 4', loc_sub: 'Research Complex UKM', loc_hours: '🕘 9AM–5PM', loc_pick: '📦 Pickup at Level 4', loc_wa: '💬 WhatsApp admin'
-  }
+  bm: { btn_submit: '🚀 HANTAR —' },
+  bi: { btn_submit: '🚀 SUBMIT —' }
 };
+// T(bm, bi) → pick the string for the current language (used by JS-rendered
+// content: admin tables, status results, modals).
+function T(bm, bi){ return CUR_LANG==='bi' ? bi : bm; }
+
+// setLang swaps every element carrying data-bm/data-bi (text) and
+// data-bm-ph/data-bi-ph (placeholder). Only LEAF elements are tagged, so the
+// innerHTML swap can never clobber JS-managed children — the bug that used to
+// wipe the whole page when we matched by text and hit an ancestor.
 function setLang(l){
-  CUR_LANG = l; localStorage.setItem('ip_lang', l);
+  if(l!=='bm' && l!=='bi') l='bm';
+  CUR_LANG = l; try{ localStorage.setItem('ip_lang', l); }catch(e){}
   document.documentElement.lang = (l==='bi'?'en':'ms');
-  document.getElementById('btnBM').classList.toggle('active', l==='bm');
-  document.getElementById('btnBI').classList.toggle('active', l==='bi');
-  // data-bm/bi tabs
+  var bBM=document.getElementById('btnBM'), bBI=document.getElementById('btnBI');
+  if(bBM) bBM.classList.toggle('active', l==='bm');
+  if(bBI) bBI.classList.toggle('active', l==='bi');
+
+  var key = (l==='bm' ? 'data-bm' : 'data-bi');
   document.querySelectorAll('[data-bm]').forEach(function(el){
-    var v = el.getAttribute(l==='bm' ? 'data-bm' : 'data-bi');
-    if(v) el.innerText = v;
+    var v = el.getAttribute(key); if(v!=null) el.innerHTML = v;
   });
-  var t = I18N[l];
-  // form titles
-  var map = {
-    '1. Maklumat Pemohon': t.m1, '2. Spesifikasi': t.m2, '3. Harga & Bayaran': t.m3, '4. Fail Poster': t.m4,
-    '1. Applicant Info': t.m1, '2. Specifications': t.m2, '3. Price & Payment': t.m3, '4. Poster File': t.m4
-  };
-  document.querySelectorAll('.b-card-title').forEach(function(el){
-    var cur = el.innerText.trim();
-    // normalize number prefix
-    for(var k in map){ if(cur.indexOf(k.split('. ')[1])>-1 || cur===k){ el.innerText = map[k]; } }
-    if(cur.indexOf('Maklumat Pemohon')>-1 || cur.indexOf('Applicant')>-1) el.innerText = t.m1;
-    else if(cur.indexOf('Spesifikasi')>-1 || cur.indexOf('Specifications')>-1) el.innerText = t.m2;
-    else if(cur.indexOf('Harga')>-1 || cur.indexOf('Price')>-1) el.innerText = t.m3;
-    else if(cur.indexOf('Fail Poster')>-1 || cur.indexOf('Poster File')>-1) el.innerText = t.m4;
+  var phKey = (l==='bm' ? 'data-bm-ph' : 'data-bi-ph');
+  document.querySelectorAll('[data-bm-ph]').forEach(function(el){
+    var v = el.getAttribute(phKey); if(v!=null) el.placeholder = v;
   });
-  // subs
-  document.querySelectorAll('.b-card-sub').forEach(function(el){
-    var txt = el.innerText;
-    if(txt.indexOf('WA +')>-1 || txt.indexOf('WA +')>-1) el.innerText = t.m1sub;
-    else if(txt.indexOf('A1/A0')>-1 && txt.indexOf('Glossy')>-1) el.innerText = t.m2sub;
-    else if(txt.indexOf('Cash')>-1 && txt.indexOf('Geran')>-1 || txt.indexOf('Grant')>-1) el.innerText = t.m3sub;
-    else if(txt.indexOf('PDF')>-1) el.innerText = t.m4sub;
-  });
-  // labels
-  var labMap = {'Nama *':t.nama, 'Telefon *':t.tel, 'Emel *':t.emel, 'UKMPer / Matrik *':t.uk, 'PTJ *':t.ptj, 'Tajuk *':t.tajuk,
-                'Name *':t.nama, 'Phone *':t.tel, 'Email *':t.emel, 'UKMPer / Matrix *':t.uk, 'Dept *':t.ptj, 'Title *':t.tajuk,
-                'Media':t.media_label, 'Unit':t.qty};
-  document.querySelectorAll('label').forEach(function(el){
-    var k = el.innerText.trim();
-    if(labMap[k]) el.innerText = labMap[k];
-    // mediaSizeHint keeps size, but translate prefix
-  });
-  var mediaSizeHint = document.getElementById('mediaSizeHint');
-  if(mediaSizeHint && t.media_hint){ /* keep dynamic size, but ensure label translated */ }
-  // pay
-  document.querySelectorAll('.pay-opt b').forEach(function(el){
-    if(el.innerText.indexOf('Cash')>-1) el.innerText = t.bayar_cash;
-    else if(el.innerText.indexOf('Geran')>-1 || el.innerText.indexOf('Grant')>-1) el.innerText = t.bayar_geran;
-  });
-  var inpGeran = document.getElementById('inpGeran'); if(inpGeran) inpGeran.placeholder = t.geran_ph;
-  // placeholders
-  var phMap = {inpNama:t.ph_nama, inpTel:t.ph_tel, inpEmail:t.ph_emel, inpUk:t.ph_uk, inpPtj:t.ph_ptj, inpTujuan:t.ph_tajuk};
-  for(var id in phMap){ var e=document.getElementById(id); if(e) e.placeholder = phMap[id]; }
-  // upload title
-  var upTitle = document.querySelector('.uz-label'); if(upTitle) upTitle.innerText = t.up_title;
-  // spec titles — target the exact badge/caption by id (never scan all divs:
-  // matching by innerText would also match every ANCESTOR of the badge, and
-  // overwriting an ancestor's innerHTML wipes the whole page).
-  var specBadgeEl = document.getElementById('specBadge');
-  if(specBadgeEl && t.spec_title) specBadgeEl.innerText = t.spec_title;
-  var specNoteEl = document.getElementById('specNote');
-  if(specNoteEl && t.spec_note) specNoteEl.innerText = t.spec_note;
-  // submit
+
+  // Submit button holds a JS-updated price span, so rebuild it with the price intact.
   var submit = document.getElementById('submitBtn');
-  if(submit){ submit.innerHTML = t.btn_submit + ' <span class="ctaPrice">'+ (document.getElementById('ctaPrice')?document.getElementById('ctaPrice').innerText:'RM 50.00') + '</span>'; }
-  // status tab
-  var statTitle = document.querySelector('.section:nth-child(2) div');
-  var chkIn = document.getElementById('chkIn');
-  if(chkIn) chkIn.placeholder = t.stat_ph;
-  var resBtn = document.querySelector('button[onclick=\"checkStatus()\"]');
-  if(resBtn) resBtn.innerText = t.stat_btn;
-  // admin
-  var adminText = document.querySelector('#loginBox div:nth-child(2)'); // rough
-  // location bar
-  var locB = document.querySelector('.b-loc-text b'); var locS = document.querySelector('.b-loc-text span');
-  var locPills = document.querySelectorAll('.b-loc-pill');
-  if(locB) locB.innerText = t.loc_title; if(locS) locS.innerText = t.loc_sub;
-  if(locPills[0]) locPills[0].innerText = t.loc_hours;
-  if(locPills[1]) locPills[1].innerText = t.loc_pick;
-  if(locPills[2]) locPills[2].innerText = t.loc_wa;
-  // glossy/plain descs
-  var glossyDesc = document.querySelector('.media-desc'); // first
-  var descs = document.querySelectorAll('.media-desc');
-  if(descs[0]) descs[0].innerText = t.glossy_desc;
-  if(descs[1]) descs[1].innerText = t.plain_desc;
+  if(submit){ var pr=document.getElementById('ctaPrice'); var price=pr?pr.innerText:'RM 50.00'; submit.innerHTML = I18N[l].btn_submit + ' <span id="ctaPrice" class="ctaPrice">'+ price +'</span>'; }
+
+  // Admin tables are rendered in JS — re-render so their headers follow the language.
+  try{ if(_admRowsCache) renderAdminFromCache(); }catch(e){}
 }
 
 // UTILITIES
@@ -815,7 +724,7 @@ var _filePreviewUrl = null;
 function pickSize(sz){ var el=document.getElementById('size'); if(el) el.value=sz; calcPrice(); }
 function pickMedia(md){
   var s=document.getElementById('size') ? document.getElementById('size').value : 'A1';
-  if(s==='A0' && md==='Plain Paper'){ myAlert('A0 tidak tersedia Plain Paper. High Glossy digunakan.', true); md='High Glossy'; }
+  if(s==='A0' && md==='Plain Paper'){ myAlert(T('A0 tidak tersedia Plain Paper. High Glossy digunakan.','Plain Paper is not available for A0. High Glossy applied.'), true); md='High Glossy'; }
   var el=document.getElementById('media'); if(el) el.value=md; calcPrice();
 }
 function pickBayar(v){ var el=document.getElementById('payMethod'); if(el) el.value=v; toggleGeran({value:v}); }
@@ -925,9 +834,9 @@ function showModal(title, msg, type, cb){
   document.getElementById('mIcon').innerText=icons[type]||'🔔';
   document.getElementById('mTitle').innerText=title; document.getElementById('mMsg').innerText=msg;
   var inp=document.getElementById('mInput'); var bCan=document.getElementById('mBtnCancel'); var bOk=document.getElementById('mBtnOk');
-  inp.style.display='none'; bCan.style.display='none'; bOk.innerText='OK'; inp.value=''; _mCb=cb||null;
-  if(type==='confirm'){ bCan.style.display='block'; bOk.innerText='Ya, Teruskan'; }
-  else if(type==='prompt'){ bCan.style.display='block'; inp.style.display='block'; bOk.innerText='Hantar'; setTimeout(function(){ inp.focus(); }, 120); }
+  inp.style.display='none'; bCan.style.display='none'; bOk.innerText='OK'; bCan.innerText=T('Batal','Cancel'); inp.value=''; _mCb=cb||null;
+  if(type==='confirm'){ bCan.style.display='block'; bOk.innerText=T('Ya, Teruskan','Yes, Continue'); }
+  else if(type==='prompt'){ bCan.style.display='block'; inp.style.display='block'; bOk.innerText=T('Hantar','Submit'); setTimeout(function(){ inp.focus(); }, 120); }
   var m=document.getElementById('cModal'); m.style.display='flex'; setTimeout(function(){ m.classList.add('show'); }, 10);
 }
 function closeM(){ var m=document.getElementById('cModal'); m.classList.remove('show'); setTimeout(function(){ m.style.display='none'; }, 300); }
@@ -935,36 +844,36 @@ function confirmM(){
   var inp=document.getElementById('mInput'); if(inp.style.display==='block' && !inp.value.trim()){ inp.style.borderColor='red'; return; }
   inp.style.borderColor='#e2e8f0'; closeM(); if(_mCb) _mCb(inp.value.trim());
 }
-function myAlert(msg, isErr){ showModal(isErr ? 'Ralat' : 'Berjaya ✅', msg, isErr ? 'error' : 'success'); }
-function myConfirm(msg, cb){ showModal('Pengesahan', msg, 'confirm', cb); }
-function myPrompt(msg, cb){ showModal('Maklumat Diperlukan', msg, 'prompt', cb); }
+function myAlert(msg, isErr){ showModal(isErr ? T('Ralat','Error') : T('Berjaya ✅','Success ✅'), msg, isErr ? 'error' : 'success'); }
+function myConfirm(msg, cb){ showModal(T('Pengesahan','Confirmation'), msg, 'confirm', cb); }
+function myPrompt(msg, cb){ showModal(T('Maklumat Diperlukan','Information Needed'), msg, 'prompt', cb); }
 
 // DIRECT-TO-DRIVE RESUMABLE
 var MAX_FILE_MB = 300;
 function submitForm(f){
-  var fileInput=document.getElementById('fileInput'); if(!fileInput.files[0]){ myAlert('Sila pilih fail untuk dimuat naik!', true); return; }
+  var fileInput=document.getElementById('fileInput'); if(!fileInput.files[0]){ myAlert(T('Sila pilih fail untuk dimuat naik!','Please select a file to upload!'), true); return; }
   var file=fileInput.files[0];
-  if(file.size > MAX_FILE_MB*1024*1024){ myAlert('Fail terlalu besar ('+fmtMB(file.size)+'). Had maksimum ialah '+MAX_FILE_MB+' MB.', true); return; }
-  if(file.size===0){ myAlert('Fail kosong. Sila pilih fail lain.', true); return; }
-  var btn=document.getElementById('submitBtn'); btn.disabled=true; btn.dataset.oldHtml=btn.innerHTML; btn.innerHTML='⏳ Sedang memuat naik...';
+  if(file.size > MAX_FILE_MB*1024*1024){ myAlert(T('Fail terlalu besar ('+fmtMB(file.size)+'). Had maksimum ialah '+MAX_FILE_MB+' MB.','File too large ('+fmtMB(file.size)+'). Maximum is '+MAX_FILE_MB+' MB.'), true); return; }
+  if(file.size===0){ myAlert(T('Fail kosong. Sila pilih fail lain.','Empty file. Please choose another.'), true); return; }
+  var btn=document.getElementById('submitBtn'); btn.disabled=true; btn.dataset.oldHtml=btn.innerHTML; btn.innerHTML=T('⏳ Sedang memuat naik...','⏳ Uploading...');
   var wrap=document.getElementById('progressWrap'); var fill=document.getElementById('progressFill');
   var pDone=document.getElementById('progChunk'); var pPct=document.getElementById('progPct'); var pSize=document.getElementById('progSize'); var pStat=document.getElementById('progStatus');
-  wrap.style.display='block'; fill.style.width='0%'; pPct.innerText='0%'; pDone.innerText='0 MB'; pSize.innerText=fmtMB(file.size); pStat.style.color='#0f172a'; pStat.innerText='Menyediakan muat naik…';
+  wrap.style.display='block'; fill.style.width='0%'; pPct.innerText='0%'; pDone.innerText='0 MB'; pSize.innerText=fmtMB(file.size); pStat.style.color='#0f172a'; pStat.innerText=T('Menyediakan muat naik…','Preparing upload…');
   var ui={ fill:fill, pDone:pDone, pPct:pPct, pStat:pStat, btn:btn };
-  google.script.run.withFailureHandler(function(err){ uploadFailed(ui, 'Gagal menyediakan muat naik: '+err); }).withSuccessHandler(function(res){ if(!res||!res.ok){ uploadFailed(ui, (res&&res.error)||'Ralat tidak diketahui'); return; } putFileToDrive(res.sessionUri, file, f, ui); }).startResumableUpload(file.name, file.type||'application/octet-stream', window.location.origin);
+  google.script.run.withFailureHandler(function(err){ uploadFailed(ui, T('Gagal menyediakan muat naik: ','Failed to prepare upload: ')+err); }).withSuccessHandler(function(res){ if(!res||!res.ok){ uploadFailed(ui, (res&&res.error)||T('Ralat tidak diketahui','Unknown error')); return; } putFileToDrive(res.sessionUri, file, f, ui); }).startResumableUpload(file.name, file.type||'application/octet-stream', window.location.origin);
 }
 function putFileToDrive(sessionUri, file, formEl, ui){
   var xhr=new XMLHttpRequest(); xhr.open('PUT', sessionUri, true); xhr.setRequestHeader('Content-Type', file.type||'application/octet-stream'); var sentFully=false;
-  xhr.upload.onprogress=function(e){ if(!e.lengthComputable) return; var pct=Math.round((e.loaded/e.total)*100); if(e.loaded>=e.total) sentFully=true; ui.fill.style.width=pct+'%'; ui.pPct.innerText=pct+'%'; ui.pDone.innerText=fmtMB(e.loaded); ui.pStat.innerText='⬆️ Memuat naik… '+pct+'%'; };
+  xhr.upload.onprogress=function(e){ if(!e.lengthComputable) return; var pct=Math.round((e.loaded/e.total)*100); if(e.loaded>=e.total) sentFully=true; ui.fill.style.width=pct+'%'; ui.pPct.innerText=pct+'%'; ui.pDone.innerText=fmtMB(e.loaded); ui.pStat.innerText=T('⬆️ Memuat naik… ','⬆️ Uploading… ')+pct+'%'; };
   xhr.onload=function(){
-    if(xhr.status!==200 && xhr.status!==201){ uploadFailed(ui, 'Muat naik gagal (HTTP '+xhr.status+'). '+(xhr.responseText||'')); return; }
-    var fileId; try{ fileId=JSON.parse(xhr.responseText).id; }catch(err){ uploadFailed(ui, 'Respons Drive tidak difahami.'); return; }
-    if(!fileId){ uploadFailed(ui, 'Drive tidak memulangkan ID fail.'); return; }
-    ui.fill.style.width='100%'; ui.pPct.innerText='100%'; ui.pDone.innerText=fmtMB(file.size); ui.pStat.style.color='#15803d'; ui.pStat.innerText='✅ Fail berjaya dimuat naik! Menyimpan data…';
+    if(xhr.status!==200 && xhr.status!==201){ uploadFailed(ui, T('Muat naik gagal (HTTP ','Upload failed (HTTP ')+xhr.status+'). '+(xhr.responseText||'')); return; }
+    var fileId; try{ fileId=JSON.parse(xhr.responseText).id; }catch(err){ uploadFailed(ui, T('Respons Drive tidak difahami.','Could not parse Drive response.')); return; }
+    if(!fileId){ uploadFailed(ui, T('Drive tidak memulangkan ID fail.','Drive did not return a file ID.')); return; }
+    ui.fill.style.width='100%'; ui.pPct.innerText='100%'; ui.pDone.innerText=fmtMB(file.size); ui.pStat.style.color='#15803d'; ui.pStat.innerText=T('✅ Fail berjaya dimuat naik! Menyimpan data…','✅ File uploaded! Saving data…');
     saveBooking(formEl, file, fileId, ui);
   };
-  xhr.onerror=function(){ uploadFailed(ui, sentFully ? 'Fail sampai ke Drive tetapi respons disekat (CORS). Pastikan Code.gs terkini telah di-deploy sebagai versi baharu.' : 'Sambungan terputus semasa muat naik. Sila cuba semula.'); };
-  xhr.ontimeout=function(){ uploadFailed(ui, 'Muat naik tamat masa. Sila cuba semula.'); };
+  xhr.onerror=function(){ uploadFailed(ui, sentFully ? T('Fail sampai ke Drive tetapi respons disekat (CORS). Pastikan Code.gs terkini telah di-deploy sebagai versi baharu.','File reached Drive but the response was blocked (CORS). Make sure the latest Code.gs is deployed as a new version.') : T('Sambungan terputus semasa muat naik. Sila cuba semula.','Connection dropped during upload. Please try again.')); };
+  xhr.ontimeout=function(){ uploadFailed(ui, T('Muat naik tamat masa. Sila cuba semula.','Upload timed out. Please try again.')); };
   xhr.send(file);
 }
 function saveBooking(formEl, file, fileId, ui){
@@ -979,20 +888,20 @@ function saveBooking(formEl, file, fileId, ui){
   }).processForm(data);
 }
 function uploadFailed(ui, msg){ ui.pStat.style.color='#b91c1c'; ui.pStat.innerText='❌ '+msg; myAlert(msg, true); resetBtn(ui.btn); }
-function resetBtn(btn){ btn.disabled=false; if(btn.dataset.oldHtml){ btn.innerHTML=btn.dataset.oldHtml; delete btn.dataset.oldHtml; } else { btn.innerHTML='🚀 Hantar Tempahan — <span class="ctaPrice">RM 50.00</span>'; } try{ calcPrice(); }catch(e){} }
+function resetBtn(btn){ btn.disabled=false; if(btn.dataset.oldHtml){ btn.innerHTML=btn.dataset.oldHtml; delete btn.dataset.oldHtml; } else { btn.innerHTML=(I18N[CUR_LANG]?I18N[CUR_LANG].btn_submit:'🚀 HANTAR —')+' <span id="ctaPrice" class="ctaPrice">RM 50.00</span>'; } try{ calcPrice(); }catch(e){} }
 
 // CHECK STATUS
 function checkStatus(){
-  var q=document.getElementById('chkIn').value.trim(); if(!q){ myAlert('Sila masukkan UKMPer / No. Matrik atau emel.', true); return; }
+  var q=document.getElementById('chkIn').value.trim(); if(!q){ myAlert(T('Sila masukkan UKMPer / No. Matrik atau emel.','Please enter UKMPer / Matrix number or email.'), true); return; }
   ld(true);
   google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(r){
     ld(false);
-    var h=''; if(!r.length){ h='<div style="text-align:center;color:var(--muted);padding:28px;font-size:13px; border:1px dashed var(--border); border-radius:12px;">Tiada rekod dijumpai.</div>'; }
+    var h=''; if(!r.length){ h='<div style="text-align:center;color:var(--muted);padding:28px;font-size:13px; border:1px dashed var(--border); border-radius:12px;">'+T('Tiada rekod dijumpai.','No records found.')+'</div>'; }
     else {
       r.forEach(function(x){
         var cls=badgeCls(x.status);
-        var extra=x.status==='Ditolak' ? '<br><small style="color:#b91c1c;margin-top:4px;display:block;">Sebab: '+esc(x.alasan)+'</small>' : '';
-        h+='<div style="background:#fff;padding:14px 16px;border-radius:14px;margin-bottom:10px;border:1px solid var(--border); box-shadow:var(--shadow-sm);"><div style="font-weight:700;margin-bottom:6px; letter-spacing:-.01em;">'+esc(x.tajuk)+'</div><span class="badge '+cls+'">'+esc(x.status)+'</span>'+extra+'</div>';
+        var extra=x.status==='Ditolak' ? '<br><small style="color:#b91c1c;margin-top:4px;display:block;">'+T('Sebab: ','Reason: ')+esc(x.alasan)+'</small>' : '';
+        h+='<div style="background:#fff;padding:14px 16px;border-radius:14px;margin-bottom:10px;border:1px solid var(--border); box-shadow:var(--shadow-sm);"><div style="font-weight:700;margin-bottom:6px; letter-spacing:-.01em;">'+esc(x.tajuk)+'</div><span class="badge '+cls+'">'+esc(statusLabel(x.status))+'</span>'+extra+'</div>';
       });
     }
     document.getElementById('res').innerHTML=h;
@@ -1012,7 +921,7 @@ function swAdminTab(n){
 }
 function _tajukCell(tajukRaw, idx, prefix){
   var t=String(tajukRaw||''); var MAX=48; var pf=prefix||'';
-  if(t.length>MAX){ var short=t.slice(0,MAX)+'…'; return '<div><span class="tajuk-short" onclick="toggleTajuk(\''+pf+idx+'\')" title="Klik untuk lihat tajuk penuh">'+esc(short)+'</span> <span id="tjt-'+pf+idx+'" class="tajuk-toggle" onclick="toggleTajuk(\''+pf+idx+'\')">Lagi…</span></div><div id="tjf-'+pf+idx+'" class="tajuk-full">'+esc(t)+'</div>'; }
+  if(t.length>MAX){ var short=t.slice(0,MAX)+'…'; return '<div><span class="tajuk-short" onclick="toggleTajuk(\''+pf+idx+'\')" title="'+T('Klik untuk lihat tajuk penuh','Click to see full title')+'">'+esc(short)+'</span> <span id="tjt-'+pf+idx+'" class="tajuk-toggle" onclick="toggleTajuk(\''+pf+idx+'\')">'+T('Lagi…','More…')+'</span></div><div id="tjf-'+pf+idx+'" class="tajuk-full">'+esc(t)+'</div>'; }
   return '<div style="font-size:12px;color:#475569;line-height:1.5;max-width:180px;word-break:break-word;">'+esc(t)+'</div>';
 }
 function _contactCell(telRaw, emailRaw, namaEsc, rowIdx){
@@ -1023,60 +932,73 @@ function _contactCell(telRaw, emailRaw, namaEsc, rowIdx){
   if(pEmal) out+='<a href="mailto:'+esc(pEmal)+'" class="contact-link contact-email" title="Emel '+namaEsc+'">'+esc(pEmal)+'</a>';
   out+='</div>'; return out;
 }
+// Translate a status value for DISPLAY only — the raw value stays untouched
+// (it is still what gets compared and written back to the sheet).
+function statusLabel(st){
+  var m={ 'Pending':T('Pending','Pending'), 'Dalam Proses':T('Dalam Proses','Processing'), 'Dah Boleh Collect':T('Dah Boleh Collect','Ready to Collect'), 'Sudah Diambil':T('Sudah Diambil','Collected'), 'Ditolak':T('Ditolak','Rejected') };
+  return m[st]||st;
+}
 function _renderAdminTable(tableId, rows){
-  if(!rows.length) return '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px;">Tiada rekod</td></tr>';
+  if(!rows.length) return '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px;">'+T('Tiada rekod','No records')+'</td></tr>';
   var isHist=tableId==='tblHist'; var pref=isHist?'h':''; var html='';
   for(var k=0;k<rows.length;k++){
     var r=rows[k]; var i=r._idx; var id=r[0]; var st=r[11]; var cls=badgeCls(st);
     var unitP=parseFloat(r[8])||0; var qty=parseInt(r[16],10)||1; var tot=(unitP*qty).toFixed(2);
     var method=r[9]; var noGeran=r[14]; var bayaranCell='';
     if(String(method).toLowerCase()==='cash'){ bayaranCell='<span style="background:#f0fdf4;color:#15803d;border:1px solid #86efac;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">💵 Cash</span>'; }
-    else { var gn=(noGeran && noGeran!=='-' && noGeran!=='')?esc(noGeran):'-'; bayaranCell='<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">🎓 Geran</span><br><small style="color:#475569;font-size:11px;">'+gn+'</small>'; }
+    else { var gn=(noGeran && noGeran!=='-' && noGeran!=='')?esc(noGeran):'-'; bayaranCell='<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">'+T('🎓 Geran','🎓 Grant')+'</span><br><small style="color:#475569;font-size:11px;">'+gn+'</small>'; }
     var eid=id.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); var tajukCell=_tajukCell(r[15], i, pref); var contact=_contactCell(r[4], r[13], esc(r[2]), i); var namaEsc=esc(r[2]);
     var acts='';
     if(!isHist){
       acts+='<div class="act-group">';
-      acts+='<button class="act-btn act-btn-blue" onclick="updStatus(\''+eid+'\',\'Dalam Proses\',\'\')" title="Tanda Dalam Proses">🔄</button>';
-      acts+='<button class="act-btn act-btn-green" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="Tanda Siap — Dah Boleh Collect">✅</button>';
-      if(st==='Dah Boleh Collect'){ acts+='<button class="act-btn act-btn-collected" onclick="updStatus(\''+eid+'\',\'Sudah Diambil\',\'\')" title="Sudah Diambil — alih ke Sejarah">📦</button>'; }
-      acts+='<button class="act-btn act-btn-red" onclick="rejectRow(\''+eid+'\')" title="Tolak">❌</button><span class="act-sep"></span>';
-      acts+='<a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="Lihat Fail">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="Padam">✕</button></div>';
+      acts+='<button class="act-btn act-btn-blue" onclick="updStatus(\''+eid+'\',\'Dalam Proses\',\'\')" title="'+T('Tanda Dalam Proses','Mark as Processing')+'">🔄</button>';
+      acts+='<button class="act-btn act-btn-green" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Tanda Siap — Dah Boleh Collect','Mark Ready to Collect')+'">✅</button>';
+      if(st==='Dah Boleh Collect'){ acts+='<button class="act-btn act-btn-collected" onclick="updStatus(\''+eid+'\',\'Sudah Diambil\',\'\')" title="'+T('Sudah Diambil — alih ke Sejarah','Collected — move to History')+'">📦</button>'; }
+      acts+='<button class="act-btn act-btn-red" onclick="rejectRow(\''+eid+'\')" title="'+T('Tolak','Reject')+'">❌</button><span class="act-sep"></span>';
+      acts+='<a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam','Delete')+'">✕</button></div>';
     } else {
-      acts+='<div class="act-group"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="Kembalikan ke Siap (Aktif)">↩️</button><a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="Lihat Fail">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="Padam Kekal">✕</button></div>';
+      acts+='<div class="act-group"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Kembalikan ke Siap (Aktif)','Restore to Ready (Active)')+'">↩️</button><a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam Kekal','Delete Permanently')+'">✕</button></div>';
     }
-    html+='<tr><td style="color:#94a3b8;font-weight:700;">'+r._no+'</td><td><div style="font-weight:700;">'+namaEsc+'</div>'+tajukCell+contact+'<div style="font-size:10px;color:#94a3b8;margin-top:2px;">'+esc(r[1])+'</div></td><td><b>'+esc(r[6])+'</b><br><small style="color:#64748b;">'+esc(r[7])+' ×'+esc(r[16])+'</small></td><td><b>RM '+tot+'</b><br><small style="color:#94a3b8;">@RM'+unitP+' ×'+qty+'</small></td><td><span class="badge '+cls+'">'+esc(st)+'</span></td><td>'+bayaranCell+'</td><td>'+acts+'</td></tr>';
+    html+='<tr><td style="color:#94a3b8;font-weight:700;">'+r._no+'</td><td><div style="font-weight:700;">'+namaEsc+'</div>'+tajukCell+contact+'<div style="font-size:10px;color:#94a3b8;margin-top:2px;">'+esc(r[1])+'</div></td><td><b>'+esc(r[6])+'</b><br><small style="color:#64748b;">'+esc(r[7])+' ×'+esc(r[16])+'</small></td><td><b>RM '+tot+'</b><br><small style="color:#94a3b8;">@RM'+unitP+' ×'+qty+'</small></td><td><span class="badge '+cls+'">'+esc(statusLabel(st))+'</span></td><td>'+bayaranCell+'</td><td>'+acts+'</td></tr>';
   }
   return html;
 }
 function loadAdmin(){
   ld(true); _adminPass=document.getElementById('pass').value;
   google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(d){
-    ld(false); if(d==='UNAUTHORIZED'){ myAlert('Kata laluan salah!', true); return; }
+    ld(false); if(d==='UNAUTHORIZED'){ myAlert(T('Kata laluan salah!','Wrong password!'), true); return; }
     document.getElementById('loginBox').style.display='none'; document.getElementById('dash').style.display='block';
     document.getElementById('actLegend').style.display='flex'; document.getElementById('actHistLegend').style.display='flex';
-    _admRowsCache=d; var active=[], hist=[]; var cT=0,cP=0,cPr=0,cS=0,cCd=0;
-    for(var i=1;i<d.length;i++){ var row=d[i].slice(0); row._idx=i; row._no=i; var st=d[i][11]; cT++;
-      if(st==='Dalam Proses'){ cPr++; active.push(row); } else if(st==='Dah Boleh Collect'){ cS++; active.push(row); } else if(st==='Sudah Diambil'){ cCd++; hist.push(row); } else if(st==='Ditolak'){ hist.push(row); } else { cP++; active.push(row); } }
-    document.getElementById('tbl').innerHTML='<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>'+_renderAdminTable('tbl', active);
-    document.getElementById('tblHist').innerHTML='<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>'+_renderAdminTable('tblHist', hist);
-    document.getElementById('cTot').innerText=cT; document.getElementById('cP').innerText=cP; document.getElementById('cPr').innerText=cPr; document.getElementById('cS').innerText=cS; document.getElementById('cCd').innerText=cCd;
-    document.getElementById('cActive').innerText=active.length; document.getElementById('cHist').innerText=hist.length;
-    document.getElementById('histEmpty').style.display=hist.length?'none':'block'; swAdminTab(_admSubTab);
+    _admRowsCache=d; renderAdminFromCache();
   }).getAdminData(document.getElementById('pass').value);
+}
+// Builds the admin tables from the cached rows. Split out from loadAdmin so
+// setLang() can re-render the (JS-built) headers when the language changes.
+function renderAdminFromCache(){
+  var d=_admRowsCache; if(!d) return;
+  var active=[], hist=[]; var cT=0,cP=0,cPr=0,cS=0,cCd=0;
+  for(var i=1;i<d.length;i++){ var row=d[i].slice(0); row._idx=i; row._no=i; var st=d[i][11]; cT++;
+    if(st==='Dalam Proses'){ cPr++; active.push(row); } else if(st==='Dah Boleh Collect'){ cS++; active.push(row); } else if(st==='Sudah Diambil'){ cCd++; hist.push(row); } else if(st==='Ditolak'){ hist.push(row); } else { cP++; active.push(row); } }
+  var hdr='<tr><th>#</th><th>'+T('Pemohon','Applicant')+'</th><th>'+T('Saiz/Media','Size/Media')+'</th><th>'+T('Harga','Price')+'</th><th>Status</th><th>'+T('Bayaran','Payment')+'</th><th>'+T('Tindakan','Action')+'</th></tr>';
+  document.getElementById('tbl').innerHTML=hdr+_renderAdminTable('tbl', active);
+  document.getElementById('tblHist').innerHTML=hdr+_renderAdminTable('tblHist', hist);
+  document.getElementById('cTot').innerText=cT; document.getElementById('cP').innerText=cP; document.getElementById('cPr').innerText=cPr; document.getElementById('cS').innerText=cS; document.getElementById('cCd').innerText=cCd;
+  document.getElementById('cActive').innerText=active.length; document.getElementById('cHist').innerText=hist.length;
+  document.getElementById('histEmpty').style.display=hist.length?'none':'block'; swAdminTab(_admSubTab);
 }
 function updStatus(id, status, reason){
   ld(true);
   google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){ ld(false); if(res.startsWith('ERROR')) myAlert(res, true); else loadAdmin(); }).updatePosterStatus(id, status, reason, _adminPass);
 }
-function rejectRow(id){ myPrompt('Nyatakan sebab penolakan (wajib):', function(reason){ if(reason) updStatus(id, 'Ditolak', reason); }); }
+function rejectRow(id){ myPrompt(T('Nyatakan sebab penolakan (wajib):','State the reason for rejection (required):'), function(reason){ if(reason) updStatus(id, 'Ditolak', reason); }); }
 function delRow(id){
-  myConfirm('Padam rekod ini secara kekal?', function(){
+  myConfirm(T('Padam rekod ini secara kekal?','Delete this record permanently?'), function(){
     ld(true); google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){ ld(false); if(res.startsWith('ERROR')) myAlert(res, true); else loadAdmin(); }).deleteRow(id, _adminPass);
   });
 }
 function toggleTajuk(rowKey){
   var k=String(rowKey); var full=document.getElementById('tjf-'+k); var link=document.getElementById('tjt-'+k); if(!full) return;
-  var isOpen=full.classList.contains('open'); if(isOpen){ full.classList.remove('open'); if(link) link.innerText='Lagi…'; } else { full.classList.add('open'); if(link) link.innerText='Tutup'; }
+  var isOpen=full.classList.contains('open'); if(isOpen){ full.classList.remove('open'); if(link) link.innerText=T('Lagi…','More…'); } else { full.classList.add('open'); if(link) link.innerText=T('Tutup','Close'); }
 }
 function filterTable(tblId, searchId){
   var tid=tblId||'tbl'; var sid=searchId||'sAdm'; var sEl=document.getElementById(sid); if(!sEl) return;
