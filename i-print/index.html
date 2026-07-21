@@ -176,9 +176,7 @@
     .b-step.done .num { background:#22c55e; color:#fff; border-color:#22c55e; }
     .b-step-line { width:22px; height:2px; background:rgba(255,255,255,.18); border-radius:999px; }
 
-    .b-grid { display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; }
-    @media (max-width: 900px){ .b-grid { grid-template-columns:1fr; } }
-    .b-col { display:flex; flex-direction:column; gap:16px; }
+    /* vertical stack 1→2→3→4 — no b-grid now, form itself is flex column */
 
     .b-card { background: var(--paper); border:1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow-sm); overflow:hidden; }
     .b-card-head { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); background: linear-gradient(180deg, var(--paper), var(--paper-2)); }
@@ -372,143 +370,136 @@
       <div class="b-steps">
         <div class="b-step"><span class="num">1</span> Pemohon</div><div class="b-step-line"></div>
         <div class="b-step"><span class="num">2</span> Spesifikasi</div><div class="b-step-line"></div>
-        <div class="b-step"><span class="num">3</span> Bayar &amp; Fail</div>
+        <div class="b-step"><span class="num">3</span> Harga &amp; Bayaran</div><div class="b-step-line"></div>
+        <div class="b-step"><span class="num">4</span> Fail Poster</div>
       </div>
     </div>
 
-    <form id="mainForm" onsubmit="submitForm(this); return false;">
-      <div class="b-grid">
-        <div class="b-col">
-
-          <!-- Card 1 — Pemohon -->
-          <div class="b-card">
-            <div class="b-card-head">
-              <div class="b-card-icon">👤</div>
-              <div><div class="b-card-title">Maklumat Pemohon</div><div class="b-card-sub">Untuk notifikasi status &amp; hubungi semula</div></div>
-            </div>
-            <div class="b-card-body">
-              <div class="form-row">
-                <div><div class="b-label-row"><label for="inpNama">Nama Penuh *</label></div><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama penuh"></div>
-                <div><div class="b-label-row"><label for="inpTel">No. Telefon *</label><span class="b-hint" id="telHint"></span></div><input type="tel" id="inpTel" name="tel" required inputmode="tel" autocomplete="tel" placeholder="012-345 6789"><div class="b-field-note">Format Malaysia, contoh 012-3456789. Akan digunakan untuk WhatsApp admin.</div></div>
-              </div>
-              <div class="form-row">
-                <div><label for="inpEmail">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="nama@ukm.edu.my"></div>
-                <div><label for="inpUk">UKMPer / No. Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
-              </div>
-              <div><label for="inpPtj">PTJ / Jabatan *</label><input type="text" id="inpPtj" name="ptj" required placeholder="Cth: IMEN, FKAB"></div>
-              <div style="margin-top:14px;"><label for="inpTujuan">Tajuk Poster *</label><textarea id="inpTujuan" name="tujuan" rows="3" required placeholder="Cth: Poster Makmal Nanoteknologi – Seminar 2026"></textarea><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px;">0 aksara</div></div>
-            </div>
-          </div>
-
-          <!-- Card 2 — Spesifikasi -->
-          <div class="b-card">
-            <div class="b-card-head">
-              <div class="b-card-icon">🖨️</div>
-              <div><div class="b-card-title">Spesifikasi Cetakan</div><div class="b-card-sub">Pilih saiz kertas &amp; media cetakan</div></div>
-            </div>
-            <div class="b-card-body">
-              <label>Saiz Poster</label>
-              <div class="size-grid" id="sizeCards">
-                <div class="size-card sel" data-size="A1" onclick="pickSize('A1')"><div class="size-paper"><span style="position:absolute;bottom:4px;right:5px;font-size:7px;font-weight:800;color:#94a3b8;font-family:var(--mono)">A1</span></div><div class="size-meta"><h4>A1 — Standard</h4><p>594 × 841 mm<br>Poster biasa &amp; booth</p><span class="size-price">RM 50/unit</span></div></div>
-                <div class="size-card" data-size="A0" onclick="pickSize('A0')"><div class="size-paper a0"><span style="position:absolute;bottom:4px;right:5px;font-size:7px;font-weight:800;color:#94a3b8;font-family:var(--mono)">A0</span></div><div class="size-meta"><h4>A0 — Besar</h4><p>841 × 1189 mm<br>Backdrop &amp; banner</p><span class="size-price">RM 80/unit</span></div></div>
-              </div>
-              <select name="size" id="size" onchange="calcPrice()" style="display:none">
-                <option value="A1">A1</option>
-                <option value="A0">A0</option>
-              </select>
-
-              <div style="margin-top:16px;"><label>Media Cetakan</label><div class="media-row" id="mediaPills">
-                <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')"><b>High Glossy</b><span>Berkilat • Warna vivid • Sesuai poster &amp; foto</span></div>
-                <div class="media-pill" id="pillPlain" data-media="Plain Paper" onclick="pickMedia('Plain Paper')"><b>Plain Paper</b><span>Matte ekonomi • Sesuai draf &amp; dalaman • RM 30</span></div>
-              </div></div>
-              <select name="media" id="media" onchange="calcPrice()" style="display:none">
-                <option value="High Glossy">High Glossy</option>
-                <option id="optPlain" value="Plain Paper">Plain Paper</option>
-              </select>
-
-              <div style="margin-top:16px;"><label>Unit / Kuantiti</label>
-                <div class="qty-row">
-                  <button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button>
-                  <input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input">
-                  <button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button>
-                  <span class="b-hint" style="margin-left:4px; font-size:11px;">Maks 99</span>
-                </div>
-              </div>
-              <input type="hidden" name="harga_hidden" id="hh" value="50">
-            </div>
-          </div>
-
+    <form id="mainForm" onsubmit="submitForm(this); return false;" style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Card 1 — Pemohon -->
+      <div class="b-card">
+        <div class="b-card-head">
+          <div class="b-card-icon">👤</div>
+          <div><div class="b-card-title">1. Maklumat Pemohon</div><div class="b-card-sub">Untuk notifikasi status &amp; hubungi semula</div></div>
         </div>
-
-        <div class="b-col">
-          <!-- Card 3 — Harga invoice (sticky) + bayaran -->
-          <div class="b-card" style="position:sticky; top:16px;">
-            <div class="b-card-head">
-              <div class="b-card-icon">💰</div>
-              <div><div class="b-card-title">Harga &amp; Bayaran</div><div class="b-card-sub">Anggaran automatik, bukan invois akhir</div></div>
-            </div>
-            <div class="b-card-body">
-              <div class="invoice" id="invoiceBox">
-                <div class="invoice-head"><b>Ringkasan</b><span style="font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.04em; text-transform:uppercase;">Anggaran</span></div>
-                <div class="invoice-body">
-                  <div class="inv-row"><span id="invSpec">A1 • High Glossy</span><span id="invUnitP" style="font-family:var(--mono)">@RM50</span></div>
-                  <div class="inv-row muted"><span id="invQty">1 unit</span><span id="invSub">RM 50.00</span></div>
-                  <div class="inv-total"><b>Jumlah Anggaran</b><span class="rm" id="priceDisplay">RM 50.00</span></div>
-                  <div class="inv-row muted" style="margin-top:8px;">💡 Harga termasuk cetakan sahaja, tidak termasuk laminasi</div>
-                </div>
-              </div>
-
-              <div style="margin-top:14px;"><label>Kaedah Pembayaran</label>
-                <div class="pay-seg" id="paySeg">
-                  <div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b>💵 Cash</b><small>Bayar semasa ambil di Aras 4</small></div>
-                  <div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b>🎓 Geran</b><small>Wajib no. geran</small></div>
-                </div>
-                <select name="bayaran" id="payMethod" onchange="toggleGeran(this)" style="display:none">
-                  <option value="Cash">Cash</option>
-                  <option value="Geran">Geran</option>
-                </select>
-                <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="Masukkan No. Geran (cth: GG-2024-001)"></div>
-              </div>
-
-              <div class="trust-row">
-                <span class="trust">🔒 Fail sulit</span>
-                <span class="trust">✅ Pra-semak DPI</span>
-                <span class="trust">💬 WhatsApp admin</span>
-              </div>
-            </div>
+        <div class="b-card-body">
+          <div class="form-row">
+            <div><div class="b-label-row"><label for="inpNama">Nama Penuh *</label></div><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama penuh"></div>
+            <div><div class="b-label-row"><label for="inpTel">No. Telefon *</label><span class="b-hint" id="telHint"></span></div><input type="tel" id="inpTel" name="tel" required inputmode="tel" autocomplete="tel" placeholder="012-345 6789"><div class="b-field-note">Format Malaysia, contoh 012-3456789. Akan digunakan untuk WhatsApp admin.</div></div>
           </div>
-
-          <!-- Card 4 — Upload -->
-          <div class="b-card">
-            <div class="b-card-head">
-              <div class="b-card-icon">📎</div>
-              <div><div class="b-card-title">Fail Poster</div><div class="b-card-sub">PDF / JPG / PNG — 300MB maks</div></div>
-            </div>
-            <div class="b-card-body">
-              <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Muat naik fail poster">
-                <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" onchange="onFileChosen(this)">
-                <div class="uz-icon"><span style="width:36px;height:36px;border-radius:10px;background:var(--paper-3);border:1px solid var(--border);display:grid;place-items:center;">📄</span><span style="display:flex;gap:6px;align-items:center"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag)"></span><span class="dot" style="background:var(--c-yellow)"></span><span class="dot" style="background:var(--c-key)"></span></span></div>
-                <div class="uz-label">Seret fail ke sini atau klik untuk pilih</div>
-                <div class="uz-sub">Reka bentuk siap cetak, 300dpi disyorkan, RGB/CMYK diterima</div>
-                <div class="uz-specs"><span class="uz-spec">PDF • JPG • PNG</span><span class="uz-spec">≤ 300 MB</span><span class="uz-spec">300dpi</span><span class="uz-spec">A0/A1 scale</span></div>
-                <div class="uz-chosen" id="uzChosen"></div>
-              </div>
-
-              <div class="progress-wrap" id="progressWrap">
-                <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
-                <div class="progress-info"><span id="progChunk">0 MB</span><span id="progPct">0%</span><span id="progSize">0 MB</span></div>
-                <div class="progress-status" id="progStatus"></div>
-              </div>
-
-              <div class="b-field-note" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"><span>✅ Minimum 150dpi (300dpi ideal)</span><span>✅ Bleed 3mm digalakkan</span><span>✅ Font embed dalam PDF</span></div>
-
-              <button class="btn btn-main cta-main" id="submitBtn" type="submit">🚀 Hantar Tempahan — <span id="ctaPrice">RM 50.00</span></button>
-              <div class="cta-foot">Dengan menghantar, anda bersetuju fail disemak pra-cetak oleh urusetia.</div>
-            </div>
+          <div class="form-row">
+            <div><label for="inpEmail">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="nama@ukm.edu.my"></div>
+            <div><label for="inpUk">UKMPer / No. Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
           </div>
-
+          <div><label for="inpPtj">PTJ / Jabatan *</label><input type="text" id="inpPtj" name="ptj" required placeholder="Cth: IMEN, FKAB"></div>
+          <div style="margin-top:14px;"><label for="inpTujuan">Tajuk Poster *</label><textarea id="inpTujuan" name="tujuan" rows="3" required placeholder="Cth: Poster Makmal Nanoteknologi – Seminar 2026"></textarea><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px;">0 aksara</div></div>
         </div>
       </div>
+
+      <!-- Card 2 — Spesifikasi -->
+      <div class="b-card">
+        <div class="b-card-head">
+          <div class="b-card-icon">🖨️</div>
+          <div><div class="b-card-title">2. Spesifikasi Cetakan</div><div class="b-card-sub">Pilih saiz kertas &amp; media cetakan</div></div>
+        </div>
+        <div class="b-card-body">
+          <label>Saiz Poster</label>
+          <div class="size-grid" id="sizeCards">
+            <div class="size-card sel" data-size="A1" onclick="pickSize('A1')"><div class="size-paper"><span style="position:absolute;bottom:4px;right:5px;font-size:7px;font-weight:800;color:#94a3b8;font-family:var(--mono)">A1</span></div><div class="size-meta"><h4>A1 — Standard</h4><p>594 × 841 mm<br>Poster biasa &amp; booth</p><span class="size-price">RM 50/unit</span></div></div>
+            <div class="size-card" data-size="A0" onclick="pickSize('A0')"><div class="size-paper a0"><span style="position:absolute;bottom:4px;right:5px;font-size:7px;font-weight:800;color:#94a3b8;font-family:var(--mono)">A0</span></div><div class="size-meta"><h4>A0 — Besar</h4><p>841 × 1189 mm<br>Backdrop &amp; banner</p><span class="size-price">RM 80/unit</span></div></div>
+          </div>
+          <select name="size" id="size" onchange="calcPrice()" style="display:none">
+            <option value="A1">A1</option>
+            <option value="A0">A0</option>
+          </select>
+
+          <div style="margin-top:16px;"><label>Media Cetakan</label><div class="media-row" id="mediaPills">
+            <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')"><b>High Glossy</b><span>Berkilat • Warna vivid • Sesuai poster &amp; foto</span></div>
+            <div class="media-pill" id="pillPlain" data-media="Plain Paper" onclick="pickMedia('Plain Paper')"><b>Plain Paper</b><span>Matte ekonomi • Sesuai draf &amp; dalaman • RM 30</span></div>
+          </div></div>
+          <select name="media" id="media" onchange="calcPrice()" style="display:none">
+            <option value="High Glossy">High Glossy</option>
+            <option id="optPlain" value="Plain Paper">Plain Paper</option>
+          </select>
+
+          <div style="margin-top:16px;"><label>Unit / Kuantiti</label>
+            <div class="qty-row">
+              <button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button>
+              <input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input">
+              <button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button>
+              <span class="b-hint" style="margin-left:4px; font-size:11px;">Maks 99</span>
+            </div>
+          </div>
+          <input type="hidden" name="harga_hidden" id="hh" value="50">
+        </div>
+      </div>
+
+      <!-- Card 3 — Harga & Bayaran -->
+      <div class="b-card">
+        <div class="b-card-head">
+          <div class="b-card-icon">💰</div>
+          <div><div class="b-card-title">3. Harga &amp; Bayaran</div><div class="b-card-sub">Anggaran automatik, bukan invois akhir</div></div>
+        </div>
+        <div class="b-card-body">
+          <div class="invoice" id="invoiceBox">
+            <div class="invoice-head"><b>Ringkasan</b><span style="font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.04em; text-transform:uppercase;">Anggaran</span></div>
+            <div class="invoice-body">
+              <div class="inv-row"><span id="invSpec">A1 • High Glossy</span><span id="invUnitP" style="font-family:var(--mono)">@RM50</span></div>
+              <div class="inv-row muted"><span id="invQty">1 unit</span><span id="invSub">RM 50.00</span></div>
+              <div class="inv-total"><b>Jumlah Anggaran</b><span class="rm" id="priceDisplay">RM 50.00</span></div>
+              <div class="inv-row muted" style="margin-top:8px;">💡 Harga termasuk cetakan sahaja, tidak termasuk laminasi</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px;"><label>Kaedah Pembayaran</label>
+            <div class="pay-seg" id="paySeg">
+              <div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b>💵 Cash</b><small>Bayar semasa ambil di Aras 4</small></div>
+              <div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b>🎓 Geran</b><small>Wajib no. geran</small></div>
+            </div>
+            <select name="bayaran" id="payMethod" onchange="toggleGeran(this)" style="display:none">
+              <option value="Cash">Cash</option>
+              <option value="Geran">Geran</option>
+            </select>
+            <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="Masukkan No. Geran (cth: GG-2024-001)"></div>
+          </div>
+
+          <div class="trust-row">
+            <span class="trust">🔒 Fail sulit</span>
+            <span class="trust">✅ Pra-semak DPI</span>
+            <span class="trust">💬 WhatsApp admin</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4 — Fail Poster -->
+      <div class="b-card">
+        <div class="b-card-head">
+          <div class="b-card-icon">📎</div>
+          <div><div class="b-card-title">4. Fail Poster</div><div class="b-card-sub">PDF / JPG / PNG — 300MB maks — 300dpi disyorkan</div></div>
+        </div>
+        <div class="b-card-body">
+          <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Muat naik fail poster">
+            <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" onchange="onFileChosen(this)">
+            <div class="uz-icon"><span style="width:36px;height:36px;border-radius:10px;background:var(--paper-3);border:1px solid var(--border);display:grid;place-items:center;">📄</span><span style="display:flex;gap:6px;align-items:center"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag)"></span><span class="dot" style="background:var(--c-yellow)"></span><span class="dot" style="background:var(--c-key)"></span></span></div>
+            <div class="uz-label">Seret fail ke sini atau klik untuk pilih</div>
+            <div class="uz-sub">Reka bentuk siap cetak, 300dpi disyorkan, RGB/CMYK diterima</div>
+            <div class="uz-specs"><span class="uz-spec">PDF • JPG • PNG</span><span class="uz-spec">≤ 300 MB</span><span class="uz-spec">300dpi</span><span class="uz-spec">A0/A1 scale</span></div>
+            <div class="uz-chosen" id="uzChosen"></div>
+          </div>
+
+          <div class="progress-wrap" id="progressWrap">
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+            <div class="progress-info"><span id="progChunk">0 MB</span><span id="progPct">0%</span><span id="progSize">0 MB</span></div>
+            <div class="progress-status" id="progStatus"></div>
+          </div>
+
+          <div class="b-field-note" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"><span>✅ Minimum 150dpi (300dpi ideal)</span><span>✅ Bleed 3mm digalakkan</span><span>✅ Font embed dalam PDF</span></div>
+
+          <button class="btn btn-main cta-main" id="submitBtn" type="submit">🚀 Hantar Tempahan — <span id="ctaPrice">RM 50.00</span></button>
+          <div class="cta-foot">Dengan menghantar, anda bersetuju fail disemak pra-cetak oleh urusetia.</div>
+        </div>
+      </div>
+
       <div class="price-box" style="display:none"><span id="priceDisplayLegacy">50.00</span></div>
     </form>
   </div>
