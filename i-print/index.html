@@ -156,6 +156,11 @@
     .act-btn-del   { background: transparent; color: #fca5a5; font-size: 11px; font-weight: 800; width: 22px; height: 22px; }
     .act-btn-del:hover { background: #fef2f2; color: #dc2626; }
     .act-sep { width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; align-self: center; display: inline-block; }
+
+    /* Contact under pemohon col */
+    .contact-box { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    .contact-link { font-size: 11px; color: #3b82f6; text-decoration: none; font-weight: 600; word-break: break-all; }
+    .contact-link:hover { color: #1d4ed8; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -675,11 +680,21 @@ function loadAdmin() {
           tajukCell = '<div style="font-size:12px;color:#475569;line-height:1.5;max-width:180px;word-break:break-word;">' + esc(tajukRaw) + '</div>';
         }
 
+        // — Contact: phone + email —
+        var rawTel = String(d[i][4] || '').replace(/^'s*/, '').trim();
+        var pEmal  = String(d[i][13] || '').trim();
+        var telLink = rawTel ? rawTel.replace(/[^0-9+]/g, '') : '';
+        var waLink  = telLink ? 'https://wa.me/' + telLink : '#';
+
         h += '<tr>' +
           '<td style="color:#94a3b8;font-weight:700;">' + i + '</td>' +
           '<td><div style="font-weight:700;">' + esc(d[i][2]) + '</div>' +
               tajukCell +
-              '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + esc(d[i][1]) + '</div></td>' +
+              '<div class="contact-box">' +
+                (rawTel ? '<a href="tel:' + esc(telLink) + '" class="contact-link" title="Hubungi ' + esc(d[i][2]) + '">📞 ' + esc(rawTel) + '</a>' : '') +
+                (pEmal  ? '<a href="mailto:' + esc(pEmal) + '" class="contact-link" title="Emel ' + esc(d[i][2]) + '">✉️ ' + esc(pEmal) + '</a>' : '') +
+              '</div>' +
+              '<div style="font-size:10px;color:#94a3b8;margin-top:1px;">' + esc(d[i][1]) + '</div></td>' +
           '<td><b>' + esc(d[i][6]) + '</b><br><small style="color:#64748b;">' + esc(d[i][7]) + ' ×' + esc(d[i][16]) + '</small></td>' +
           '<td><b>RM ' + tot + '</b><br><small style="color:#94a3b8;">@RM' + unitP + ' ×' + qty + '</small></td>' +
           '<td><span class="badge ' + cls + '">' + esc(st) + '</span></td>' +
