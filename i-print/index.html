@@ -158,10 +158,12 @@
     .act-btn-del:hover { background: #fef2f2; color: #dc2626; }
     .act-sep { width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; align-self: center; display: inline-block; }
 
-    /* Contact under pemohon col — WhatsApp B: WA primary + call icon small */
+    /* Contact under pemohon col — WhatsApp B: WA primary + call icon small, email plain */
     .contact-box { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
     .contact-link { font-size: 11px; color: #3b82f6; text-decoration: none; font-weight: 600; word-break: break-all; }
     .contact-link:hover { color: #1d4ed8; text-decoration: underline; }
+    .contact-email { font-size: 11px; color: #334155; font-weight: 500; user-select: all; cursor: text; }
+    .contact-email:hover { color: #0f172a; text-decoration: none; }
     .wa-link { color: #128C7E; }
     .wa-link:hover { color: #075E54; text-decoration: underline; }
     .contact-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -732,7 +734,7 @@ function _contactCell(telRaw, emailRaw, namaEsc, rowIdx) {
       out += '<span class="contact-link" style="color:#64748b;">📞 ' + esc(rawTel) + '</span>';
     }
   }
-  if (pEmal) out += '<a href="mailto:' + esc(pEmal) + '" class="contact-link" title="Emel ' + namaEsc + '">✉️ ' + esc(pEmal) + '</a>';
+  if (pEmal) out += '<a href="mailto:' + esc(pEmal) + '" class="contact-link contact-email" title="Emel ' + namaEsc + '">' + esc(pEmal) + '</a>';
   out += '</div>';
   return out;
 }
