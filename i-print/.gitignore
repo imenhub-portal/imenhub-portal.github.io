@@ -1,4 +1,6 @@
-# large banner originals — already embedded as base64 in index.html for fast load
+# ignore original huge files, keep optimized webp
 poster size.png
 banner printer.jpg
 *.b64.txt
+poster-size.png
+banner-printer.jpg
