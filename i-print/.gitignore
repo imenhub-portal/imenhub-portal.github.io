@@ -1,0 +1,4 @@
+# large banner originals — already embedded as base64 in index.html for fast load
+poster size.png
+banner printer.jpg
+*.b64.txt
