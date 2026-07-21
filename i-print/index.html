@@ -595,7 +595,7 @@ function loadAdmin() {
       document.getElementById('loginBox').style.display = 'none';
       document.getElementById('dash').style.display     = 'block';
 
-      var h = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Status</th><th>Geran</th><th>Tindakan</th></tr>';
+      var h = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>';
       var cT=0, cP=0, cPr=0, cS=0;
 
       for (var i = 1; i < d.length; i++) {
@@ -608,6 +608,23 @@ function loadAdmin() {
         else if (st === 'Ditolak')           { cls = 'badge-reject'; }
         else                                  { cP++; }
 
+        // — Harga (unit × qty = total) —
+        var unitP  = parseFloat(d[i][8])  || 0;
+        var qty    = parseInt(d[i][16],10) || 1;
+        var tot    = (unitP * qty).toFixed(2);
+
+        // — Bayaran column: show Cash badge or Geran + no —
+        var method  = d[i][9];
+        var noGeran = d[i][14];
+        var bayaranCell = '';
+        if (String(method).toLowerCase() === 'cash') {
+          bayaranCell = '<span style="background:#f0fdf4;color:#15803d;border:1px solid #86efac;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">💵 Cash</span>';
+        } else {
+          var gn = (noGeran && noGeran !== '-' && noGeran !== '') ? esc(noGeran) : '-';
+          bayaranCell = '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">🎓 Geran</span>' +
+                        '<br><small style="color:#475569;font-size:11px;">' + gn + '</small>';
+        }
+
         var eid = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         h += '<tr>' +
           '<td style="color:#94a3b8;font-weight:700;">' + i + '</td>' +
@@ -615,8 +632,9 @@ function loadAdmin() {
               '<div style="font-size:11px;color:#64748b;">' + esc(d[i][15]) + '</div>' +
               '<div style="font-size:11px;color:#94a3b8;">' + esc(d[i][1]) + '</div></td>' +
           '<td><b>' + esc(d[i][6]) + '</b><br><small style="color:#64748b;">' + esc(d[i][7]) + ' ×' + esc(d[i][16]) + '</small></td>' +
+          '<td><b>RM ' + tot + '</b><br><small style="color:#94a3b8;">@RM' + unitP + ' ×' + qty + '</small></td>' +
           '<td><span class="badge ' + cls + '">' + esc(st) + '</span></td>' +
-          '<td><small>' + esc(d[i][14]) + '</small></td>' +
+          '<td>' + bayaranCell + '</td>' +
           '<td>' +
             '<button class="btn btn-blue"  onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')">Proses</button>' +
             '<button class="btn btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')">Siap</button>' +
