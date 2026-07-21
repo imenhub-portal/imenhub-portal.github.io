@@ -226,28 +226,77 @@
     .b-hint{ font-size:11px; color:var(--muted); font-weight:600; }
     .b-field-note{ font-size:11px; color:var(--muted); margin-top:6px; line-height:1.45; }
 
-    .size-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:6px; }
-    @media (max-width:600px){ .size-grid{ grid-template-columns:1fr; } }
-    .size-card{ position:relative; border:1.5px solid var(--border); border-radius:16px; padding:14px 12px 12px; cursor:pointer; transition:border-color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease), background .18s var(--ease); background:var(--paper); display:flex; gap:12px; align-items:flex-start; }
-    .size-card:hover{ border-color:var(--ink); transform:translateY(-1px); box-shadow:var(--shadow-sm); }
+    /* Merch size cards — icon only, radio style A1 594×841 */
+    .size-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
+    @media (max-width:600px){ .size-grid{ grid-template-columns:1fr 1fr; } }
+    .size-card{
+      position:relative; border:1.5px solid var(--border); border-radius:16px; padding:12px;
+      cursor:pointer; transition:border-color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease), background .18s var(--ease);
+      background:var(--paper); display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+    }
+    .size-card:hover{ border-color:var(--ink); transform:translateY(-2px); box-shadow:var(--shadow-sm); }
     .size-card.sel{ border-color:var(--ink); background:linear-gradient(180deg,#ffffff,#f8fafc); box-shadow:var(--ring), var(--shadow-sm); }
-    .size-card.sel::after{ content:'✓'; position:absolute; top:10px; right:10px; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:800; box-shadow:0 4px 12px rgba(15,23,42,.22); }
-    .size-paper{ width:38px; height:52px; border-radius:5px; border:1.5px solid var(--border-2); background:linear-gradient(180deg,#fff,#f1f5f9); flex-shrink:0; position:relative; box-shadow:0 2px 10px rgba(15,23,42,.06); }
-    .size-paper.a0{ width:48px; height:64px; }
-    .size-paper::after{ content:''; position:absolute; inset:5px; border:1px dashed #cbd5e1; border-radius:3px; }
-    .size-paper i{ position:absolute; bottom:5px; right:6px; font-style:normal; font-size:7px; font-weight:800; color:var(--muted-2); font-family:var(--mono); }
-    .size-meta h4{ margin:0; font-size:13px; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
-    .size-meta p{ margin:4px 0 0; font-size:11px; color:var(--muted); line-height:1.4; }
-    .size-price{ margin-top:8px; display:inline-flex; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:800; background:var(--paper-3); border:1px solid var(--border); color:var(--ink); letter-spacing:.02em; }
-    .size-card.sel .size-price{ background:var(--ink); color:#fff; border-color:var(--ink); }
+    .size-card.sel::after{ content:'✓'; position:absolute; top:8px; right:8px; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:800; box-shadow:0 4px 12px rgba(15,23,42,.22); }
 
-    .media-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
-    .media-pill{ flex:1; min-width:148px; padding:12px 13px; border-radius:14px; border:1.5px solid var(--border); background:var(--paper); cursor:pointer; transition:.18s var(--ease); position:relative; }
-    .media-pill:hover{ border-color:var(--ink-2); transform:translateY(-1px); }
-    .media-pill.sel{ border-color:var(--ink); box-shadow:var(--ring); background:var(--paper); }
-    .media-pill b{ display:block; font-size:12.5px; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
-    .media-pill span{ display:block; font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4; }
-    .media-pill.sel::after{ content:'✓'; position:absolute; top:9px; right:9px; width:18px; height:18px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:10px; }
+    .size-art{ position:relative; width:100%; display:flex; align-items:center; justify-content:center; padding:6px 0 2px; }
+    .size-paper{
+      width:46px; height:64px; border-radius:7px; border:1.5px solid var(--ink); background:
+        linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+      flex-shrink:0; position:relative; box-shadow:0 6px 18px rgba(15,23,42,.12), 0 1px 0 rgba(255,255,255,.8) inset;
+      display:grid; place-items:center;
+    }
+    .size-paper.a0{ width:56px; height:76px; border-radius:8px; }
+    .size-paper::before{ content:''; position:absolute; inset:6px; border:1px dashed #cbd5e1; border-radius:4px; }
+    .size-paper::after{ content:''; position:absolute; inset:auto 0 -4px 0; height:8px; background:linear-gradient(180deg, rgba(15,23,42,.18), transparent); filter:blur(4px); border-radius:50%; z-index:-1; }
+    .size-paper i{ font-style:normal; font-size:10px; font-weight:800; color:var(--ink); font-family:var(--mono); letter-spacing:.02em; }
+
+    .size-info{ display:flex; flex-direction:column; gap:2px; align-items:center; }
+    .size-info b{ font-size:14px; font-weight:800; color:var(--ink); letter-spacing:-.01em; line-height:1; }
+    .size-info span{ font-size:11px; font-weight:600; color:var(--ink-3); font-family:var(--mono); letter-spacing:.01em; }
+    .size-info em{ font-style:normal; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; background:var(--paper-3); border:1px solid var(--border); color:var(--ink); margin-top:2px; }
+    .size-card.sel .size-info em{ background:var(--ink); color:#fff; border-color:var(--ink); }
+
+    /* Merch media — glossy vs plain graphics */
+    .media-row{ display:flex; gap:12px; margin-top:10px; }
+    @media (max-width:520px){ .media-row{ flex-direction:column; } }
+    .media-pill{
+      flex:1; min-width:120px; padding:12px; border-radius:16px; border:1.5px solid var(--border); background:var(--paper);
+      cursor:pointer; transition:.18s var(--ease); position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+    }
+    .media-pill:hover{ border-color:var(--ink-2); transform:translateY(-1px); box-shadow:var(--shadow-sm); }
+    .media-pill.sel{ border-color:var(--ink); box-shadow:var(--ring), var(--shadow-sm); background:linear-gradient(180deg,#fff,#f8fafc); }
+    .media-pill.sel::after{ content:'✓'; position:absolute; top:8px; right:8px; width:18px; height:18px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:10px; font-weight:800; }
+
+    .media-art{ width:56px; height:56px; border-radius:14px; position:relative; overflow:hidden; display:grid; place-items:center; border:1px solid var(--border); box-shadow:0 4px 16px rgba(15,23,42,.06); }
+    .media-art.glossy{
+      background: radial-gradient(120% 120% at 28% 18%, #ffffff 0%, #dbeafe 22%, #93c5fd 48%, #1e40af 100%);
+    }
+    .media-art.glossy::before{
+      content:''; position:absolute; inset:0;
+      background: linear-gradient(108deg, transparent 36%, rgba(255,255,255,.85) 50%, transparent 66%);
+      transform:translateX(-18px); animation:glossSheen 2.8s var(--ease) infinite;
+    }
+    .media-art.glossy::after{
+      content:''; position:absolute; top:8px; left:10px; width:16px; height:10px; border-radius:50%; background:rgba(255,255,255,.9); transform:rotate(-18deg); filter:blur(.3px);
+    }
+    @keyframes glossSheen{ 0%{ transform:translateX(-30px);} 55%{ transform:translateX(30px);} 100%{ transform:translateX(30px);} }
+
+    .media-art.plain{
+      background:#f8fafc;
+      background-image:
+        radial-gradient(#e2e8f0 1px, transparent 1px),
+        linear-gradient(180deg, #ffffff, #f1f5f9);
+      background-size: 10px 10px, 100% 100%;
+      border-style:dashed;
+    }
+    .media-art.plain::after{
+      content:''; position:absolute; inset:8px; border:1px solid #e2e8f0; border-radius:8px; background:repeating-linear-gradient(90deg, transparent 0 4px, rgba(148,163,184,.18) 4px 5px);
+      opacity:.6;
+    }
+
+    .media-info b{ font-size:12.5px; font-weight:800; color:var(--ink); letter-spacing:-.01em; display:block; }
+    .media-info span{ font-size:11px; font-weight:700; color:var(--muted); font-family:var(--mono); margin-top:2px; display:block; }
+    .media-pill.sel .media-info span{ color:var(--ink); }
 
     .qty-row{ display:flex; align-items:center; gap:10px; margin-top:10px; }
     .qty-btn{ width:42px; height:42px; border-radius:13px; border:1.5px solid var(--border); background:var(--paper); cursor:pointer; font-size:20px; font-weight:700; display:grid; place-items:center; transition:.15s var(--ease); }
@@ -376,35 +425,28 @@
     <div class="b-hero">
       <div class="b-hero-grid">
         <div>
-          <h1>Servis Cetakan <em>Poster</em><br>bertaraf merch.</h1>
-          <p>Cetakan A0/A1 makmal siap 2–3 hari, pra-semak fail oleh urusetia, warna vivid, kertas berkualiti. Muat naik PDF/JPG/PNG beresolusi tinggi — sistem terus ke Drive tanpa had saiz seni bina lama.</p>
-          <div class="b-meta">
-            <span class="b-pill"><span class="dot" style="background:var(--c-cyan)"></span> A1 594×841</span>
-            <span class="b-pill"><span class="dot" style="background:var(--orange)"></span> A0 841×1189</span>
-            <span class="b-pill"><span class="dot" style="background:#22c55e"></span> 300dpi disyorkan</span>
-            <span class="b-pill" style="gap:5px"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag); margin-left:-4px"></span><span class="dot" style="background:var(--c-yellow); margin-left:-4px"></span><span class="dot" style="background:#fff; margin-left:-4px"></span> CMYK ready</span>
-          </div>
+          <h1>Servis Cetakan <em>Poster</em></h1>
           <div class="b-steps">
             <div class="b-step active"><span class="num">1</span> Pemohon</div><div class="b-step-line"></div>
             <div class="b-step"><span class="num">2</span> Spesifikasi</div><div class="b-step-line"></div>
-            <div class="b-step"><span class="num">3</span> Harga & Bayaran</div><div class="b-step-line"></div>
+            <div class="b-step"><span class="num">3</span> Bayaran</div><div class="b-step-line"></div>
             <div class="b-step"><span class="num">4</span> Fail</div>
+          </div>
+          <div class="b-meta" style="margin-top:10px">
+            <span class="b-pill"><span class="dot" style="background:var(--c-cyan)"></span> A1 • A0</span>
+            <span class="b-pill"><span class="dot" style="background:var(--orange)"></span> 300dpi</span>
+            <span class="b-pill" style="gap:5px"><span class="dot" style="background:var(--c-cyan)"></span><span class="dot" style="background:var(--c-mag); margin-left:-4px"></span><span class="dot" style="background:var(--c-yellow); margin-left:-4px"></span><span class="dot" style="background:#fff; margin-left:-4px"></span> CMYK</span>
           </div>
         </div>
         <div class="merch-mock">
-          <div class="merch-top"><span>Mock • A1</span><span style="font-family:var(--mono); text-transform:none; letter-spacing:0;">594×841mm • 300dpi</span></div>
+          <div class="merch-top"><span>A1 594×841</span><span style="font-family:var(--mono);">merch-grade</span></div>
           <div class="merch-art">
             <div class="merch-bleed"></div>
             <div class="merch-sheet">
               <div class="merch-line"></div><div class="merch-line mid"></div><div class="merch-line short"></div>
               <div style="flex:1; border:1px dashed #cbd5e1; border-radius:6px; background:linear-gradient(135deg, #f8fafc, #fff);"></div>
-              <div class="merch-swatch"><i style="background:var(--c-cyan)"></i><i style="background:var(--c-mag)"></i><i style="background:var(--c-yellow)"></i><i style="background:var(--c-key)"></i><i style="background:var(--orange)"></i></div>
+              <div class="merch-swatch"><i style="background:var(--c-cyan)"></i><i style="background:var(--c-mag)"></i><i style="background:var(--c-yellow)"></i><i style="background:var(--c-key)"></i></div>
             </div>
-          </div>
-          <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
-            <span class="b-pill" style="font-size:9px; padding:4px 8px;">Glossy vivid</span>
-            <span class="b-pill" style="font-size:9px; padding:4px 8px;">Matte ekonomi</span>
-            <span class="b-pill" style="font-size:9px; padding:4px 8px;">🔒 Sulit</span>
           </div>
         </div>
       </div>
@@ -434,15 +476,29 @@
         <div class="b-card-body">
           <label>Saiz Poster</label>
           <div class="size-grid" id="sizeCards">
-            <div class="size-card sel" data-size="A1" onclick="pickSize('A1')"><div class="size-paper"><i>A1</i></div><div class="size-meta"><h4>A1 — Standard</h4><p>594 × 841 mm<br>Poster biasa, booth, pembentangan</p><span class="size-price">RM 50 / unit</span></div></div>
-            <div class="size-card" data-size="A0" onclick="pickSize('A0')"><div class="size-paper a0"><i>A0</i></div><div class="size-meta"><h4>A0 — Besar</h4><p>841 × 1189 mm<br>Backdrop, banner, pameran</p><span class="size-price">RM 80 / unit</span></div></div>
+            <div class="size-card sel" data-size="A1" onclick="pickSize('A1')">
+              <div class="size-art"><div class="size-paper"><i>A1</i></div></div>
+              <div class="size-info"><b>A1</b><span>594 × 841</span><em>RM 50</em></div>
+            </div>
+            <div class="size-card" data-size="A0" onclick="pickSize('A0')">
+              <div class="size-art"><div class="size-paper a0"><i>A0</i></div></div>
+              <div class="size-info"><b>A0</b><span>841 × 1189</span><em>RM 80</em></div>
+            </div>
           </div>
           <select name="size" id="size" onchange="calcPrice()" style="display:none"><option value="A1">A1</option><option value="A0">A0</option></select>
 
-          <div style="margin-top:16px;"><label>Media Cetakan</label><div class="media-row" id="mediaPills">
-            <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')"><b>High Glossy</b><span>Berkilat, warna vivid, sesuai poster &amp; foto — pilihan kedai merch</span></div>
-            <div class="media-pill" id="pillPlain" data-media="Plain Paper" onclick="pickMedia('Plain Paper')"><b>Plain Paper</b><span>Matte ekonomi, dalaman/draf, RM 30 — tidak tersedia untuk A0</span></div>
-          </div></div>
+          <div style="margin-top:16px;"><label>Media Cetakan</label>
+            <div class="media-row" id="mediaPills">
+              <div class="media-pill sel" data-media="High Glossy" onclick="pickMedia('High Glossy')">
+                <div class="media-art glossy"></div>
+                <div class="media-info"><b>High Glossy</b><span>RM 50 / 80</span></div>
+              </div>
+              <div class="media-pill" id="pillPlain" data-media="Plain Paper" onclick="pickMedia('Plain Paper')">
+                <div class="media-art plain"></div>
+                <div class="media-info"><b>Plain Paper</b><span>RM 30</span></div>
+              </div>
+            </div>
+          </div>
           <select name="media" id="media" onchange="calcPrice()" style="display:none"><option value="High Glossy">High Glossy</option><option id="optPlain" value="Plain Paper">Plain Paper</option></select>
 
           <div style="margin-top:16px;"><label>Unit / Kuantiti</label>
