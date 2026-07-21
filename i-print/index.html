@@ -86,10 +86,11 @@
     .btn-main:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
     .badge { padding: 5px 11px; border-radius: 8px; font-weight: 800; font-size: 10px; text-transform: uppercase; display: inline-block; }
-    .badge-pending { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
-    .badge-process { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
-    .badge-reject  { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
-    .badge-success { background: #f0fdf4; color: #15803d; border: 1px solid #22c55e; }
+    .badge-pending   { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+    .badge-process   { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .badge-reject    { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .badge-success   { background: #f0fdf4; color: #15803d; border: 1px solid #22c55e; }
+    .badge-collected { background: #f5f3ff; color: #6d28d9; border: 1px solid #c4b5fd; }
 
     table { width: 100%; border-collapse: collapse; }
     th { background: #f8fafc; padding: 11px 12px; text-align: left; font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; }
@@ -157,10 +158,28 @@
     .act-btn-del:hover { background: #fef2f2; color: #dc2626; }
     .act-sep { width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; align-self: center; display: inline-block; }
 
-    /* Contact under pemohon col */
-    .contact-box { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    /* Contact under pemohon col — WhatsApp B: WA primary + call icon small */
+    .contact-box { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
     .contact-link { font-size: 11px; color: #3b82f6; text-decoration: none; font-weight: 600; word-break: break-all; }
     .contact-link:hover { color: #1d4ed8; text-decoration: underline; }
+    .wa-link { color: #128C7E; }
+    .wa-link:hover { color: #075E54; text-decoration: underline; }
+    .contact-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .contact-link-sm { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: #f1f5f9; font-size: 11px; text-decoration: none; flex-shrink: 0; }
+    .contact-link-sm:hover { background: #e2e8f0; }
+
+    /* Admin sub-tabs: Aktif / Sejarah */
+    .adm-subtabs { display: flex; gap: 6px; margin-bottom: 12px; background: #f1f5f9; padding: 4px; border-radius: 12px; width: fit-content; }
+    .adm-subtab { padding: 8px 14px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; color: #64748b; user-select: none; transition: 0.18s; display: flex; align-items: center; gap: 6px; }
+    .adm-subtab:hover { color: #0f172a; }
+    .adm-subtab.active { background: white; color: #0f172a; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .adm-subtab b { background: #e2e8f0; color: #334155; padding: 2px 7px; border-radius: 99px; font-size: 11px; }
+    .adm-subtab.active b { background: #0f172a; color: white; }
+    .adm-pane { animation: fadeIn 0.22s ease; }
+    .act-btn-collected { background: #f5f3ff; }
+    .act-btn-collected:hover { background: #ede9fe; }
+    .act-btn-restore { background: #fef3c7; }
+    .act-btn-restore:hover { background: #fde68a; }
   </style>
 </head>
 <body>
@@ -302,23 +321,49 @@
         <h3 style="margin:0;">📊 Admin Dashboard</h3>
         <button class="btn" onclick="loadAdmin()" style="background:#e2e8f0;color:#0f172a;">🔄 Refresh</button>
       </div>
-      <div class="stat-grid">
+      <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
         <div class="stat-card" style="background:#f1f5f9;">Semua<b id="cTot">0</b></div>
         <div class="stat-card" style="background:#fff7ed;color:#c2410c;">Pending<b id="cP">0</b></div>
         <div class="stat-card" style="background:#eff6ff;color:#1d4ed8;">Proses<b id="cPr">0</b></div>
         <div class="stat-card" style="background:#f0fdf4;color:#15803d;">Siap<b id="cS">0</b></div>
+        <div class="stat-card" style="background:#f5f3ff;color:#6d28d9;">Diambil<b id="cCd">0</b></div>
       </div>
-      <input type="text" id="sAdm" onkeyup="filterTable()" placeholder="🔍 Cari nama..." style="margin-bottom:12px;">
-      <!-- Legend — explains icon-only action buttons -->
-      <div id="actLegend" style="display:none;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11px;font-weight:600;color:#475569;">
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#eff6ff;border-radius:6px;font-size:11px;">🔄</span> Proses</span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f0fdf4;border-radius:6px;font-size:11px;">✅</span> Siap</span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#fef2f2;border-radius:6px;font-size:11px;">❌</span> Tolak</span>
-        <span style="width:1px;height:16px;background:#e2e8f0;display:inline-block;"></span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;">📄</span> Fail</span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:transparent;color:#fca5a5;border-radius:6px;font-size:11px;font-weight:800;">✕</span> Padam</span>
+
+      <!-- Sub-tabs: Aktif / Sejarah -->
+      <div class="adm-subtabs">
+        <div class="adm-subtab active" id="admSub0" onclick="swAdminTab(0)">🔥 Aktif <b id="cActive">0</b></div>
+        <div class="adm-subtab"        id="admSub1" onclick="swAdminTab(1)">📜 Sejarah <b id="cHist">0</b></div>
       </div>
-      <div style="overflow-x:auto;"><table id="tbl"></table></div>
+
+      <!-- Aktif pane -->
+      <div id="admActivePane" class="adm-pane">
+        <input type="text" id="sAdm" onkeyup="filterTable('tbl','sAdm')" placeholder="🔍 Cari nama..." style="margin-bottom:10px;">
+        <div id="actLegend" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11px;font-weight:600;color:#475569;">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#eff6ff;border-radius:6px;">🔄</span> Proses</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f0fdf4;border-radius:6px;">✅</span> Siap</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f5f3ff;border-radius:6px;">📦</span> Diambil</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#fef2f2;border-radius:6px;">❌</span> Tolak</span>
+          <span style="width:1px;height:16px;background:#e2e8f0;display:inline-block;"></span>
+          <span style="display:flex;align-items:center;gap:3px;"><span style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e6fffa;color:#128C7E;border-radius:6px;font-size:10px;">💬</span> WA</span>
+          <span style="display:flex;align-items:center;gap:3px;"><span style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:6px;font-size:10px;">📞</span> Call</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">📄</span> Fail</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:transparent;color:#fca5a5;border-radius:6px;font-weight:800;">✕</span> Padam</span>
+        </div>
+        <div style="overflow-x:auto;"><table id="tbl"></table></div>
+      </div>
+
+      <!-- Sejarah pane -->
+      <div id="admHistPane" class="adm-pane" style="display:none;">
+        <input type="text" id="sAdmHist" onkeyup="filterTable('tblHist','sAdmHist')" placeholder="🔍 Cari dalam sejarah..." style="margin-bottom:10px;">
+        <div id="actHistLegend" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:11px;font-weight:600;color:#92400e;">
+          <span>📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini.</span>
+          <span style="width:1px;height:16px;background:#fde68a;display:inline-block;"></span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#fef3c7;border-radius:6px;">↩️</span> Kembali ke Siap</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">📄</span> Fail</span>
+        </div>
+        <div style="overflow-x:auto;"><table id="tblHist"></table></div>
+        <div id="histEmpty" style="display:none;text-align:center;color:#94a3b8;padding:24px 12px;font-size:13px;">Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini.</div>
+      </div>
     </div>
   </div>
 
@@ -335,6 +380,22 @@ function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// MY phone → WhatsApp E.164 digits. SG guard: if starts 65 and looks SG, keep as 65.
+function normalizePhoneMY(raw) {
+  var d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length < 9) return ''; // too short
+  // SG: 65 + 8 digits = 10 total starting 65 — keep
+  if (d.indexOf('65') === 0 && (d.length === 10 || d.length === 11)) return d;
+  if (d.indexOf('60') === 0) return d;
+  if (d.charAt(0) === '0') return '60' + d.slice(1);
+  return '60' + d;
+}
+function waUrlFrom(raw) {
+  var n = normalizePhoneMY(raw);
+  return n ? 'https://wa.me/' + n : '';
 }
 function sw(n) {
   document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active', i===n); });
@@ -597,9 +658,7 @@ function checkStatus() {
         h = '<div style="text-align:center;color:#64748b;padding:30px;font-size:14px;">Tiada rekod dijumpai.</div>';
       } else {
         r.forEach(function(x){
-          var cls = x.status === 'Dalam Proses' ? 'badge-process'
-                  : x.status === 'Dah Boleh Collect' ? 'badge-success'
-                  : x.status === 'Ditolak' ? 'badge-reject' : 'badge-pending';
+          var cls = badgeCls(x.status);
           var extra = x.status === 'Ditolak'
             ? '<br><small style="color:#b91c1c;margin-top:4px;display:block;">Sebab: ' + esc(x.alasan) + '</small>' : '';
           h += '<div style="background:white;padding:16px;border-radius:12px;margin-bottom:10px;border:1px solid #e2e8f0;">' +
@@ -620,6 +679,131 @@ function checkStatus() {
 // they must prove admin rights themselves — the password prompt alone is
 // only a UI gate, not a lock.
 var _adminPass = '';
+var _admSubTab = 0;
+var _admRowsCache = null;
+
+function badgeCls(st) {
+  if (st === 'Dalam Proses')      return 'badge-process';
+  if (st === 'Dah Boleh Collect') return 'badge-success';
+  if (st === 'Sudah Diambil')     return 'badge-collected';
+  if (st === 'Ditolak')           return 'badge-reject';
+  return 'badge-pending';
+}
+
+function isHistoryStatus(st) {
+  return st === 'Sudah Diambil' || st === 'Ditolak';
+}
+
+function swAdminTab(n) {
+  _admSubTab = n;
+  document.getElementById('admSub0').classList.toggle('active', n === 0);
+  document.getElementById('admSub1').classList.toggle('active', n === 1);
+  document.getElementById('admActivePane').style.display = n === 0 ? 'block' : 'none';
+  document.getElementById('admHistPane').style.display   = n === 1 ? 'block' : 'none';
+}
+
+function _tajukCell(tajukRaw, idx, prefix) {
+  var t = String(tajukRaw || '');
+  var MAX = 48;
+  var pf = prefix || '';
+  if (t.length > MAX) {
+    var short = t.slice(0, MAX) + '…';
+    return '<div><span class="tajuk-short" onclick="toggleTajuk(\'' + pf + idx + '\')" title="Klik untuk lihat tajuk penuh">' + esc(short) + '</span>' +
+           ' <span id="tjt-' + pf + idx + '" class="tajuk-toggle" onclick="toggleTajuk(\'' + pf + idx + '\')">Lagi...</span></div>' +
+           '<div id="tjf-' + pf + idx + '" class="tajuk-full">' + esc(t) + '</div>';
+  }
+  return '<div style="font-size:12px;color:#475569;line-height:1.5;max-width:180px;word-break:break-word;">' + esc(t) + '</div>';
+}
+
+function _contactCell(telRaw, emailRaw, namaEsc, rowIdx) {
+  var rawTel = String(telRaw || '').replace(/^'+/, '').trim();
+  var pEmal  = String(emailRaw || '').trim();
+  var waNum  = normalizePhoneMY(rawTel);
+  var waUrl  = waNum ? 'https://wa.me/' + waNum : '';
+  var telDig = rawTel.replace(/\D/g, '');
+  var out = '<div class="contact-box">';
+  if (rawTel) {
+    if (waUrl) {
+      out += '<div class="contact-line">' +
+             '<a href="' + waUrl + '" target="_blank" rel="noopener noreferrer" class="contact-link wa-link" title="WhatsApp ' + namaEsc + ' (buka tab baru)">' +
+               '💬 ' + esc(rawTel) + '</a>' +
+             '<a href="tel:' + esc(telDig) + '" class="contact-link-sm" title="Call ' + namaEsc + '">📞</a></div>';
+    } else {
+      out += '<span class="contact-link" style="color:#64748b;">📞 ' + esc(rawTel) + '</span>';
+    }
+  }
+  if (pEmal) out += '<a href="mailto:' + esc(pEmal) + '" class="contact-link" title="Emel ' + namaEsc + '">✉️ ' + esc(pEmal) + '</a>';
+  out += '</div>';
+  return out;
+}
+
+function _renderAdminTable(tableId, rows) {
+  if (!rows.length) return '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px;">Tiada rekod</td></tr>';
+  var isHist = tableId === 'tblHist';
+  var pref   = isHist ? 'h' : '';
+  var html = '';
+  for (var k = 0; k < rows.length; k++) {
+    var r   = rows[k];
+    var i   = r._idx;
+    var id  = r[0];
+    var st  = r[11];
+    var cls = badgeCls(st);
+
+    var unitP = parseFloat(r[8])  || 0;
+    var qty   = parseInt(r[16],10) || 1;
+    var tot   = (unitP * qty).toFixed(2);
+
+    var method  = r[9];
+    var noGeran = r[14];
+    var bayaranCell = '';
+    if (String(method).toLowerCase() === 'cash') {
+      bayaranCell = '<span style="background:#f0fdf4;color:#15803d;border:1px solid #86efac;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">💵 Cash</span>';
+    } else {
+      var gn = (noGeran && noGeran !== '-' && noGeran !== '') ? esc(noGeran) : '-';
+      bayaranCell = '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">🎓 Geran</span>' +
+                    '<br><small style="color:#475569;font-size:11px;">' + gn + '</small>';
+    }
+
+    var eid = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var tajukCell = _tajukCell(r[15], i, pref);
+    var contact   = _contactCell(r[4], r[13], esc(r[2]), i);
+    var namaEsc   = esc(r[2]);
+
+    // Act buttons — Active enforces workflow: Collected only when Siap
+    var acts = '';
+    if (!isHist) {
+      acts += '<div class="act-group">';
+      acts += '<button class="act-btn act-btn-blue" onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')" title="Tanda Dalam Proses">🔄</button>';
+      acts += '<button class="act-btn act-btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')" title="Tanda Siap — Dah Boleh Collect">✅</button>';
+      if (st === 'Dah Boleh Collect') {
+        acts += '<button class="act-btn act-btn-collected" onclick="updStatus(\'' + eid + '\',\'Sudah Diambil\',\'\')" title="Sudah Diambil — alih ke Sejarah">📦</button>';
+      }
+      acts += '<button class="act-btn act-btn-red" onclick="rejectRow(\'' + eid + '\')" title="Tolak">❌</button>';
+      acts += '<span class="act-sep"></span>';
+      acts += '<a href="' + esc(r[10]) + '" target="_blank" class="act-btn act-btn-file" title="Lihat Fail">📄</a>';
+      acts += '<button class="act-btn act-btn-del" onclick="delRow(\'' + eid + '\')" title="Padam">✕</button>';
+      acts += '</div>';
+    } else {
+      // History: only restore + file + delete
+      acts += '<div class="act-group">';
+      acts += '<button class="act-btn act-btn-restore" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')" title="Kembalikan ke Siap (Aktif)">↩️</button>';
+      acts += '<a href="' + esc(r[10]) + '" target="_blank" class="act-btn act-btn-file" title="Lihat Fail">📄</a>';
+      acts += '<button class="act-btn act-btn-del" onclick="delRow(\'' + eid + '\')" title="Padam Kekal">✕</button>';
+      acts += '</div>';
+    }
+
+    html += '<tr>' +
+      '<td style="color:#94a3b8;font-weight:700;">' + r._no + '</td>' +
+      '<td><div style="font-weight:700;">' + namaEsc + '</div>' + tajukCell + contact +
+           '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + esc(r[1]) + '</div></td>' +
+      '<td><b>' + esc(r[6]) + '</b><br><small style="color:#64748b;">' + esc(r[7]) + ' ×' + esc(r[16]) + '</small></td>' +
+      '<td><b>RM ' + tot + '</b><br><small style="color:#94a3b8;">@RM' + unitP + ' ×' + qty + '</small></td>' +
+      '<td><span class="badge ' + cls + '">' + esc(st) + '</span></td>' +
+      '<td>' + bayaranCell + '</td>' +
+      '<td>' + acts + '</td></tr>';
+  }
+  return html;
+}
 
 function loadAdmin() {
   ld(true);
@@ -633,89 +817,40 @@ function loadAdmin() {
       document.getElementById('loginBox').style.display = 'none';
       document.getElementById('dash').style.display     = 'block';
       document.getElementById('actLegend').style.display = 'flex';
+      document.getElementById('actHistLegend').style.display = 'flex';
 
-      var h = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>';
-      var cT=0, cP=0, cPr=0, cS=0;
+      _admRowsCache = d;
+
+      var active = [], hist = [];
+      var cT=0, cP=0, cPr=0, cS=0, cCd=0;
 
       for (var i = 1; i < d.length; i++) {
+        var row = d[i].slice(0);
+        row._idx = i;
+        row._no  = i;
+        var st = d[i][11];
         cT++;
-        var id    = d[i][0];
-        var st    = d[i][11];
-        var cls   = 'badge-pending';
-        if      (st === 'Dalam Proses')      { cls = 'badge-process'; cPr++; }
-        else if (st === 'Dah Boleh Collect') { cls = 'badge-success'; cS++; }
-        else if (st === 'Ditolak')           { cls = 'badge-reject'; }
-        else                                  { cP++; }
-
-        // — Harga (unit × qty = total) —
-        var unitP  = parseFloat(d[i][8])  || 0;
-        var qty    = parseInt(d[i][16],10) || 1;
-        var tot    = (unitP * qty).toFixed(2);
-
-        // — Bayaran column: show Cash badge or Geran + no —
-        var method  = d[i][9];
-        var noGeran = d[i][14];
-        var bayaranCell = '';
-        if (String(method).toLowerCase() === 'cash') {
-          bayaranCell = '<span style="background:#f0fdf4;color:#15803d;border:1px solid #86efac;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">💵 Cash</span>';
-        } else {
-          var gn = (noGeran && noGeran !== '-' && noGeran !== '') ? esc(noGeran) : '-';
-          bayaranCell = '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">🎓 Geran</span>' +
-                        '<br><small style="color:#475569;font-size:11px;">' + gn + '</small>';
-        }
-
-        var eid = id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        // — Tajuk: truncate + click-to-reveal —
-        var tajukRaw = String(d[i][15] || '');
-        var MAXLEN = 48;
-        var tajukShort = tajukRaw.length > MAXLEN ? tajukRaw.slice(0, MAXLEN) + '…' : tajukRaw;
-        var tajukCell  = '';
-        if (tajukRaw.length > MAXLEN) {
-          tajukCell = '<div>' +
-            '<span class="tajuk-short" onclick="toggleTajuk(' + i + ')" title="Klik untuk lihat tajuk penuh">' + esc(tajukShort) + '</span>' +
-            ' <span id="tjt-' + i + '" class="tajuk-toggle" onclick="toggleTajuk(' + i + ')">Lagi...</span>' +
-          '</div>' +
-          '<div id="tjf-' + i + '" class="tajuk-full">' + esc(tajukRaw) + '</div>';
-        } else {
-          tajukCell = '<div style="font-size:12px;color:#475569;line-height:1.5;max-width:180px;word-break:break-word;">' + esc(tajukRaw) + '</div>';
-        }
-
-        // — Contact: phone + email —
-        var rawTel = String(d[i][4] || '').replace(/^'s*/, '').trim();
-        var pEmal  = String(d[i][13] || '').trim();
-        var telLink = rawTel ? rawTel.replace(/[^0-9+]/g, '') : '';
-        var waLink  = telLink ? 'https://wa.me/' + telLink : '#';
-
-        h += '<tr>' +
-          '<td style="color:#94a3b8;font-weight:700;">' + i + '</td>' +
-          '<td><div style="font-weight:700;">' + esc(d[i][2]) + '</div>' +
-              tajukCell +
-              '<div class="contact-box">' +
-                (rawTel ? '<a href="tel:' + esc(telLink) + '" class="contact-link" title="Hubungi ' + esc(d[i][2]) + '">📞 ' + esc(rawTel) + '</a>' : '') +
-                (pEmal  ? '<a href="mailto:' + esc(pEmal) + '" class="contact-link" title="Emel ' + esc(d[i][2]) + '">✉️ ' + esc(pEmal) + '</a>' : '') +
-              '</div>' +
-              '<div style="font-size:10px;color:#94a3b8;margin-top:1px;">' + esc(d[i][1]) + '</div></td>' +
-          '<td><b>' + esc(d[i][6]) + '</b><br><small style="color:#64748b;">' + esc(d[i][7]) + ' ×' + esc(d[i][16]) + '</small></td>' +
-          '<td><b>RM ' + tot + '</b><br><small style="color:#94a3b8;">@RM' + unitP + ' ×' + qty + '</small></td>' +
-          '<td><span class="badge ' + cls + '">' + esc(st) + '</span></td>' +
-          '<td>' + bayaranCell + '</td>' +
-          '<td>' +
-            '<div class="act-group" title="Ubah Status">' +
-              '<button class="act-btn act-btn-blue"  onclick="updStatus(\'' + eid + '\',\'Dalam Proses\',\'\')" title="Tanda Dalam Proses">🔄</button>' +
-              '<button class="act-btn act-btn-green" onclick="updStatus(\'' + eid + '\',\'Dah Boleh Collect\',\'\')" title="Tanda Siap — Dah Boleh Collect">✅</button>' +
-              '<button class="act-btn act-btn-red"   onclick="rejectRow(\'' + eid + '\')" title="Tolak Permohonan">❌</button>' +
-              '<span class="act-sep"></span>' +
-              '<a href="' + esc(d[i][10]) + '" target="_blank" class="act-btn act-btn-file" title="Lihat Fail Poster">📄</a>' +
-              '<button class="act-btn act-btn-del" onclick="delRow(\'' + eid + '\')" title="Padam Rekod Kekal">✕</button>' +
-            '</div>' +
-          '</td></tr>';
+        if      (st === 'Dalam Proses')      { cPr++; active.push(row); }
+        else if (st === 'Dah Boleh Collect') { cS++;  active.push(row); }
+        else if (st === 'Sudah Diambil')     { cCd++; hist.push(row);   }
+        else if (st === 'Ditolak')           {        hist.push(row);   }
+        else                                 { cP++;  active.push(row); }
       }
 
-      document.getElementById('tbl').innerHTML = h;
+      document.getElementById('tbl').innerHTML     = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>' + _renderAdminTable('tbl', active);
+      document.getElementById('tblHist').innerHTML = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>' + _renderAdminTable('tblHist', hist);
+
       document.getElementById('cTot').innerText = cT;
       document.getElementById('cP').innerText   = cP;
       document.getElementById('cPr').innerText  = cPr;
       document.getElementById('cS').innerText   = cS;
+      document.getElementById('cCd').innerText  = cCd;
+      document.getElementById('cActive').innerText = active.length;
+      document.getElementById('cHist').innerText   = hist.length;
+
+      document.getElementById('histEmpty').style.display = hist.length ? 'none' : 'block';
+
+      swAdminTab(_admSubTab);
     })
     .getAdminData(document.getElementById('pass').value);
 }
@@ -742,18 +877,23 @@ function delRow(id) {
   });
 }
 
-function toggleTajuk(rowIdx) {
-  var full = document.getElementById('tjf-' + rowIdx);
-  var link = document.getElementById('tjt-' + rowIdx);
+function toggleTajuk(rowKey) {
+  var k = String(rowKey);
+  var full = document.getElementById('tjf-' + k);
+  var link = document.getElementById('tjt-' + k);
   if (!full) return;
   var isOpen = full.classList.contains('open');
   if (isOpen) { full.classList.remove('open'); if (link) link.innerText = 'Lagi...'; }
   else        { full.classList.add('open');    if (link) link.innerText = 'Tutup'; }
 }
 
-function filterTable() {
-  var v  = document.getElementById('sAdm').value.toUpperCase();
-  var tr = document.getElementById('tbl').getElementsByTagName('tr');
+function filterTable(tblId, searchId) {
+  var tid = tblId || 'tbl';
+  var sid = searchId || 'sAdm';
+  var sEl = document.getElementById(sid);
+  if (!sEl) return;
+  var v  = sEl.value.toUpperCase();
+  var tr = document.getElementById(tid).getElementsByTagName('tr');
   for (var i = 1; i < tr.length; i++) {
     var td = tr[i].getElementsByTagName('td')[1];
     if (td) tr[i].style.display = td.innerText.toUpperCase().indexOf(v) > -1 ? '' : 'none';
