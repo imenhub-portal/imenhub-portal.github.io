@@ -836,16 +836,23 @@
                         showRefreshBadge(false);
                     };
 
-                    // Stale-while-revalidate: with no deep-link params there is
-                    // nothing to route on, so paint the landing view immediately
-                    // from cached reference data while the live payload lands.
-                    // Deep links (?appId= / ?role=) deliberately still wait for
-                    // live data — a routing decision must never be made against
-                    // cached content (applications is empty in the cache).
-                    if (!params.appId && !params.role) {
+                    // Stale-while-revalidate: paint immediately from cached
+                    // reference data whenever the destination can be decided
+                    // WITHOUT live data, then let the live payload swap in.
+                    //   • no params      → the landing (role picker)
+                    //   • role=applicant → the apply form, whose only data needs
+                    //     are the labs + supervisors dropdowns, both cached. This
+                    //     is apply.html's entry point, so it's the path that most
+                    //     benefits from an instant repeat-visit paint.
+                    // Excluded (must wait for live data — never route on cached
+                    // content): ?appId= (assessment lookup in `applications`,
+                    // which is empty in the cache) and role=pic/hol (needs token
+                    // or credential verification before showing the dashboard).
+                    if (!params.appId && (!params.role || params.role === 'applicant')) {
                         const cached = readRefCache();
                         if (cached) {
                             setDb({ staff: [], labs: cached.labs, applications: [], lab_users: [], supervisors: cached.supervisors });
+                            if (params.role === 'applicant') { setUserRole('applicant'); setViewMode('app'); setActiveTab('apply'); }
                             setIsLoading(false);
                             showRefreshBadge(true);
                         }

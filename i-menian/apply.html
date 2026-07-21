@@ -24,8 +24,18 @@
     </style>
 </head>
 <body>
-    <iframe 
-        src="https://script.google.com/macros/s/AKfycbx7kSzb09RIJfuj4hL4t8TzLeAIvv54uuWiaIbLLomt_mN0mNWjV1Zs3nfnG2hK_ebwzg/exec?authuser=0&role=applicant" 
+    <!-- Points at the GitHub-Pages copy of the app (same origin as this file),
+         NOT at the Apps Script /exec URL it used to load. /exec serves this very
+         same index.html — it just fetches it from GitHub first — so going direct
+         removes a whole hop from every applicant's load:
+           before: apply.html → /exec → UrlFetchApp pulls 185 KB from GitHub
+                   → HtmlService sandbox iframe → app
+           after:  apply.html → app
+         It also means the app runs in GitHub-Pages mode, where the <head> early
+         fetch for getInitialData applies (native google.script.run mode skips it),
+         and localStorage is first-party so the cached instant paint works. -->
+    <iframe
+        src="./index.html?role=applicant"
         allow="geolocation; microphone; camera">
     </iframe>
 </body>
