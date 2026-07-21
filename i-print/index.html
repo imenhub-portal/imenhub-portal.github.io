@@ -304,6 +304,15 @@
         <div class="stat-card" style="background:#f0fdf4;color:#15803d;">Siap<b id="cS">0</b></div>
       </div>
       <input type="text" id="sAdm" onkeyup="filterTable()" placeholder="🔍 Cari nama..." style="margin-bottom:12px;">
+      <!-- Legend — explains icon-only action buttons -->
+      <div id="actLegend" style="display:none;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11px;font-weight:600;color:#475569;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#eff6ff;border-radius:6px;font-size:11px;">🔄</span> Proses</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f0fdf4;border-radius:6px;font-size:11px;">✅</span> Siap</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#fef2f2;border-radius:6px;font-size:11px;">❌</span> Tolak</span>
+        <span style="width:1px;height:16px;background:#e2e8f0;display:inline-block;"></span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;">📄</span> Fail</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:transparent;color:#fca5a5;border-radius:6px;font-size:11px;font-weight:800;">✕</span> Padam</span>
+      </div>
       <div style="overflow-x:auto;"><table id="tbl"></table></div>
     </div>
   </div>
@@ -618,6 +627,7 @@ function loadAdmin() {
 
       document.getElementById('loginBox').style.display = 'none';
       document.getElementById('dash').style.display     = 'block';
+      document.getElementById('actLegend').style.display = 'flex';
 
       var h = '<tr><th>#</th><th>Pemohon</th><th>Saiz/Media</th><th>Harga</th><th>Status</th><th>Bayaran</th><th>Tindakan</th></tr>';
       var cT=0, cP=0, cPr=0, cS=0;
