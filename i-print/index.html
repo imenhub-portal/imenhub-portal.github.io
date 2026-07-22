@@ -239,12 +239,6 @@
     .b-hint{ font-size:11px; color:var(--muted); font-weight:600; }
     .b-field-note{ font-size:11px; color:var(--muted); margin-top:6px; line-height:1.45; }
 
-    /* Supervisor (Penyelia) sub-section inside Maklumat Pemohon */
-    .sup-wrap{ margin-top:16px; padding:14px; border:1px dashed var(--border); border-radius:14px; background:linear-gradient(180deg,#fbfdff,#f6f9ff); }
-    .sup-head{ display:flex; align-items:center; gap:8px; font-weight:800; font-size:13px; letter-spacing:-.01em; margin-bottom:12px; }
-    .sup-icon{ font-size:15px; }
-    .sup-opt{ font-size:10px; font-weight:600; color:var(--muted); background:#eef2f7; padding:2px 8px; border-radius:999px; }
-
     /* Merch size cards — icon only, radio style A1 594×841 */
     .size-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
     @media (max-width:600px){ .size-grid{ grid-template-columns:1fr 1fr; } }
@@ -515,16 +509,8 @@
             <div><label for="inpPtj" data-bm="PTJ *" data-bi="Dept *">PTJ *</label><input type="text" id="inpPtj" name="ptj" required placeholder="IMEN"></div>
             <div><label for="inpTujuan" data-bm="Tajuk *" data-bi="Title *">Tajuk *</label><input type="text" id="inpTujuan" name="tujuan" required placeholder="Tajuk poster" data-bm-ph="Tajuk poster" data-bi-ph="Poster title"><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px; font-size:10px; opacity:.7;">0</div></div>
           </div>
-
-          <div class="sup-wrap">
-            <div class="sup-head"><span class="sup-icon">🧑‍🏫</span><span data-bm="Maklumat Penyelia" data-bi="Supervisor Info">Maklumat Penyelia</span><span class="sup-opt" data-bm="(pilihan)" data-bi="(optional)">(pilihan)</span></div>
-            <div class="form-row" style="margin-bottom:0">
-              <div><label for="inpPenyelia" data-bm="Nama Penyelia" data-bi="Supervisor Name">Nama Penyelia</label><input type="text" id="inpPenyelia" name="penyelia_nama" autocomplete="off" placeholder="Nama penyelia" data-bm-ph="Nama penyelia" data-bi-ph="Supervisor name"></div>
-              <div><label for="inpPenyeliaTel" data-bm="Telefon Penyelia" data-bi="Supervisor Phone">Telefon Penyelia</label><input type="tel" id="inpPenyeliaTel" name="penyelia_tel" inputmode="tel" autocomplete="off" placeholder="012-345 6789"></div>
-            </div>
-            <div class="form-row" style="margin-bottom:0; margin-top:10px;">
-              <div style="flex:1"><label for="inpPenyeliaEmail" data-bm="Emel Penyelia" data-bi="Supervisor Email">Emel Penyelia</label><input type="email" id="inpPenyeliaEmail" name="penyelia_email" autocomplete="off" placeholder="penyelia@ukm.edu.my" data-bm-ph="penyelia@ukm.edu.my" data-bi-ph="supervisor@ukm.edu.my"></div>
-            </div>
+          <div class="form-row" style="margin-bottom:0; margin-top:14px;">
+            <div style="flex:1"><label for="inpPenyelia" data-bm="Nama Penyelia" data-bi="Supervisor Name">Nama Penyelia</label><input type="text" id="inpPenyelia" name="penyelia_nama" autocomplete="off" placeholder="Nama penyelia" data-bm-ph="Nama penyelia" data-bi-ph="Supervisor name"></div>
           </div>
         </div>
       </div>
