@@ -1,0 +1,466 @@
+// ============================================================
+//  SISTEM POSTER IMEN — Code.gs
+//  Paste this entire file into your Apps Script Code.gs
+// ============================================================
+
+const FOLDER_ID      = '1dx7g_oNPKgJDYQI-uYov4kQYGdy6zR9D';
+const SPREADSHEET_ID = '1fPuU_gT-xgy1ZAWGvfJm_lzvNFNJCDzazCz2yOwKFc4';
+const ADMIN_EMAIL    = 'hazde@ukm.edu.my';
+
+// Admin password. Prefer Script Properties (Project Settings → Script Properties
+// → key: ADMIN_PASSWORD) so the secret is not in the source file. Falls back to
+// the old literal so nothing breaks if the property is not set yet.
+// ⚠️ This matters more now: doPost makes these functions callable anonymously
+//    from anywhere, so a weak password is a weak lock on the whole admin panel.
+function _adminPassword_() {
+  return PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD') || 'hazde';
+}
+
+// ------------------------------------------------------------
+// EMAIL HELPERS
+// ------------------------------------------------------------
+// Escape user input before embedding in HTML emails — form data is
+// attacker-controlled and would otherwise be injected raw.
+function _esc_(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _emailLayout_(title, inner) {
+  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">' +
+    '<div style="background:#0f172a;color:#ffffff;padding:16px 20px;font-size:15px;font-weight:bold;">🖨️ i-Print IMEN — ' + title + '</div>' +
+    '<div style="padding:20px;color:#1e293b;font-size:14px;line-height:1.6;">' + inner + '</div>' +
+    '<div style="padding:12px 20px;background:#f8fafc;color:#94a3b8;font-size:11px;">Sistem Poster IMEN · Emel automatik, jangan balas.</div>' +
+  '</div>';
+}
+
+function _kvRows_(pairs) {
+  return '<table style="width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;">' +
+    pairs.map(function (p) {
+      return '<tr>' +
+        '<td style="padding:6px 8px;color:#64748b;width:42%;vertical-align:top;border-bottom:1px solid #f1f5f9;">' + p[0] + '</td>' +
+        '<td style="padding:6px 8px;font-weight:bold;color:#0f172a;border-bottom:1px solid #f1f5f9;">' + p[1] + '</td>' +
+      '</tr>';
+    }).join('') + '</table>';
+}
+
+// Central send wrapper: never throws, always logs loudly. Email failures
+// must not kill a booking, but they must be VISIBLE in the Executions log.
+function _sendMail_(to, subject, html, plainText) {
+  try {
+    MailApp.sendEmail({
+      to      : to,
+      subject : subject,
+      body    : plainText || ' ',
+      htmlBody: html
+    });
+    console.log('✅ Emel dihantar ke ' + to + ' — ' + subject);
+    return true;
+  } catch (e) {
+    console.error('❌ EMEL GAGAL ke ' + to + ' — ' + subject + ' — RALAT: ' + e);
+    return false;
+  }
+}
+
+// ------------------------------------------------------------
+// UJIAN EMAIL — RUN MANUAL DARI EDITOR (▶ Run)
+//
+// WAJIB SELEPAS TAMPAL KOD BAHARU:
+//   Fungsi ini memaksa skrin kebenaran (authorization) untuk skop
+//   emel muncul. Web app yang di-deploy semula tanpa langkah ini akan
+//   GAGAL menghantar emel secara senyap — skop baharu tidak pernah
+//   diluluskan, dan ralat ditelan oleh try/catch.
+//
+// Langkah: pilih fungsi ini di editor → Run → benarkan bila diminta →
+// semak inbox (dan folder spam). Kemudian deploy versi baharu.
+// ------------------------------------------------------------
+function testEmailNotifications() {
+  const to     = ADMIN_EMAIL;
+  const before = MailApp.getRemainingDailyQuota();
+  const ok = _sendMail_(
+    to,
+    '✅ i-Print: Ujian Email Berjaya',
+    _emailLayout_('Ujian Sistem', '<p style="margin:0;">Jika anda membaca emel ini, penghantaran emel i-Print berfungsi dengan baik. 🎉</p>'),
+    'Ujian emel i-Print berjaya.'
+  );
+  const after = MailApp.getRemainingDailyQuota();
+  const msg = 'Hantar ke: ' + to + ' | Berjaya: ' + ok +
+              ' | Quota sebelum: ' + before + ' | selepas: ' + after;
+  Logger.log(msg);
+  return msg;
+}
+
+// Single-source UI: the real index.html lives in the GitHub Pages repo.
+const UI_SOURCE = 'https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-print/index.html';
+
+// ------------------------------------------------------------
+// SERVE THE WEB APP
+//
+// Fetches the latest UI from GitHub so index.html has ONE home.
+// Falls back to the pasted local `Index` file if GitHub is unreachable.
+// ------------------------------------------------------------
+function doGet() {
+  try {
+    const resp = UrlFetchApp.fetch(UI_SOURCE, { muteHttpExceptions: true });
+    if (resp.getResponseCode() === 200) {
+      return _page_(HtmlService.createHtmlOutput(resp.getContentText()));
+    }
+  } catch (err) {
+    console.log('UI fetch from GitHub failed, serving local copy: ' + err);
+  }
+  return _page_(HtmlService.createHtmlOutputFromFile('Index'));
+}
+
+function _page_(output) {
+  return output
+    .setTitle('Sistem Poster IMEN')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// ------------------------------------------------------------
+// JSON API — for the GitHub-Pages hosted UI
+//
+// The frontend shim POSTs {fn, args} as text/plain (a CORS "simple
+// request" — no preflight, which Apps Script cannot answer).
+//
+// SECURITY: dispatch is an explicit switch. ONLY these entry points are
+// reachable from outside; arbitrary function names are rejected.
+// ------------------------------------------------------------
+function doPost(e) {
+  let payload;
+  try {
+    const req  = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const args = Array.isArray(req.args) ? req.args : [];
+    let result;
+    switch (req.fn) {
+      case 'startResumableUpload': result = startResumableUpload(args[0], args[1], args[2]); break;
+      case 'processForm':          result = processForm(args[0]);                   break;
+      case 'updatePosterStatus':   result = updatePosterStatus(args[0], args[1], args[2], args[3]); break;
+      case 'deleteRow':            result = deleteRow(args[0], args[1]);            break;
+      case 'getAdminData':         result = getAdminData(args[0]);                  break;
+      case 'checkUserStatus':      result = checkUserStatus(args[0]);               break;
+      default: throw new Error('Unknown API function: ' + req.fn);
+    }
+    payload = { ok: true, result: result };
+  } catch (err) {
+    payload = { ok: false, error: (err && err.message) || String(err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(payload))
+                       .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ------------------------------------------------------------
+// START A DRIVE RESUMABLE UPLOAD  (replaces the old uploadChunk)
+//
+// Why this exists:
+//   The previous approach base64'd the file into ~50KB pieces, parked
+//   them in CacheService, then reassembled the whole string in memory.
+//   That could never carry a print-quality poster:
+//     • CacheService evicts entries at will → "chunk hilang" errors
+//     • a 100MB file is ~133MB of base64 → ~1,500 cache entries
+//     • reassembling that string exceeds Apps Script memory
+//     • Utilities.newBlob caps out around 50MB regardless
+//
+//   Now the bytes never pass through Apps Script at all. We ask Drive to
+//   open a resumable upload session and hand the browser ONLY the session
+//   URI. The browser PUTs the file straight to Google's upload endpoint.
+//
+// SECURITY: we deliberately return the session URI, never
+//   ScriptApp.getOAuthToken(). The URI authorises exactly one upload into
+//   one folder; a leaked OAuth token would expose the owner's whole Drive.
+//
+// Returns { ok:true, sessionUri } — the client PUTs bytes there, and the
+// final PUT response carries the Drive file id, which goes to processForm.
+// ------------------------------------------------------------
+// Origins allowed to continue an upload session in the browser. Google binds
+// CORS to the origin supplied when the session is INITIATED, so we must pass
+// the caller's origin through — otherwise the upload transfers to 100% and
+// then the response is blocked, which looks exactly like a dropped connection.
+const PAGES_ORIGIN = 'https://imenhub-portal.github.io';
+
+function _safeOrigin_(origin) {
+  if (origin === PAGES_ORIGIN) return origin;
+  if (origin === 'https://script.google.com') return origin;
+  // Apps Script's sandbox origin is https://n-<random>-script.googleusercontent.com
+  // — the hash differs per session, so it has to be matched by shape.
+  if (/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/.test(origin || '')) return origin;
+  return PAGES_ORIGIN; // unknown origin → fall back, never echo it blindly
+}
+
+function startResumableUpload(fileName, mimeType, origin) {
+  try {
+    const meta = {
+      name    : 'TEMP_' + Date.now() + '.' + _ext(mimeType),
+      parents : [FOLDER_ID],
+      mimeType: mimeType || 'application/pdf'
+    };
+
+    const res = UrlFetchApp.fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+      {
+        method     : 'post',
+        contentType: 'application/json; charset=UTF-8',
+        headers    : {
+          Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+          // Makes the returned session CORS-enabled for this origin.
+          Origin: _safeOrigin_(origin)
+        },
+        payload    : JSON.stringify(meta),
+        muteHttpExceptions: true
+      }
+    );
+
+    if (res.getResponseCode() !== 200) {
+      return { ok: false, error: 'Drive init HTTP ' + res.getResponseCode() + ': ' + res.getContentText() };
+    }
+
+    const headers    = res.getAllHeaders();
+    const sessionUri = headers['Location'] || headers['location'];
+    if (!sessionUri) return { ok: false, error: 'Drive tidak memulangkan session URI.' };
+
+    return { ok: true, sessionUri: sessionUri };
+  } catch (e) {
+    return { ok: false, error: e.toString() };
+  }
+}
+
+// ------------------------------------------------------------
+// SAVE FORM DATA  (call after all chunks finish)
+// ------------------------------------------------------------
+function processForm(formObject) {
+  try {
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
+
+    // Auto-create the "Penyelia" header column if it is missing, so new
+    // submissions always land in a labelled column without manual setup.
+    const _hdrLast = sheet.getLastColumn();
+    const _hdrRow  = sheet.getRange(1, 1, 1, _hdrLast).getValues()[0];
+    if (_hdrRow.indexOf('Penyelia') === -1) {
+      sheet.getRange(1, _hdrLast + 1).setValue('Penyelia');
+    }
+
+    let fileUrl = '';
+    if (formObject.fileId) {
+      const file = DriveApp.getFileById(formObject.fileId);
+      const ext  = _ext(formObject.fileMime);
+      file.setName('POSTER_' + formObject.nama + '_' + Date.now() + '.' + ext);
+
+      // Sharing can be refused by Workspace policy (many universities block
+      // "anyone with the link"). If that happens the booking must still save —
+      // losing a submission over a link permission would be the worse failure.
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (shareErr) {
+        console.log('setSharing gagal (semak polisi domain UKM): ' + shareErr);
+      }
+
+      // Build the link explicitly rather than using getUrl(), which returns
+      // ...?usp=drivesdk — that form is unreliable when several Google
+      // accounts are signed in. The plain /view URL is the stable one.
+      fileUrl = 'https://drive.google.com/file/d/' + formObject.fileId + '/view';
+    }
+
+    const newId   = 'REQ-' + Date.now();
+    const rowData = [
+      newId,
+      new Date(),
+      formObject.nama,
+      formObject.ukmper,
+      "'" + formObject.tel,
+      formObject.ptj,
+      formObject.size,
+      formObject.media,
+      formObject.harga_hidden,
+      formObject.bayaran,
+      fileUrl,
+      'Pending',
+      '-',
+      formObject.email,
+      formObject.no_geran || '-',
+      formObject.tujuan,
+      formObject.unit || '1',
+      formObject.penyelia_nama || '-'
+    ];
+
+    sheet.appendRow(rowData);
+
+    const qty   = parseInt(formObject.unit, 10) || 1;
+    const unitP = parseFloat(formObject.harga_hidden) || 0;
+    const total = (unitP * qty).toFixed(2);
+
+    // 1) Notify admin
+    _sendMail_(
+      ADMIN_EMAIL,
+      '🔔 Tempahan Poster Baru: ' + newId,
+      _emailLayout_('Tempahan Baru',
+        '<p style="margin-top:0;">Terdapat tempahan poster baharu. Sila semak sistem admin.</p>' +
+        _kvRows_([
+          ['ID',           _esc_(newId)],
+          ['Nama',         _esc_(formObject.nama)],
+          ['UKMPer',       _esc_(formObject.ukmper)],
+          ['Telefon',      _esc_(formObject.tel)],
+          ['PTJ',          _esc_(formObject.ptj)],
+          ['Tajuk',        _esc_(formObject.tujuan)],
+          ['Saiz / Media', _esc_(formObject.size) + ' / ' + _esc_(formObject.media)],
+          ['Unit',         qty],
+          ['Jumlah',       'RM ' + total],
+          ['Bayaran',      _esc_(formObject.bayaran)],
+          ['Penyelia',     _esc_(formObject.penyelia_nama || '-')]
+        ])
+      ),
+      'Tempahan baru: ' + newId + ' — ' + formObject.nama + ' — ' + formObject.tujuan
+    );
+
+    // 2) Acknowledge applicant (only if the address looks sane)
+    const emelPemohon = String(formObject.email || '').trim();
+    if (/.+@.+\..+/.test(emelPemohon)) {
+      _sendMail_(
+        emelPemohon,
+        'Tempahan Poster Diterima — ' + newId,
+        _emailLayout_('Tempahan Diterima',
+          '<p style="margin-top:0;">Salam <b>' + _esc_(formObject.nama) + '</b>,</p>' +
+          '<p>Tempahan poster anda telah selamat diterima. Sila tunggu notifikasi seterusnya apabila poster siap.</p>' +
+          _kvRows_([
+            ['ID Tempahan',    _esc_(newId)],
+            ['Tajuk',          _esc_(formObject.tujuan)],
+            ['Saiz / Media',   _esc_(formObject.size) + ' / ' + _esc_(formObject.media)],
+            ['Unit',           qty],
+            ['Harga Anggaran', 'RM ' + total]
+          ])
+        ),
+        'Tempahan ' + newId + ' diterima. Jumlah anggaran: RM ' + total
+      );
+    } else {
+      console.warn('⚠️ Emel pemohon tidak sah, diabaikan: "' + formObject.email + '"');
+    }
+
+    return { status: 'success', message: 'Tempahan berjaya dihantar! Semak emel anda.' };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+// ------------------------------------------------------------
+// UPDATE STATUS (Admin)
+// ------------------------------------------------------------
+function updatePosterStatus(id, newStatus, reason, pass) {
+  if (pass !== _adminPassword_()) return 'ERROR: UNAUTHORIZED';
+  try {
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
+    const data  = sheet.getDataRange().getDisplayValues();
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == id) { rowIndex = i + 1; break; }
+    }
+    if (rowIndex === -1) return 'ERROR: ID Tidak Dijumpai. Sila refresh.';
+
+    sheet.getRange(rowIndex, 12).setValue(newStatus);
+    if (newStatus === 'Ditolak') sheet.getRange(rowIndex, 13).setValue(reason);
+
+    const namaUser = sheet.getRange(rowIndex, 3).getValue();
+    const harga    = sheet.getRange(rowIndex, 9).getValue();
+    const method   = sheet.getRange(rowIndex, 10).getValue();
+    const emelUser = sheet.getRange(rowIndex, 14).getValue();
+
+    // — branch per status (email skip for Sudah Diambil per requirement #4) —
+    let notaHtml  = '';
+    let notaPlain = '';
+    let skipEmail = false;
+
+    if (newStatus === 'Dalam Proses') {
+      notaHtml  = '<p>Poster anda sedang dalam proses percetakan.</p>';
+      notaPlain = 'Poster anda sedang dalam proses percetakan.';
+    } else if (newStatus === 'Dah Boleh Collect') {
+      const bayar = method === 'Cash'
+        ? 'Sila bawa wang tunai <b>RM ' + _esc_(harga) + '</b> semasa mengambil poster.'
+        : 'Bayaran melalui Geran (No: <b>' + _esc_(sheet.getRange(rowIndex, 15).getValue()) + '</b>) — hadir ke pejabat untuk urusan dokumen.';
+      notaHtml  = '<p>Poster telah <b style="color:#15803d;">SIAP</b> dicetak! 🎉</p>' +
+                  '<p>📍 <b>Lokasi:</b> Aras 4 (En. Hazde)<br>💰 <b>Pembayaran:</b> ' + bayar + '</p>';
+      notaPlain = 'Poster telah SIAP. Lokasi: Aras 4 (En. Hazde). Bayaran: RM ' + harga + ' (' + method + ').';
+    } else if (newStatus === 'Ditolak') {
+      notaHtml  = '<p>Maaf, tempahan anda telah ditolak.</p>' +
+                  '<p><b>Sebab:</b> ' + _esc_(reason) + '</p>';
+      notaPlain = 'Maaf, tempahan ditolak. Sebab: ' + reason;
+    } else if (newStatus === 'Sudah Diambil') {
+      // Final state — job done, no email (per decision #4)
+      skipEmail = true;
+      console.log('📦 ' + id + ' ditanda Sudah Diambil oleh admin.');
+    }
+
+    if (!skipEmail) {
+      const emelPengguna = String(emelUser || '').trim();
+      if (/.+@.+\..+/.test(emelPengguna)) {
+        _sendMail_(
+          emelPengguna,
+          'Status Poster IMEN: ' + newStatus + ' — ' + id,
+          _emailLayout_('Kemas Kini Status',
+            '<p style="margin-top:0;">Salam <b>' + _esc_(namaUser) + '</b>,</p>' +
+            '<p>Status tempahan anda (<b>' + _esc_(id) + '</b>) telah dikemaskini:</p>' +
+            '<div style="background:#f1f5f9;border-radius:8px;padding:10px 14px;font-weight:bold;text-align:center;margin:12px 0;">' +
+              _esc_(String(newStatus).toUpperCase()) +
+            '</div>' + notaHtml
+          ),
+          'Status ' + id + ': ' + newStatus + '. ' + notaPlain
+        );
+      } else {
+        console.warn('⚠️ Emel pengguna tidak sah, diabaikan: "' + emelUser + '" (ID ' + id + ')');
+      }
+    }
+    return 'OK';
+  } catch (e) { return 'ERROR: ' + e.toString(); }
+}
+
+// ------------------------------------------------------------
+// DELETE ROW (Admin)
+// ------------------------------------------------------------
+function deleteRow(id, pass) {
+  if (pass !== _adminPassword_()) return 'ERROR: UNAUTHORIZED';
+  try {
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
+    const data  = sheet.getDataRange().getDisplayValues();
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == id) { rowIndex = i + 1; break; }
+    }
+    if (rowIndex === -1) return 'ERROR: Rekod tidak dijumpai.';
+    sheet.deleteRow(rowIndex);
+    return 'OK';
+  } catch (e) { return 'ERROR: ' + e.toString(); }
+}
+
+// ------------------------------------------------------------
+// GET ADMIN DATA
+// ------------------------------------------------------------
+function getAdminData(pass) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
+  const data  = sheet.getDataRange().getDisplayValues();
+  return data.map(r => {
+    const clean = r.slice(0, 17);
+    while (clean.length < 17) clean.push('');
+    return clean;
+  });
+}
+
+// ------------------------------------------------------------
+// CHECK USER STATUS
+// ------------------------------------------------------------
+function checkUserStatus(q) {
+  const rows = SpreadsheetApp.openById(SPREADSHEET_ID)
+    .getSheets()[0].getDataRange().getDisplayValues();
+  return rows.slice(1)
+    .filter(r => r[3].toLowerCase() === q.toLowerCase() || r[13].toLowerCase() === q.toLowerCase())
+    .map(r => ({ tarikh: r[1], tajuk: r[15], status: r[11], alasan: r[12] }));
+}
+
+// ------------------------------------------------------------
+// HELPER — file extension from MIME
+// ------------------------------------------------------------
+function _ext(mime) {
+  if (!mime) return 'pdf';
+  if (mime.includes('png'))  return 'png';
+  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+  return 'pdf';
+}
