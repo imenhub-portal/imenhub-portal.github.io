@@ -141,6 +141,11 @@ function doPost(e) {
       case 'deleteRow':            result = deleteRow(args[0], args[1]);            break;
       case 'getAdminData':         result = getAdminData(args[0]);                  break;
       case 'checkUserStatus':      result = checkUserStatus(args[0]);               break;
+      case 'getPrices':            result = getPrices();                            break;
+      case 'getAllocationConfig':  result = getAllocationConfig(args[0]);           break;
+      case 'saveAllocationConfig': result = saveAllocationConfig(args[0], args[1]); break;
+      case 'getAllocationLedger':  result = getAllocationLedger(args[0]);           break;
+      case 'recomputeLedger':      result = recomputeLedger(args[0]);               break;
       default: throw new Error('Unknown API function: ' + req.fn);
     }
     payload = { ok: true, result: result };
@@ -224,6 +229,346 @@ function startResumableUpload(fileName, mimeType, origin) {
   } catch (e) {
     return { ok: false, error: e.toString() };
   }
+}
+
+// ============================================================
+//  CONFIG SHEET — prices, cost constants & allocation ledger
+//
+//  Lives at sheet index 1 of the same spreadsheet. Key/value rows
+//  so column position never matters — everything is looked up by
+//  its `key` string. Seeded with defaults from the allocation MD
+//  on first access, so the sheet self-initialises.
+// ============================================================
+const CONFIG_SHEET_NAME = 'Config';
+
+// Default config (mirrors printing_allocation_logic.md). A0 costs are
+// derived as ×2 of these A1 constants; the form seeds the live values.
+const CONFIG_DEFAULTS = {
+  // Block 1 — selling prices the form charges
+  price_A1_glossy: 50,
+  price_A0_glossy: 80,
+  price_A1_plain:  30,
+  enabled_plain:   true,
+  // Block 2 — cost constants (per A1; A0 = ×2 all)
+  cost_paper:      6.67,
+  cost_ink:        20.00,
+  cost_printhead:  0.50,
+  cost_maintenance:2.83,
+  fixed_profit:    5.00,
+  // target cycles for progress bars
+  target_paper:      300,
+  target_ink:        3000,
+  target_printhead:  2500,
+  target_maintenance:0,
+  target_profit:     0,
+  // Block 3 — ledger running totals
+  total_prints:       0,
+  ledger_paper:       0,
+  ledger_ink:         0,
+  ledger_maintenance: 0,
+  ledger_printhead:   0,
+  ledger_profit:      0
+};
+
+function _configSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sh = ss.getSheetByName(CONFIG_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(CONFIG_SHEET_NAME, 1);
+    sh.getRange(1, 1, 1, 2).setValues([['key', 'value']]);
+    _seedConfig_(sh);
+  }
+  // Ensure header exists / sheet not empty
+  if (sh.getLastRow() < 1) {
+    sh.getRange(1, 1, 1, 2).setValues([['key', 'value']]);
+    _seedConfig_(sh);
+  }
+  return sh;
+}
+
+// Write any missing default keys (never overwrites existing values).
+function _seedConfig_(sh) {
+  var vals = sh.getDataRange().getValues();
+  var have = {};
+  for (var i = 1; i < vals.length; i++) { have[vals[i][0]] = true; }
+  var add = [];
+  for (var k in CONFIG_DEFAULTS) {
+    if (!have[k]) add.push([k, CONFIG_DEFAULTS[k]]);
+  }
+  if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, 2).setValues(add);
+}
+
+// Read all config as {key: value}. Coerces numbers/booleans.
+function _cfgAll_() {
+  var sh = _configSheet_();
+  _seedConfig_(sh);
+  var vals = sh.getDataRange().getValues();
+  var cfg = {};
+  for (var i = 1; i < vals.length; i++) {
+    var k = vals[i][0], v = vals[i][1];
+    if (!k) continue;
+    if (v === 'true') v = true;
+    else if (v === 'false') v = false;
+    else if (!isNaN(parseFloat(v)) && isFinite(v) && typeof v !== 'boolean') v = parseFloat(v);
+    cfg[k] = v;
+  }
+  return cfg;
+}
+
+// Read a single key (with fallback to defaults).
+function _cfg_(key) {
+  var cfg = _cfgAll_();
+  return (key in cfg) ? cfg[key] : CONFIG_DEFAULTS[key];
+}
+
+// Write/update one or more keys {key:value,...}.
+function _cfgSet_(obj) {
+  var sh = _configSheet_();
+  _seedConfig_(sh);
+  var vals = sh.getDataRange().getValues();
+  var rowMap = {};
+  for (var i = 1; i < vals.length; i++) { if (vals[i][0]) rowMap[vals[i][0]] = i + 1; }
+  for (var k in obj) {
+    var v = obj[k];
+    if (typeof v === 'boolean') v = v ? 'true' : 'false';
+    if (rowMap[k]) {
+      sh.getRange(rowMap[k], 2).setValue(v);
+    } else {
+      sh.appendRow([k, v]);
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// ALLOCATION MATH — the 5-channel split (mirrors the MD)
+//
+//  mult        = (size === 'A0') ? 2 : 1
+//  paper/ink/head/maint = cost constants × mult
+//  costs       = paper + ink + head + maint
+//  profit      = fixed_profit          (FIXED, never scales with price)
+//  surplus     = sellingPrice - costs - profit
+//  if surplus > 0 → paper += surplus/2, ink += surplus/2  (50/50)
+//
+// Returns the 5 channel amounts (per unit, NOT × qty — caller multiplies).
+// ------------------------------------------------------------
+function _allocate_(cfg, size, sellingPrice) {
+  var mult = (size === 'A0') ? 2 : 1;
+  var paper = cfg.cost_paper * mult;
+  var ink   = cfg.cost_ink * mult;
+  var head  = cfg.cost_printhead * mult;
+  var maint = cfg.cost_maintenance * mult;
+  var costs = paper + ink + head + maint;
+  var profit = cfg.fixed_profit;
+  var surplus = (sellingPrice - costs - profit);
+  if (surplus > 0) {
+    var half = surplus / 2;
+    paper += half;
+    ink += half;
+  }
+  return {
+    paper: paper, ink: ink, maintenance: maint,
+    printhead: head, profit: profit,
+    costs: costs, surplus: Math.max(surplus, 0)
+  };
+}
+
+// Breakeven price for a size (costs + fixed profit). Admin must not save below.
+function _breakeven_(cfg, size) {
+  var mult = (size === 'A0') ? 2 : 1;
+  return (cfg.cost_paper + cfg.cost_ink + cfg.cost_printhead + cfg.cost_maintenance) * mult + cfg.fixed_profit;
+}
+
+// ============================================================
+//  PUBLIC: prices for the form (ungated)
+// ============================================================
+function getPrices() {
+  var cfg = _cfgAll_();
+  return {
+    price_A1_glossy: cfg.price_A1_glossy,
+    price_A0_glossy: cfg.price_A0_glossy,
+    price_A1_plain:  cfg.price_A1_plain,
+    enabled_plain:   cfg.enabled_plain
+  };
+}
+
+// ============================================================
+//  ADMIN: read full config (prices + costs + targets)
+// ============================================================
+function getAllocationConfig(pass) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  var cfg = _cfgAll_();
+  return {
+    prices: {
+      price_A1_glossy: cfg.price_A1_glossy,
+      price_A0_glossy: cfg.price_A0_glossy,
+      price_A1_plain:  cfg.price_A1_plain,
+      enabled_plain:   cfg.enabled_plain
+    },
+    costs: {
+      cost_paper:       cfg.cost_paper,
+      cost_ink:         cfg.cost_ink,
+      cost_printhead:   cfg.cost_printhead,
+      cost_maintenance: cfg.cost_maintenance,
+      fixed_profit:     cfg.fixed_profit
+    },
+    targets: {
+      target_paper:       cfg.target_paper,
+      target_ink:         cfg.target_ink,
+      target_printhead:   cfg.target_printhead,
+      target_maintenance: cfg.target_maintenance,
+      target_profit:      cfg.target_profit
+    },
+    breakeven: {
+      A1: _breakeven_(cfg, 'A1'),
+      A0: _breakeven_(cfg, 'A0')
+    }
+  };
+}
+
+// ============================================================
+//  ADMIN: save config (prices + costs + targets) with validation
+//
+//  Breakeven rule: each selling price must be ≥ (costs for that
+//  size) + fixed_profit. A0 costs = ×2. Refuses to save if any
+//  price is below breakeven, returning the offender(s).
+// ============================================================
+function saveAllocationConfig(pass, cfgIn) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  if (!cfgIn) return { status: 'error', message: 'Tiada data diterima.' };
+
+  var cfg = _cfgAll_();
+  // Merge incoming into a working copy so validation sees new values
+  var w = {};
+  for (var k in cfg) w[k] = cfg[k];
+  if (cfgIn.prices) {
+    w.price_A1_glossy = parseFloat(cfgIn.prices.price_A1_glossy);
+    w.price_A0_glossy = parseFloat(cfgIn.prices.price_A0_glossy);
+    w.price_A1_plain  = parseFloat(cfgIn.prices.price_A1_plain);
+    w.enabled_plain   = !!cfgIn.prices.enabled_plain;
+  }
+  if (cfgIn.costs) {
+    w.cost_paper       = parseFloat(cfgIn.costs.cost_paper);
+    w.cost_ink         = parseFloat(cfgIn.costs.cost_ink);
+    w.cost_printhead   = parseFloat(cfgIn.costs.cost_printhead);
+    w.cost_maintenance = parseFloat(cfgIn.costs.cost_maintenance);
+    w.fixed_profit     = parseFloat(cfgIn.costs.fixed_profit);
+  }
+  if (cfgIn.targets) {
+    w.target_paper       = parseFloat(cfgIn.targets.target_paper);
+    w.target_ink         = parseFloat(cfgIn.targets.target_ink);
+    w.target_printhead   = parseFloat(cfgIn.targets.target_printhead);
+    w.target_maintenance = parseFloat(cfgIn.targets.target_maintenance);
+    w.target_profit      = parseFloat(cfgIn.targets.target_profit);
+  }
+
+  // Breakeven validation
+  var beA1 = _breakeven_(w, 'A1');
+  var beA0 = _breakeven_(w, 'A0');
+  var offenders = [];
+  if (!isFinite(w.price_A1_glossy) || w.price_A1_glossy < beA1)
+    offenders.push('A1 Glossy (min RM ' + beA1.toFixed(2) + ')');
+  if (!isFinite(w.price_A0_glossy) || w.price_A0_glossy < beA0)
+    offenders.push('A0 Glossy (min RM ' + beA0.toFixed(2) + ')');
+  if (w.enabled_plain && (!isFinite(w.price_A1_plain) || w.price_A1_plain < beA1))
+    offenders.push('A1 Plain (min RM ' + beA1.toFixed(2) + ')');
+  if (offenders.length) {
+    return {
+      status: 'error',
+      message: 'Harga di bawah breakeven: ' + offenders.join(', ')
+    };
+  }
+
+  // Persist
+  _cfgSet_({
+    price_A1_glossy: w.price_A1_glossy,
+    price_A0_glossy: w.price_A0_glossy,
+    price_A1_plain:  w.price_A1_plain,
+    enabled_plain:   w.enabled_plain,
+    cost_paper:       w.cost_paper,
+    cost_ink:         w.cost_ink,
+    cost_printhead:   w.cost_printhead,
+    cost_maintenance: w.cost_maintenance,
+    fixed_profit:     w.fixed_profit,
+    target_paper:       w.target_paper,
+    target_ink:         w.target_ink,
+    target_printhead:   w.target_printhead,
+    target_maintenance: w.target_maintenance,
+    target_profit:      w.target_profit
+  });
+
+  // Costs may have changed → recompute ledger so balances reflect new rates
+  try { recomputeLedger(pass); } catch (e) { console.warn('recomputeLedger selepas save: ' + e); }
+
+  return { status: 'success', message: 'Konfigurasi disimpan & lejar dikira semula.' };
+}
+
+// ============================================================
+//  ADMIN: read ledger balances + progress
+// ============================================================
+function getAllocationLedger(pass) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  var cfg = _cfgAll_();
+  function pct(have, target) {
+    if (!target || target <= 0) return null; // ongoing, no bar
+    return Math.min(100, Math.round((have / target) * 100));
+  }
+  return {
+    total_prints:       cfg.total_prints,
+    channels: {
+      paper:       { amount: cfg.ledger_paper,       target: cfg.target_paper,       pct: pct(cfg.ledger_paper, cfg.target_paper) },
+      ink:         { amount: cfg.ledger_ink,         target: cfg.target_ink,         pct: pct(cfg.ledger_ink, cfg.target_ink) },
+      maintenance: { amount: cfg.ledger_maintenance, target: cfg.target_maintenance, pct: pct(cfg.ledger_maintenance, cfg.target_maintenance) },
+      printhead:   { amount: cfg.ledger_printhead,   target: cfg.target_printhead,   pct: pct(cfg.ledger_printhead, cfg.target_printhead) },
+      profit:      { amount: cfg.ledger_profit,      target: cfg.target_profit,      pct: pct(cfg.ledger_profit, cfg.target_profit) }
+    },
+    breakeven: { A1: _breakeven_(cfg, 'A1'), A0: _breakeven_(cfg, 'A0') }
+  };
+}
+
+// ============================================================
+//  ADMIN: recompute the whole ledger by replaying every order row
+//
+//  Reads sheet 0 (orders): size = col 7 (idx 6), unit price = col 9
+//  (idx 8), qty = col 17 (idx 16). Sums the 5 channels using the
+//  current cost constants. Writes totals back to the Config sheet.
+// ============================================================
+function recomputeLedger(pass) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  var cfg = _cfgAll_();
+  var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
+  var data = sheet.getDataRange().getValues();
+
+  var tPrints = 0, tPaper = 0, tInk = 0, tMaint = 0, tHead = 0, tProfit = 0;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue;
+    var size = String(row[6] || 'A1').toUpperCase().indexOf('A0') > -1 ? 'A0' : 'A1';
+    var unitPrice = parseFloat(row[8]) || 0;
+    var qty = parseInt(row[16], 10) || 1;
+    var a = _allocate_(cfg, size, unitPrice);
+    tPrints += qty;
+    tPaper += a.paper * qty;
+    tInk   += a.ink * qty;
+    tMaint += a.maintenance * qty;
+    tHead  += a.printhead * qty;
+    tProfit+= a.profit * qty;
+  }
+
+  _cfgSet_({
+    total_prints: tPrints,
+    ledger_paper: Math.round(tPaper * 100) / 100,
+    ledger_ink: Math.round(tInk * 100) / 100,
+    ledger_maintenance: Math.round(tMaint * 100) / 100,
+    ledger_printhead: Math.round(tHead * 100) / 100,
+    ledger_profit: Math.round(tProfit * 100) / 100
+  });
+
+  return {
+    status: 'success',
+    message: 'Lejar dikira semula dari ' + tPrints + ' cetakan.',
+    total_prints: tPrints,
+    totals: { paper: tPaper, ink: tInk, maintenance: tMaint, printhead: tHead, profit: tProfit }
+  };
 }
 
 // ------------------------------------------------------------

@@ -16,7 +16,7 @@
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
   var API_URL = 'https://script.google.com/macros/s/AKfycbwjO97_YWugdYIRpV6bT3Uv4uTbmM6Ob1axw9ASpk668ugB40O1DAxzBn2jTRp9rLxKTg/exec';
-  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus','deleteRow', 'getAdminData', 'checkUserStatus'];
+  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus','deleteRow', 'getAdminData', 'checkUserStatus', 'getPrices', 'getAllocationConfig', 'saveAllocationConfig', 'getAllocationLedger', 'recomputeLedger'];
   function makeRunner() {
     var onOk = function(){}; var onErr = function(e){ console.error('[API] ', e); };
     var runner = {
@@ -419,6 +419,57 @@
     .lang-btn{ background:transparent; color:var(--muted); }
     .lang-btn:hover{ color:var(--ink); background:rgba(255,255,255,.7); }
     .lang-btn.active{ background:var(--ink); color:#fff; box-shadow:0 2px 8px rgba(15,23,42,.18); }
+
+    /* ── Banking-style admin dashboard ─────────────────────────── */
+    .dash-layout{ display:grid; grid-template-columns:220px 1fr; gap:18px; align-items:start; }
+    @media (max-width:760px){ .dash-layout{ grid-template-columns:1fr; } }
+    .dash-side{ background:#fff; border:1px solid var(--border); border-radius:16px; padding:10px; box-shadow:var(--shadow-sm); position:sticky; top:12px; }
+    .dash-side-head{ display:flex; align-items:center; gap:8px; padding:8px 10px 12px; border-bottom:1px solid var(--border-3); margin-bottom:8px; }
+    .dash-side-head .av{ width:34px; height:34px; border-radius:10px; background:var(--ink); color:#fff; display:grid; place-items:center; font-weight:800; font-size:14px; }
+    .dash-side-head b{ font-size:13px; } .dash-side-head small{ display:block; font-size:10px; color:var(--muted); font-weight:600; }
+    .dash-nav-item{ display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; color:var(--muted); transition:.18s var(--ease); border:1px solid transparent; }
+    .dash-nav-item:hover{ background:var(--paper-3); color:var(--ink-2); }
+    .dash-nav-item.active{ background:var(--ink); color:#fff; box-shadow:0 4px 14px rgba(15,23,42,.18); }
+    .dash-nav-item .ic{ font-size:15px; width:20px; text-align:center; }
+    .dash-nav-item .badge-count{ margin-left:auto; background:rgba(255,255,255,.16); padding:1px 8px; border-radius:999px; font-size:11px; }
+    .dash-nav-item:not(.active) .badge-count{ background:var(--paper-3); color:var(--ink-3); }
+    .dash-pane{ display:none; }
+    .dash-pane.active{ display:block; animation:mFade .28s var(--ease); }
+    .dash-pane-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+    .dash-pane-head h3{ margin:0; font-size:16px; font-weight:800; letter-spacing:-.01em; }
+    .dash-pane-head .sub{ font-size:11px; color:var(--muted); font-weight:600; margin-top:2px; }
+
+    /* Allocation channel cards */
+    .alloc-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+    .alloc-card{ background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow-sm); position:relative; overflow:hidden; }
+    .alloc-card .ac-top{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    .alloc-card .ac-icon{ width:38px; height:38px; border-radius:11px; display:grid; place-items:center; font-size:18px; flex-shrink:0; }
+    .alloc-card .ac-name{ font-size:12px; font-weight:800; letter-spacing:-.01em; }
+    .alloc-card .ac-per{ font-size:10px; color:var(--muted); font-weight:600; }
+    .alloc-card .ac-amt{ font-size:24px; font-weight:800; font-family:var(--mono); letter-spacing:-.02em; }
+    .alloc-card .ac-meta{ font-size:11px; color:var(--muted); margin-top:2px; }
+    .alloc-bar{ height:7px; background:var(--paper-3); border-radius:999px; overflow:hidden; margin-top:12px; }
+    .alloc-bar-fill{ height:100%; border-radius:999px; transition:width .5s var(--ease); }
+    .alloc-pct{ font-size:10px; font-weight:700; color:var(--muted); margin-top:4px; text-align:right; }
+    .alloc-summary{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:18px; }
+    .alloc-sum-card{ background:var(--paper-2); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+    .alloc-sum-card b{ font-size:18px; font-family:var(--mono); display:block; }
+    .alloc-sum-card span{ font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+
+    /* Settings editor */
+    .cfg-section{ background:#fff; border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:16px; box-shadow:var(--shadow-sm); }
+    .cfg-section h4{ margin:0 0 4px; font-size:14px; font-weight:800; } .cfg-section .cfg-sub{ font-size:11px; color:var(--muted); margin-bottom:16px; font-weight:600; }
+    .cfg-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+    .cfg-field label{ display:block; font-size:11px; font-weight:700; color:var(--ink-3); margin-bottom:5px; }
+    .cfg-field input{ width:100%; }
+    .cfg-field .hint{ font-size:10px; color:var(--muted); margin-top:4px; }
+    .cfg-field .hint.danger{ color:var(--err); font-weight:700; }
+    .cfg-toggle{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:12px; font-weight:700; }
+    .cfg-toggle input{ width:auto; }
+    .cfg-preview{ background:var(--paper-2); border:1px dashed var(--border-2); border-radius:12px; padding:14px; margin-top:14px; }
+    .cfg-preview-row{ display:flex; justify-content:space-between; padding:5px 0; font-size:12px; border-bottom:1px solid var(--border-3); }
+    .cfg-preview-row:last-child{ border:none; }
+    .cfg-preview-row b{ font-family:var(--mono); }
   </style>
 </head>
 <body>
@@ -623,45 +674,116 @@
       <button class="btn btn-main" onclick="loadAdmin()" data-bm="MASUK DASHBOARD" data-bi="ENTER DASHBOARD">MASUK DASHBOARD</button>
     </div>
     <div id="dash" style="display:none;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
-        <h3 style="margin:0; font-size:16px; font-weight:800; letter-spacing:-.01em;" data-bm="📊 Papan Pemuka Admin — Merch Ops" data-bi="📊 Admin Dashboard — Merch Ops">📊 Papan Pemuka Admin — Merch Ops</h3>
-        <button class="btn" onclick="loadAdmin()" style="background:var(--paper-3); color:var(--ink); border:1px solid var(--border);">🔄 Refresh</button>
-      </div>
-      <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
-        <div class="stat-card" style="background:var(--paper-3);"><span data-bm="Semua" data-bi="All">Semua</span><b id="cTot">0</b></div>
-        <div class="stat-card" style="background:var(--orange-soft); color:#9a3412; border-color:#fed7aa;"><span data-bm="Pending" data-bi="Pending">Pending</span><b id="cP">0</b></div>
-        <div class="stat-card" style="background:#eff6ff; color:#1d4ed8;"><span data-bm="Proses" data-bi="Processing">Proses</span><b id="cPr">0</b></div>
-        <div class="stat-card" style="background:var(--ok-soft); color:#15803d;"><span data-bm="Siap" data-bi="Ready">Siap</span><b id="cS">0</b></div>
-        <div class="stat-card" style="background:#f5f3ff; color:#6d28d9;"><span data-bm="Diambil" data-bi="Collected">Diambil</span><b id="cCd">0</b></div>
-      </div>
-      <div class="adm-subtabs">
-        <div class="adm-subtab active" id="admSub0" onclick="swAdminTab(0)"><span data-bm="🔥 Aktif" data-bi="🔥 Active">🔥 Aktif</span> <b id="cActive">0</b></div>
-        <div class="adm-subtab" id="admSub1" onclick="swAdminTab(1)"><span data-bm="📜 Sejarah" data-bi="📜 History">📜 Sejarah</span> <b id="cHist">0</b></div>
-      </div>
-      <div id="admActivePane" class="adm-pane">
-        <input type="text" id="sAdm" onkeyup="filterTable('tbl','sAdm')" placeholder="🔍 Cari nama, tajuk, PTJ…" data-bm-ph="🔍 Cari nama, tajuk, PTJ…" data-bi-ph="🔍 Search name, title, dept…" style="margin-bottom:10px;">
-        <div id="actLegend" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; font-size:11px; font-weight:600; color:#475569;">
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#eff6ff; border-radius:7px;">🔄</span> <span data-bm="Proses" data-bi="Processing">Proses</span></span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f0fdf4; border-radius:7px;">✅</span> <span data-bm="Siap" data-bi="Ready">Siap</span></span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f5f3ff; border-radius:7px;">📦</span> <span data-bm="Diambil" data-bi="Collected">Diambil</span></span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef2f2; border-radius:7px;">❌</span> <span data-bm="Tolak" data-bi="Rejected">Tolak</span></span>
-          <span style="width:1px; height:16px; background:#e2e8f0; display:inline-block;"></span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#e6fffa; color:#128C7E; border-radius:7px; font-size:10px;">💬</span> <span data-bm="WA tab baru" data-bi="WA new tab">WA tab baru</span></span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:7px; font-size:10px;">📞</span> Call</span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:7px;">📄</span> <span data-bm="Fail" data-bi="File">Fail</span></span>
-          <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:#fca5a5; border-radius:7px; font-weight:800;">✕</span> <span data-bm="Padam" data-bi="Delete">Padam</span></span>
+      <div class="dash-layout">
+        <!-- SIDEBAR -->
+        <div class="dash-side">
+          <div class="dash-side-head">
+            <div class="av">A</div>
+            <div><b>Admin IMEN</b><small data-bm="Papan Pemuka" data-bi="Dashboard">Papan Pemuka</small></div>
+          </div>
+          <div class="dash-nav-item active" id="dn0" onclick="swDash(0)"><span class="ic">📋</span><span data-bm="Tempahan" data-bi="Orders">Tempahan</span><span class="badge-count" id="dnBadge">0</span></div>
+          <div class="dash-nav-item" id="dn1" onclick="swDash(1)"><span class="ic">📊</span><span data-bm="Peruntukan" data-bi="Allocation">Peruntukan</span></div>
+          <div class="dash-nav-item" id="dn2" onclick="swDash(2)"><span class="ic">⚙️</span><span data-bm="Harga &amp; Kos" data-bi="Price &amp; Cost">Harga &amp; Kos</span></div>
+          <div style="height:1px; background:var(--border-3); margin:8px 0;"></div>
+          <div class="dash-nav-item" onclick="logoutAdmin()"><span class="ic">🚪</span><span data-bm="Log Keluar" data-bi="Log Out">Log Keluar</span></div>
         </div>
-        <div style="overflow-x:auto;"><table id="tbl"></table></div>
-      </div>
-      <div id="admHistPane" class="adm-pane" style="display:none;">
-        <input type="text" id="sAdmHist" onkeyup="filterTable('tblHist','sAdmHist')" placeholder="🔍 Cari dalam sejarah…" data-bm-ph="🔍 Cari dalam sejarah…" data-bi-ph="🔍 Search history…" style="margin-bottom:10px;">
-        <div id="actHistLegend" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:9px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; font-size:11px; font-weight:600; color:#92400e;">
-          <span data-bm="📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini." data-bi="📦 Collected &amp; ❌ Rejected — completed, kept here.">📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini.</span>
-          <span style="width:1px; height:16px; background:#fde68a; display:inline-block;"></span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef3c7; border-radius:7px;">↩️</span> <span data-bm="Kembali ke Siap" data-bi="Back to Ready">Kembali ke Siap</span></span>
+
+        <!-- PANE 0: TEMPATAN (orders) -->
+        <div class="dash-pane active" id="dp0">
+          <div class="dash-pane-head">
+            <div><h3 data-bm="📋 Tempahan Poster" data-bi="📋 Poster Orders">📋 Tempahan Poster</h3><div class="sub" data-bm="Pengurusan &amp; status cetakan" data-bi="Print order management &amp; status">Pengurusan &amp; status cetakan</div></div>
+            <button class="btn" onclick="loadAdmin()" style="background:var(--paper-3); color:var(--ink); border:1px solid var(--border);">🔄 Refresh</button>
+          </div>
+          <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">
+            <div class="stat-card" style="background:var(--paper-3);"><span data-bm="Semua" data-bi="All">Semua</span><b id="cTot">0</b></div>
+            <div class="stat-card" style="background:var(--orange-soft); color:#9a3412; border-color:#fed7aa;"><span data-bm="Pending" data-bi="Pending">Pending</span><b id="cP">0</b></div>
+            <div class="stat-card" style="background:#eff6ff; color:#1d4ed8;"><span data-bm="Proses" data-bi="Processing">Proses</span><b id="cPr">0</b></div>
+            <div class="stat-card" style="background:var(--ok-soft); color:#15803d;"><span data-bm="Siap" data-bi="Ready">Siap</span><b id="cS">0</b></div>
+            <div class="stat-card" style="background:#f5f3ff; color:#6d28d9;"><span data-bm="Diambil" data-bi="Collected">Diambil</span><b id="cCd">0</b></div>
+          </div>
+          <div class="adm-subtabs">
+            <div class="adm-subtab active" id="admSub0" onclick="swAdminTab(0)"><span data-bm="🔥 Aktif" data-bi="🔥 Active">🔥 Aktif</span> <b id="cActive">0</b></div>
+            <div class="adm-subtab" id="admSub1" onclick="swAdminTab(1)"><span data-bm="📜 Sejarah" data-bi="📜 History">📜 Sejarah</span> <b id="cHist">0</b></div>
+          </div>
+          <div id="admActivePane" class="adm-pane">
+            <input type="text" id="sAdm" onkeyup="filterTable('tbl','sAdm')" placeholder="🔍 Cari nama, tajuk, PTJ…" data-bm-ph="🔍 Cari nama, tajuk, PTJ…" data-bi-ph="🔍 Search name, title, dept…" style="margin-bottom:10px;">
+            <div id="actLegend" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; font-size:11px; font-weight:600; color:#475569;">
+              <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#eff6ff; border-radius:7px;">🔄</span> <span data-bm="Proses" data-bi="Processing">Proses</span></span>
+              <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f0fdf4; border-radius:7px;">✅</span> <span data-bm="Siap" data-bi="Ready">Siap</span></span>
+              <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f5f3ff; border-radius:7px;">📦</span> <span data-bm="Diambil" data-bi="Collected">Diambil</span></span>
+              <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef2f2; border-radius:7px;">❌</span> <span data-bm="Tolak" data-bi="Rejected">Tolak</span></span>
+              <span style="width:1px; height:16px; background:#e2e8f0; display:inline-block;"></span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#e6fffa; color:#128C7E; border-radius:7px; font-size:10px;">💬</span> <span data-bm="WA tab baru" data-bi="WA new tab">WA tab baru</span></span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:7px; font-size:10px;">📞</span> Call</span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:7px;">📄</span> <span data-bm="Fail" data-bi="File">Fail</span></span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:#fca5a5; border-radius:7px; font-weight:800;">✕</span> <span data-bm="Padam" data-bi="Delete">Padam</span></span>
+            </div>
+            <div style="overflow-x:auto;"><table id="tbl"></table></div>
+          </div>
+          <div id="admHistPane" class="adm-pane" style="display:none;">
+            <input type="text" id="sAdmHist" onkeyup="filterTable('tblHist','sAdmHist')" placeholder="🔍 Cari dalam sejarah…" data-bm-ph="🔍 Cari dalam sejarah…" data-bi-ph="🔍 Search history…" style="margin-bottom:10px;">
+            <div id="actHistLegend" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:9px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; font-size:11px; font-weight:600; color:#92400e;">
+              <span data-bm="📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini." data-bi="📦 Collected &amp; ❌ Rejected — completed, kept here.">📦 Diambil &amp; ❌ Ditolak — urusan selesai, disimpan di sini.</span>
+              <span style="width:1px; height:16px; background:#fde68a; display:inline-block;"></span>
+              <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef3c7; border-radius:7px;">↩️</span> <span data-bm="Kembali ke Siap" data-bi="Back to Ready">Kembali ke Siap</span></span>
+            </div>
+            <div style="overflow-x:auto;"><table id="tblHist"></table></div>
+            <div id="histEmpty" data-bm="Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini." data-bi="No history records yet. Mark a poster as <b>Collected</b> to move it here." style="display:none; text-align:center; color:#94a3b8; padding:24px 12px; font-size:13px;">Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini.</div>
+          </div>
         </div>
-        <div style="overflow-x:auto;"><table id="tblHist"></table></div>
-        <div id="histEmpty" data-bm="Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini." data-bi="No history records yet. Mark a poster as <b>Collected</b> to move it here." style="display:none; text-align:center; color:#94a3b8; padding:24px 12px; font-size:13px;">Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini.</div>
+
+        <!-- PANE 1: PERUNTUKAN (allocation) -->
+        <div class="dash-pane" id="dp1">
+          <div class="dash-pane-head">
+            <div><h3 data-bm="📊 Peruntukan Kewangan" data-bi="📊 Financial Allocation">📊 Peruntukan Kewangan</h3><div class="sub" data-bm="Pembahagian hasil cetakan ke 5 dana" data-bi="Print revenue split into 5 funds">Pembahagian hasil cetakan ke 5 dana</div></div>
+            <button class="btn" onclick="recomputeLedgerBtn()" style="background:var(--paper-3); color:var(--ink); border:1px solid var(--border);">↻ <span data-bm="Kira Semula" data-bi="Recompute">Kira Semula</span></button>
+          </div>
+          <div class="alloc-summary" id="allocSummary"></div>
+          <div class="alloc-grid" id="allocGrid"></div>
+        </div>
+
+        <!-- PANE 2: HARGA & KOS (settings) -->
+        <div class="dash-pane" id="dp2">
+          <div class="dash-pane-head">
+            <div><h3 data-bm="⚙️ Harga &amp; Kos" data-bi="⚙️ Price &amp; Cost">⚙️ Harga &amp; Kos</h3><div class="sub" data-bm="Harga jualan &amp; pemalar kos — kesemua perubahan disimpan ke Config" data-bi="Selling prices &amp; cost constants — saved to Config">Harga jualan &amp; pemalar kos — kesemua perubahan disimpan ke Config</div></div>
+          </div>
+          <div class="cfg-section">
+            <h4 data-bm="Harga Jualan" data-bi="Selling Prices">Harga Jualan</h4>
+            <div class="cfg-sub" data-bm="Harga yang dikenakan kepada pelanggan. Tidak boleh di bawah breakeven." data-bi="Prices charged to customers. Cannot go below breakeven.">Harga yang dikenakan kepada pelanggan. Tidak boleh di bawah breakeven.</div>
+            <div class="cfg-grid">
+              <div class="cfg-field"><label data-bm="A1 High Glossy (RM)" data-bi="A1 High Glossy (RM)">A1 High Glossy (RM)</label><input type="number" id="cfgP1" step="0.01" min="0"><div class="hint" id="cfgP1h"></div></div>
+              <div class="cfg-field"><label data-bm="A0 High Glossy (RM)" data-bi="A0 High Glossy (RM)">A0 High Glossy (RM)</label><input type="number" id="cfgP2" step="0.01" min="0"><div class="hint" id="cfgP2h"></div></div>
+              <div class="cfg-field"><label data-bm="A1 Plain Paper (RM)" data-bi="A1 Plain Paper (RM)">A1 Plain Paper (RM)</label><input type="number" id="cfgP3" step="0.01" min="0"><div class="hint" id="cfgP3h"></div></div>
+              <div class="cfg-field"><label>&nbsp;</label><label class="cfg-toggle"><input type="checkbox" id="cfgPlainEn" checked> <span data-bm="Plain Paper tersedia" data-bi="Plain Paper enabled">Plain Paper tersedia</span></label></div>
+            </div>
+          </div>
+          <div class="cfg-section">
+            <h4 data-bm="Pemalar Kos (per A1)" data-bi="Cost Constants (per A1)">Pemalar Kos (per A1)</h4>
+            <div class="cfg-sub" data-bm="A0 = ×2 semua kos. Untuk A1 sahaja, ikut nilai ini. Sumber: printing_allocation_logic.md" data-bi="A0 = ×2 all costs. For A1 only, use these values. Source: printing_allocation_logic.md">A0 = ×2 semua kos. Untuk A1 sahaja, ikut nilai ini. Sumber: printing_allocation_logic.md</div>
+            <div class="cfg-grid">
+              <div class="cfg-field"><label data-bm="Kertas (RM)" data-bi="Paper (RM)">Kertas (RM)</label><input type="number" id="cfgC1" step="0.01" min="0"></div>
+              <div class="cfg-field"><label data-bm="Dakwat (RM)" data-bi="Ink (RM)">Dakwat (RM)</label><input type="number" id="cfgC2" step="0.01" min="0"></div>
+              <div class="cfg-field"><label data-bm="Printhead (RM)" data-bi="Printhead (RM)">Printhead (RM)</label><input type="number" id="cfgC3" step="0.01" min="0"></div>
+              <div class="cfg-field"><label data-bm="Penyelenggaraan (RM)" data-bi="Maintenance (RM)">Penyelenggaraan (RM)</label><input type="number" id="cfgC4" step="0.01" min="0"></div>
+              <div class="cfg-field"><label data-bm="Untung Tetap (RM)" data-bi="Fixed Profit (RM)">Untung Tetap (RM)</label><input type="number" id="cfgC5" step="0.01" min="0"></div>
+            </div>
+          </div>
+          <div class="cfg-section">
+            <h4 data-bm="Kitaran Sasaran Dana" data-bi="Fund Target Cycles">Kitaran Sasaran Dana</h4>
+            <div class="cfg-sub" data-bm="Sasaran RM sebelum dana dikira penuh (0 = berterusan, tiada bar)" data-bi="RM target before a fund is fully funded (0 = ongoing, no bar)">Sasaran RM sebelum dana dikira penuh (0 = berterusan, tiada bar)</div>
+            <div class="cfg-grid">
+              <div class="cfg-field"><label data-bm="Dana Kertas (RM)" data-bi="Paper Fund (RM)">Dana Kertas (RM)</label><input type="number" id="cfgT1" step="1" min="0"></div>
+              <div class="cfg-field"><label data-bm="Dana Dakwat (RM)" data-bi="Ink Fund (RM)">Dana Dakwat (RM)</label><input type="number" id="cfgT2" step="1" min="0"></div>
+              <div class="cfg-field"><label data-bm="Dana Printhead (RM)" data-bi="Printhead Fund (RM)">Dana Printhead (RM)</label><input type="number" id="cfgT3" step="1" min="0"></div>
+            </div>
+          </div>
+          <div class="cfg-preview" id="cfgPreview"></div>
+          <div style="display:flex; gap:10px; margin-top:16px;">
+            <button class="btn btn-main" onclick="saveConfig()" style="margin-top:0;">💾 <span data-bm="Simpan" data-bi="Save">Simpan</span></button>
+            <button class="btn" onclick="loadConfig()" style="margin-top:0; background:var(--paper-3); color:var(--ink); border:1px solid var(--border);">↩️ <span data-bm="Batal" data-bi="Revert">Batal</span></button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -680,6 +802,27 @@ var I18N = {
 // T(bm, bi) → pick the string for the current language (used by JS-rendered
 // content: admin tables, status results, modals).
 function T(bm, bi){ return CUR_LANG==='bi' ? bi : bm; }
+
+// ── DYNAMIC PRICING ──────────────────────────────────────────
+// Prices live in the Config sheet (backend) and are fetched on load.
+// Falls back to the legacy hardcoded defaults so the form never breaks.
+var PRICES = { price_A1_glossy:50, price_A0_glossy:80, price_A1_plain:30, enabled_plain:true };
+function fetchPrices(){
+  try{
+    google.script.run.withFailureHandler(function(e){
+      console.warn('[getPrices] fallback to defaults:', e);
+      try{ calcPrice(); }catch(x){}
+    }).withSuccessHandler(function(d){
+      if(d && typeof d==='object'){ PRICES=d; window.PRICES=d; }
+      try{ calcPrice(); }catch(x){}
+      // reflect plain availability from server
+      var pp=document.getElementById('pillPlain'); var op=document.getElementById('optPlain');
+      var en = !(d && d.enabled_plain===false);
+      if(pp){ pp.style.display = en ? '' : 'none'; }
+      if(op){ op.disabled = !en; }
+    }).getPrices();
+  }catch(e){ console.warn('[fetchPrices]', e); }
+}
 
 // setLang swaps every element carrying data-bm/data-bi (text) and
 // data-bm-ph/data-bi-ph (placeholder). Only LEAF elements are tagged, so the
@@ -746,9 +889,10 @@ function calcPrice(){
   var pillPlain=document.getElementById('pillPlain'); if(pillPlain){ pillPlain.style.opacity=(s==='A0')?'.38':''; pillPlain.style.pointerEvents=(s==='A0')?'none':''; }
   if(s==='A0' && m==='Plain Paper'){ if(selM) selM.value='High Glossy'; m='High Glossy'; }
 
-  // price matrix with size dependency
-  var priceGlossy = (s==='A1'?50:80);
-  var pricePlain  = 30;
+  // price matrix with size dependency — driven by backend PRICES (fallback to defaults)
+  var PR = window.PRICES || {};
+  var priceGlossy = (s==='A1') ? (PR.price_A1_glossy||50) : (PR.price_A0_glossy||80);
+  var pricePlain  = (PR.price_A1_plain||30);
   var p = (m==='High Glossy') ? priceGlossy : pricePlain;
   var total = p * u;
 
@@ -827,6 +971,7 @@ function onFileChosen(input){
   var tel=document.getElementById('inpTel'); if(tel) tel.addEventListener('input', calcPrice);
   var tj=document.getElementById('inpTujuan'); if(tj) tj.addEventListener('input', calcPrice);
   try{ calcPrice(); }catch(e){}
+  try{ fetchPrices(); }catch(e){}
   try{ setLang(CUR_LANG); }catch(e){}
 })();
 
@@ -912,7 +1057,7 @@ function checkStatus(){
 }
 
 // ADMIN
-var _adminPass=''; var _admSubTab=0; var _admRowsCache=null;
+var _adminPass=''; var _admSubTab=0; var _admRowsCache=null; var _adminLoggedIn=false; var _cfgCache=null;
 function badgeCls(st){ if(st==='Dalam Proses') return 'badge-process'; if(st==='Dah Boleh Collect') return 'badge-success'; if(st==='Sudah Diambil') return 'badge-collected'; if(st==='Ditolak') return 'badge-reject'; return 'badge-pending'; }
 function isHistoryStatus(st){ return st==='Sudah Diambil' || st==='Ditolak'; }
 function swAdminTab(n){
@@ -973,6 +1118,8 @@ function loadAdmin(){
     document.getElementById('loginBox').style.display='none'; document.getElementById('dash').style.display='block';
     document.getElementById('actLegend').style.display='flex'; document.getElementById('actHistLegend').style.display='flex';
     _admRowsCache=d; renderAdminFromCache();
+    _adminLoggedIn=true; swDash(0);
+    try{ loadAllocation(); loadConfig(); }catch(e){ console.warn('[alloc/cfg load]', e); }
   }).getAdminData(document.getElementById('pass').value);
 }
 // Builds the admin tables from the cached rows. Split out from loadAdmin so
@@ -987,6 +1134,7 @@ function renderAdminFromCache(){
   document.getElementById('tblHist').innerHTML=hdr+_renderAdminTable('tblHist', hist);
   document.getElementById('cTot').innerText=cT; document.getElementById('cP').innerText=cP; document.getElementById('cPr').innerText=cPr; document.getElementById('cS').innerText=cS; document.getElementById('cCd').innerText=cCd;
   document.getElementById('cActive').innerText=active.length; document.getElementById('cHist').innerText=hist.length;
+  var dnB=document.getElementById('dnBadge'); if(dnB) dnB.innerText=cT;
   document.getElementById('histEmpty').style.display=hist.length?'none':'block'; swAdminTab(_admSubTab);
 }
 function updStatus(id, status, reason){
@@ -1008,6 +1156,220 @@ function filterTable(tblId, searchId){
   var v=sEl.value.toUpperCase(); var tr=document.getElementById(tid).getElementsByTagName('tr');
   for(var i=1;i<tr.length;i++){ var td=tr[i].getElementsByTagName('td')[1]; if(td) tr[i].style.display=td.innerText.toUpperCase().indexOf(v)>-1?'':'none'; }
 }
+
+// ============================================================
+//  ALLOCATION DASHBOARD + SETTINGS  (admin pane 1 & 2)
+// ============================================================
+
+// Sidebar navigation between the 3 admin panes.
+function swDash(n){
+  _adminSubPane=n;
+  for(var i=0;i<3;i++){
+    var nav=document.getElementById('dn'+i); var pane=document.getElementById('dp'+i);
+    if(nav) nav.classList.toggle('active', i===n);
+    if(pane) pane.classList.toggle('active', i===n);
+  }
+  if(n===1) loadAllocation();
+  if(n===2) loadConfig();
+}
+var _adminSubPane=0;
+
+function logoutAdmin(){
+  _adminLoggedIn=false; _adminPass=''; _admRowsCache=null;
+  document.getElementById('dash').style.display='none';
+  document.getElementById('loginBox').style.display='block';
+  var p=document.getElementById('pass'); if(p) p.value='';
+  swDash(0);
+}
+
+// Client-side mirror of the backend _allocate_ math (for the settings
+// live preview). cfg = {cost_paper, cost_ink, cost_printhead,
+// cost_maintenance, fixed_profit}. Returns per-unit channel amounts.
+function _allocMath(cfg, size, sellingPrice){
+  var mult=(size==='A0')?2:1;
+  var paper=cfg.cost_paper*mult, ink=cfg.cost_ink*mult, head=cfg.cost_printhead*mult, maint=cfg.cost_maintenance*mult;
+  var costs=paper+ink+head+maint, profit=cfg.fixed_profit;
+  var surplus=sellingPrice-costs-profit;
+  if(surplus>0){ var h=surplus/2; paper+=h; ink+=h; }
+  return { paper:paper, ink:ink, maintenance:maint, printhead:head, profit:profit, costs:costs, surplus:Math.max(surplus,0) };
+}
+function _breakeven(cfg, size){ var mult=(size==='A0')?2:1; return (cfg.cost_paper+cfg.cost_ink+cfg.cost_printhead+cfg.cost_maintenance)*mult + cfg.fixed_profit; }
+
+// ── Pane 1: load + render the allocation ledger ──
+function loadAllocation(){
+  if(!_adminPass) return;
+  google.script.run.withFailureHandler(function(e){ console.warn('[ledger]', e); }).withSuccessHandler(function(d){
+    if(d==='UNAUTHORIZED'){ return; }
+    renderAllocation(d);
+  }).getAllocationLedger(_adminPass);
+}
+
+var _ALLOC_META=[
+  { key:'paper',       icon:'📄', name:{bm:'Dana Kertas',bi:'Paper Fund'},       color:'#2563eb' },
+  { key:'ink',         icon:'🖨️', name:{bm:'Dana Dakwat',bi:'Ink Fund'},         color:'#7c3aed' },
+  { key:'maintenance', icon:'🛠️', name:{bm:'Penyelenggaraan',bi:'Maintenance'},  color:'#d97706' },
+  { key:'printhead',   icon:'⚙️', name:{bm:'Dana Printhead',bi:'Printhead Fund'},color:'#0891b2' },
+  { key:'profit',      icon:'💰', name:{bm:'Untung Bersih',bi:'Net Profit'},      color:'#16a34a' }
+];
+
+function renderAllocation(d){
+  if(!d || !d.channels){ return; }
+  var grid=document.getElementById('allocGrid'); if(!grid) return;
+  var html='';
+  var sumRev=0, sumCost=0, sumProfit=0;
+  _ALLOC_META.forEach(function(m){
+    var ch=d.channels[m.key]||{amount:0,target:0,pct:null};
+    var amt=parseFloat(ch.amount)||0;
+    if(m.key==='profit') sumProfit+=amt; else sumCost+=amt;
+    sumRev+= (m.key==='profit')? amt : amt;
+    var perPrint = _allocPerPrint(m.key);
+    var pctLabel = (ch.pct==null) ? T('berterusan','ongoing') : ch.pct+'%';
+    var bar = (ch.pct==null) ? '' : '<div class="alloc-bar"><div class="alloc-bar-fill" style="width:'+ch.pct+'%; background:'+m.color+'"></div></div>';
+    var targetTxt = (ch.target && ch.target>0) ? ' / RM '+_fmt(ch.target) : '';
+    html+='<div class="alloc-card">'
+      + '<div class="ac-top"><div class="ac-icon" style="background:'+m.color+'1a; color:'+m.color+'">'+m.icon+'</div>'
+      + '<div><div class="ac-name">'+T(m.name.bm,m.name.bi)+'</div>'
+      + '<div class="ac-per">'+perPrint+' / '+T('cetakan','print')+'</div></div></div>'
+      + '<div class="ac-amt" style="color:'+m.color+'">RM '+_fmt(amt)+'</div>'
+      + '<div class="ac-meta">'+targetTxt+' • '+pctLabel+'</div>'
+      + bar
+      + '</div>';
+  });
+  grid.innerHTML=html;
+  // Summary strip
+  var totPrints=parseInt(d.total_prints,10)||0;
+  var s=document.getElementById('allocSummary');
+  if(s){
+    s.innerHTML=
+      _sumCard(T('Jumlah Cetakan','Total Prints'), totPrints, '#0f172a')
+      + _sumCard(T('Jumlah Kos','Total Costs'), 'RM '+_fmt(sumCost), '#d97706')
+      + _sumCard(T('Untung Bersih','Net Profit'), 'RM '+_fmt(sumProfit), '#16a34a')
+      + _sumCard(T('Breakeven A1','A1 Breakeven'), 'RM '+_fmt(d.breakeven?d.breakeven.A1:0), '#2563eb')
+      + _sumCard(T('Breakeven A0','A0 Breakeven'), 'RM '+_fmt(d.breakeven?d.breakeven.A0:0), '#7c3aed');
+  }
+}
+function _sumCard(label, val, color){
+  return '<div class="alloc-sum-card"><span>'+label+'</span><b style="color:'+color+'">'+val+'</b></div>';
+}
+function _fmt(n){ var v=parseFloat(n)||0; return v.toLocaleString('en-MY',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+// Per-print contribution hint for each channel (uses live PRICES/costs if available)
+function _allocPerPrint(key){
+  var cfg = _cfgCache ? _cfgCache.costs : null;
+  if(!cfg) return '—';
+  var be1=_breakeven(cfg,'A1');
+  var a=_allocMath(cfg,'A1', (window.PRICES&&window.PRICES.price_A1_glossy)||be1);
+  var map={paper:a.paper, ink:a.ink, maintenance:a.maintenance, printhead:a.printhead, profit:a.profit};
+  return 'RM '+_fmt(map[key]||0);
+}
+
+// Recompute button
+function recomputeLedgerBtn(){
+  ld(true);
+  google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){
+    ld(false); if(res && res.status==='success'){ myAlert(res.message); loadAllocation(); }
+    else if(res==='UNAUTHORIZED'){ myAlert(T('Tidak sah','Unauthorized'), true); }
+    else { myAlert((res&&res.message)||T('Selesai','Done')); loadAllocation(); }
+  }).recomputeLedger(_adminPass);
+}
+
+// ── Pane 2: load + render the settings editor ──
+function loadConfig(){
+  if(!_adminPass) return;
+  google.script.run.withFailureHandler(function(e){ console.warn('[config]', e); }).withSuccessHandler(function(d){
+    if(d==='UNAUTHORIZED') return;
+    _cfgCache=d;
+    var p=d.prices||{}, c=d.costs||{}, t=d.targets||{};
+    _setv('cfgP1', p.price_A1_glossy); _setv('cfgP2', p.price_A0_glossy); _setv('cfgP3', p.price_A1_plain);
+    document.getElementById('cfgPlainEn').checked = !!p.enabled_plain;
+    _setv('cfgC1', c.cost_paper); _setv('cfgC2', c.cost_ink); _setv('cfgC3', c.cost_printhead);
+    _setv('cfgC4', c.cost_maintenance); _setv('cfgC5', c.fixed_profit);
+    _setv('cfgT1', t.target_paper); _setv('cfgT2', t.target_ink); _setv('cfgT3', t.target_printhead);
+    updateConfigHints(); renderCfgPreview();
+  }).getAllocationConfig(_adminPass);
+}
+function _setv(id, v){ var el=document.getElementById(id); if(el) el.value=v; }
+function _getv(id){ var el=document.getElementById(id); return el? parseFloat(el.value) : 0; }
+
+function curCfgFromInputs(){
+  return {
+    prices:{ price_A1_glossy:_getv('cfgP1'), price_A0_glossy:_getv('cfgP2'), price_A1_plain:_getv('cfgP3'), enabled_plain:document.getElementById('cfgPlainEn').checked },
+    costs:{ cost_paper:_getv('cfgC1'), cost_ink:_getv('cfgC2'), cost_printhead:_getv('cfgC3'), cost_maintenance:_getv('cfgC4'), fixed_profit:_getv('cfgC5') },
+    targets:{ target_paper:_getv('cfgT1'), target_ink:_getv('cfgT2'), target_printhead:_getv('cfgT3'), target_maintenance:0, target_profit:0 }
+  };
+}
+
+// Live breakeven hints + danger styling
+function updateConfigHints(){
+  var cfg=curCfgFromInputs().costs;
+  var be1=_breakeven(cfg,'A1'), be0=_breakeven(cfg,'A0');
+  _hint('cfgP1h', _getv('cfgP1'), be1); _hint('cfgP2h', _getv('cfgP2'), be0); _hint('cfgP3h', _getv('cfgP3'), be1);
+}
+function _hint(id, val, be){
+  var el=document.getElementById(id); if(!el) return;
+  var ok = isFinite(val) && val>=be;
+  el.className='hint'+(ok?'':' danger');
+  el.innerText = T('Breakeven RM ','Breakeven RM ')+_fmt(be) + (ok?'  ✓':'  ⚠️ '+T('di bawah','below'));
+}
+
+// Live preview: how one A1 + one A0 order splits into 5 channels
+function renderCfgPreview(){
+  var cfg=curCfgFromInputs(); var c=cfg.costs;
+  var a1=_allocMath(c,'A1',cfg.prices.price_A1_glossy);
+  var a0=_allocMath(c,'A0',cfg.prices.price_A0_glossy);
+  var rows=[
+    [T('Kertas','Paper'), a1.paper, a0.paper],
+    [T('Dakwat','Ink'), a1.ink, a0.ink],
+    [T('Penyelenggaraan','Maintenance'), a1.maintenance, a0.maintenance],
+    [T('Printhead','Printhead'), a1.printhead, a0.printhead],
+    [T('Untung','Profit'), a1.profit, a0.profit],
+    [T('JUMLAH','TOTAL'), a1.paper+a1.ink+a1.maintenance+a1.printhead+a1.profit, a0.paper+a0.ink+a0.maintenance+a0.printhead+a0.profit]
+  ];
+  var h='<div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:8px;">'+T('Pratonton peruntukan (1 unit)','Allocation preview (1 unit)')+'</div>';
+  h+='<div class="cfg-preview-row" style="font-weight:800;color:var(--ink-3)"><span></span><span>A1 Glossy</span><span>A0 Glossy</span></div>';
+  rows.forEach(function(r,i){
+    h+='<div class="cfg-preview-row"'+(i===rows.length-1?' style="font-weight:800;border-top:2px solid var(--border)"':'')+'><span>'+r[0]+'</span><b>RM '+_fmt(r[1])+'</b><b>RM '+_fmt(r[2])+'</b></div>';
+  });
+  var el=document.getElementById('cfgPreview'); if(el) el.innerHTML=h;
+}
+
+function saveConfig(){
+  updateConfigHints();
+  var cfg=curCfgFromInputs();
+  // Client-side guard mirrors the backend breakeven check
+  var c=cfg.costs, be1=_breakeven(c,'A1'), be0=_breakeven(c,'A0');
+  var offenders=[];
+  if(cfg.prices.price_A1_glossy < be1) offenders.push('A1 Glossy');
+  if(cfg.prices.price_A0_glossy < be0) offenders.push('A0 Glossy');
+  if(cfg.prices.enabled_plain && cfg.prices.price_A1_plain < be1) offenders.push('A1 Plain');
+  if(offenders.length){ myAlert(T('Harga di bawah breakeven: ','Prices below breakeven: ')+offenders.join(', '), true); return; }
+  ld(true);
+  google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){
+    ld(false);
+    if(res==='UNAUTHORIZED'){ myAlert(T('Tidak sah','Unauthorized'), true); return; }
+    if(res && res.status==='error'){ myAlert(res.message, true); return; }
+    myAlert(res.message||T('Disimpan','Saved'));
+    _cfgCache=cfg; _cfgCache.costs=c;
+    renderCfgPreview();
+    loadAllocation();
+  }).saveAllocationConfig(_adminPass, cfg);
+}
+
+// Wire up live preview on settings input changes (delegated, once)
+(function(){
+  var dp2=document.getElementById('dp2'); if(!dp2) return;
+  dp2.addEventListener('input', function(){ updateConfigHints(); renderCfgPreview(); });
+  dp2.addEventListener('change', function(){ updateConfigHints(); renderCfgPreview(); });
+})();
+
+// Re-render admin JS-built content on language switch (allocation + config labels)
+(function(){
+  var _origSetLang=setLang;
+  setLang=function(l){
+    _origSetLang(l);
+    try{ if(_adminLoggedIn && _adminSubPane===1 && _admRowsCache!==null){ /* allocation re-render */ var grid=document.getElementById('allocGrid'); if(grid && grid.innerHTML) loadAllocation(); } }catch(e){}
+    try{ if(_adminLoggedIn && _adminSubPane===2){ renderCfgPreview(); updateConfigHints(); } }catch(e){}
+  };
+})();
 </script>
 </body>
 </html>
