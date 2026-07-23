@@ -942,7 +942,7 @@ function statusLabel(st){
   return m[st]||st;
 }
 function _renderAdminTable(tableId, rows){
-  if(!rows.length) return '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px;">'+T('Tiada rekod','No records')+'</td></tr>';
+  if(!rows.length) return '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px;">'+T('Tiada rekod','No records')+'</td></tr>';
   var isHist=tableId==='tblHist'; var pref=isHist?'h':''; var html='';
   for(var k=0;k<rows.length;k++){
     var r=rows[k]; var i=r._idx; var id=r[0]; var st=r[11]; var cls=badgeCls(st);
@@ -950,7 +950,7 @@ function _renderAdminTable(tableId, rows){
     var method=r[9]; var noGeran=r[14]; var bayaranCell='';
     if(String(method).toLowerCase()==='cash'){ bayaranCell='<span style="background:#f0fdf4;color:#15803d;border:1px solid #86efac;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">💵 Cash</span>'; }
     else { var gn=(noGeran && noGeran!=='-' && noGeran!=='')?esc(noGeran):'-'; bayaranCell='<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;">'+T('🎓 Geran','🎓 Grant')+'</span><br><small style="color:#475569;font-size:11px;">'+gn+'</small>'; }
-    var eid=id.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); var tajukCell=_tajukCell(r[15], i, pref); var contact=_contactCell(r[4], r[13], esc(r[2]), i); var namaEsc=esc(r[2]);
+    var eid=id.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); var tajukCell=_tajukCell(r[15], i, pref); var contact=_contactCell(r[4], r[13], esc(r[2]), i); var namaEsc=esc(r[2]); var penyelia=esc(r[17]||'-');
     var acts='';
     if(!isHist){
       acts+='<div class="act-group">';
@@ -962,7 +962,7 @@ function _renderAdminTable(tableId, rows){
     } else {
       acts+='<div class="act-group"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Kembalikan ke Siap (Aktif)','Restore to Ready (Active)')+'">↩️</button><a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam Kekal','Delete Permanently')+'">✕</button></div>';
     }
-    html+='<tr><td style="color:#94a3b8;font-weight:700;">'+r._no+'</td><td><div style="font-weight:700;">'+namaEsc+'</div>'+tajukCell+contact+'<div style="font-size:10px;color:#94a3b8;margin-top:2px;">'+esc(r[1])+'</div></td><td><b>'+esc(r[6])+'</b><br><small style="color:#64748b;">'+esc(r[7])+' ×'+esc(r[16])+'</small></td><td><b>RM '+tot+'</b><br><small style="color:#94a3b8;">@RM'+unitP+' ×'+qty+'</small></td><td><span class="badge '+cls+'">'+esc(statusLabel(st))+'</span></td><td>'+bayaranCell+'</td><td>'+acts+'</td></tr>';
+    html+='<tr><td style="color:#94a3b8;font-weight:700;">'+r._no+'</td><td><div style="font-weight:700;">'+namaEsc+'</div>'+tajukCell+contact+'<div style="font-size:10px;color:#94a3b8;margin-top:2px;">'+esc(r[1])+'</div></td><td style="font-size:12px;">'+penyelia+'</td><td><b>'+esc(r[6])+'</b><br><small style="color:#64748b;">'+esc(r[7])+' ×'+esc(r[16])+'</small></td><td><b>RM '+tot+'</b><br><small style="color:#94a3b8;">@RM'+unitP+' ×'+qty+'</small></td><td><span class="badge '+cls+'">'+esc(statusLabel(st))+'</span></td><td>'+bayaranCell+'</td><td>'+acts+'</td></tr>';
   }
   return html;
 }
@@ -982,7 +982,7 @@ function renderAdminFromCache(){
   var active=[], hist=[]; var cT=0,cP=0,cPr=0,cS=0,cCd=0;
   for(var i=1;i<d.length;i++){ var row=d[i].slice(0); row._idx=i; row._no=i; var st=d[i][11]; cT++;
     if(st==='Dalam Proses'){ cPr++; active.push(row); } else if(st==='Dah Boleh Collect'){ cS++; active.push(row); } else if(st==='Sudah Diambil'){ cCd++; hist.push(row); } else if(st==='Ditolak'){ hist.push(row); } else { cP++; active.push(row); } }
-  var hdr='<tr><th>#</th><th>'+T('Pemohon','Applicant')+'</th><th>'+T('Saiz/Media','Size/Media')+'</th><th>'+T('Harga','Price')+'</th><th>Status</th><th>'+T('Bayaran','Payment')+'</th><th>'+T('Tindakan','Action')+'</th></tr>';
+  var hdr='<tr><th>#</th><th>'+T('Pemohon','Applicant')+'</th><th>'+T('Penyelia','Supervisor')+'</th><th>'+T('Saiz/Media','Size/Media')+'</th><th>'+T('Harga','Price')+'</th><th>Status</th><th>'+T('Bayaran','Payment')+'</th><th>'+T('Tindakan','Action')+'</th></tr>';
   document.getElementById('tbl').innerHTML=hdr+_renderAdminTable('tbl', active);
   document.getElementById('tblHist').innerHTML=hdr+_renderAdminTable('tblHist', hist);
   document.getElementById('cTot').innerText=cT; document.getElementById('cP').innerText=cP; document.getElementById('cPr').innerText=cPr; document.getElementById('cS').innerText=cS; document.getElementById('cCd').innerText=cCd;

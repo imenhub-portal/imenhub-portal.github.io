@@ -438,8 +438,8 @@ function getAdminData(pass) {
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets()[0];
   const data  = sheet.getDataRange().getDisplayValues();
   return data.map(r => {
-    const clean = r.slice(0, 17);
-    while (clean.length < 17) clean.push('');
+    const clean = r.slice(0, 18);
+    while (clean.length < 18) clean.push('');
     return clean;
   });
 }
