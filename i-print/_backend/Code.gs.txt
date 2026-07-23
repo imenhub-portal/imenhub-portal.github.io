@@ -146,6 +146,9 @@ function doPost(e) {
       case 'saveAllocationConfig': result = saveAllocationConfig(args[0], args[1]); break;
       case 'getAllocationLedger':  result = getAllocationLedger(args[0]);           break;
       case 'recomputeLedger':      result = recomputeLedger(args[0]);               break;
+      case 'addPurchase':          result = addPurchase(args[0], args[1], args[2], args[3]); break;
+      case 'getPurchases':         result = getPurchases(args[0]);                  break;
+      case 'deletePurchase':       result = deletePurchase(args[0], args[1]);       break;
       default: throw new Error('Unknown API function: ' + req.fn);
     }
     payload = { ok: true, result: result };
@@ -508,21 +511,108 @@ function saveAllocationConfig(pass, cfgIn) {
 function getAllocationLedger(pass) {
   if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
   var cfg = _cfgAll_();
+  var spent = _purchasesByChannel_();
+  // pct is allowed to exceed 100 (overflow) — the UI caps the bar visually.
   function pct(have, target) {
     if (!target || target <= 0) return null; // ongoing, no bar
-    return Math.min(100, Math.round((have / target) * 100));
+    return Math.round((have / target) * 100);
+  }
+  function ch(key, ledgerKey, targetKey) {
+    var allocated = cfg[ledgerKey] + spent[key]; // gross before spend
+    var net = cfg[ledgerKey];                    // already net (recompute subtracted)
+    return { amount: net, allocated: allocated, spent: spent[key], target: cfg[targetKey], pct: pct(net, cfg[targetKey]) };
   }
   return {
-    total_prints:       cfg.total_prints,
+    total_prints: cfg.total_prints,
     channels: {
-      paper:       { amount: cfg.ledger_paper,       target: cfg.target_paper,       pct: pct(cfg.ledger_paper, cfg.target_paper) },
-      ink:         { amount: cfg.ledger_ink,         target: cfg.target_ink,         pct: pct(cfg.ledger_ink, cfg.target_ink) },
-      maintenance: { amount: cfg.ledger_maintenance, target: cfg.target_maintenance, pct: pct(cfg.ledger_maintenance, cfg.target_maintenance) },
-      printhead:   { amount: cfg.ledger_printhead,   target: cfg.target_printhead,   pct: pct(cfg.ledger_printhead, cfg.target_printhead) },
-      profit:      { amount: cfg.ledger_profit,      target: cfg.target_profit,      pct: pct(cfg.ledger_profit, cfg.target_profit) }
+      paper:       ch('paper', 'ledger_paper', 'target_paper'),
+      ink:         ch('ink', 'ledger_ink', 'target_ink'),
+      maintenance: ch('maintenance', 'ledger_maintenance', 'target_maintenance'),
+      printhead:   ch('printhead', 'ledger_printhead', 'target_printhead'),
+      profit:      ch('profit', 'ledger_profit', 'target_profit')
     },
     breakeven: { A1: _breakeven_(cfg, 'A1'), A0: _breakeven_(cfg, 'A0') }
   };
+}
+
+// ============================================================
+//  PURCHASES SHEET — restock / spend records
+//
+//  Separate sheet ("Purchases") so spends survive recomputeLedger.
+//  Schema: [date, channel, amount, note]. channel is one of the 5
+//  fund keys (paper/ink/maintenance/printhead/profit). amount is the
+//  RM spent (positive). Ledger balance = allocated − spent.
+// ============================================================
+const PURCHASES_SHEET_NAME = 'Purchases';
+var _PURCHASE_CHANNELS = ['paper', 'ink', 'maintenance', 'printhead', 'profit'];
+
+function _purchasesSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sh = ss.getSheetByName(PURCHASES_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(PURCHASES_SHEET_NAME);
+    sh.getRange(1, 1, 1, 4).setValues([['date', 'channel', 'amount', 'note']]);
+  }
+  if (sh.getLastRow() < 1) {
+    sh.getRange(1, 1, 1, 4).setValues([['date', 'channel', 'amount', 'note']]);
+  }
+  return sh;
+}
+
+// Sum of spends per channel {paper:n, ink:n, ...}. Used by recompute + ledger.
+function _purchasesByChannel_() {
+  var sh = _purchasesSheet_();
+  var data = sh.getDataRange().getValues();
+  var sums = { paper: 0, ink: 0, maintenance: 0, printhead: 0, profit: 0 };
+  for (var i = 1; i < data.length; i++) {
+    var ch = String(data[i][1] || '').toLowerCase();
+    var amt = parseFloat(data[i][2]) || 0;
+    if (ch in sums) sums[ch] += amt;
+  }
+  return sums;
+}
+
+// ADMIN: log a restock / spend
+function addPurchase(pass, channel, amount, note) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  channel = String(channel || '').toLowerCase();
+  if (_PURCHASE_CHANNELS.indexOf(channel) === -1)
+    return { status: 'error', message: 'Saluran tidak sah: ' + channel };
+  amount = parseFloat(amount);
+  if (!isFinite(amount) || amount <= 0)
+    return { status: 'error', message: 'Jumlah mesti nombor positif.' };
+  var sh = _purchasesSheet_();
+  sh.appendRow([new Date(), channel, Math.round(amount * 100) / 100, String(note || '')]);
+  // Recompute so balances reflect the new spend immediately
+  try { recomputeLedger(pass); } catch (e) { console.warn('recompute selepas addPurchase: ' + e); }
+  return { status: 'success', message: 'Pembelian dicatat. Saluran ' + channel + ' −RM' + amount };
+}
+
+// ADMIN: list all purchases (newest first)
+function getPurchases(pass) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  var sh = _purchasesSheet_();
+  var data = sh.getDataRange().getValues();
+  var out = [];
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (!data[i][0] && !data[i][2]) continue;
+    out.push({ rowIndex: i + 1, date: data[i][0], channel: data[i][1], amount: data[i][2], note: data[i][3] });
+  }
+  return out;
+}
+
+// ADMIN: delete a purchase (correct a mistake) by 1-based row index
+function deletePurchase(pass, rowIndex) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  rowIndex = parseInt(rowIndex, 10);
+  if (!isFinite(rowIndex) || rowIndex < 2)
+    return { status: 'error', message: 'Indeks baris tidak sah.' };
+  var sh = _purchasesSheet_();
+  if (rowIndex > sh.getLastRow())
+    return { status: 'error', message: 'Baris tidak wujud.' };
+  sh.deleteRow(rowIndex);
+  try { recomputeLedger(pass); } catch (e) { console.warn('recompute selepas deletePurchase: ' + e); }
+  return { status: 'success', message: 'Pembelian dipadam.' };
 }
 
 // ============================================================
@@ -553,6 +643,15 @@ function recomputeLedger(pass) {
     tHead  += a.printhead * qty;
     tProfit+= a.profit * qty;
   }
+
+  // Subtract restock spends (from the Purchases sheet) so the net balance
+  // survives a recompute — spends are re-summed, never overwritten away.
+  var spent = _purchasesByChannel_();
+  tPaper  -= spent.paper;
+  tInk    -= spent.ink;
+  tMaint  -= spent.maintenance;
+  tHead   -= spent.printhead;
+  tProfit -= spent.profit;
 
   _cfgSet_({
     total_prints: tPrints,

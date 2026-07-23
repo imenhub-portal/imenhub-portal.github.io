@@ -16,7 +16,7 @@
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
   var API_URL = 'https://script.google.com/macros/s/AKfycbwjO97_YWugdYIRpV6bT3Uv4uTbmM6Ob1axw9ASpk668ugB40O1DAxzBn2jTRp9rLxKTg/exec';
-  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus','deleteRow', 'getAdminData', 'checkUserStatus', 'getPrices', 'getAllocationConfig', 'saveAllocationConfig', 'getAllocationLedger', 'recomputeLedger'];
+  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus','deleteRow', 'getAdminData', 'checkUserStatus', 'getPrices', 'getAllocationConfig', 'saveAllocationConfig', 'getAllocationLedger', 'recomputeLedger', 'addPurchase', 'getPurchases', 'deletePurchase'];
   function makeRunner() {
     var onOk = function(){}; var onErr = function(e){ console.error('[API] ', e); };
     var runner = {
@@ -684,6 +684,7 @@
           <div class="dash-nav-item active" id="dn0" onclick="swDash(0)"><span class="ic">📋</span><span data-bm="Tempahan" data-bi="Orders">Tempahan</span><span class="badge-count" id="dnBadge">0</span></div>
           <div class="dash-nav-item" id="dn1" onclick="swDash(1)"><span class="ic">📊</span><span data-bm="Peruntukan" data-bi="Allocation">Peruntukan</span></div>
           <div class="dash-nav-item" id="dn2" onclick="swDash(2)"><span class="ic">⚙️</span><span data-bm="Harga &amp; Kos" data-bi="Price &amp; Cost">Harga &amp; Kos</span></div>
+          <div class="dash-nav-item" id="dn3" onclick="swDash(3)"><span class="ic">🧾</span><span data-bm="Pembelian" data-bi="Purchases">Pembelian</span></div>
           <div style="height:1px; background:var(--border-3); margin:8px 0;"></div>
           <div class="dash-nav-item" onclick="logoutAdmin()"><span class="ic">🚪</span><span data-bm="Log Keluar" data-bi="Log Out">Log Keluar</span></div>
         </div>
@@ -781,6 +782,37 @@
           <div style="display:flex; gap:10px; margin-top:16px;">
             <button class="btn btn-main" onclick="saveConfig()" style="margin-top:0;">💾 <span data-bm="Simpan" data-bi="Save">Simpan</span></button>
             <button class="btn" onclick="loadConfig()" style="margin-top:0; background:var(--paper-3); color:var(--ink); border:1px solid var(--border);">↩️ <span data-bm="Batal" data-bi="Revert">Batal</span></button>
+          </div>
+        </div>
+
+        <!-- PANE 3: PEMBELIAN (restock / spend) -->
+        <div class="dash-pane" id="dp3">
+          <div class="dash-pane-head">
+            <div><h3 data-bm="🧾 Rekod Pembelian" data-bi="🧾 Purchase Records">🧾 Rekod Pembelian</h3><div class="sub" data-bm="Catat pembelian stok — dana berkenaan akan ditolak" data-bi="Log restock spends — the matching fund is deducted">Catat pembelian stok — dana berkenaan akan ditolak</div></div>
+          </div>
+          <div class="cfg-section">
+            <h4 data-bm="Tambah Pembelian" data-bi="Add Purchase">Tambah Pembelian</h4>
+            <div class="cfg-sub" data-bm="Contoh: beli gulungan kertas RM 300 → tolak Dana Kertas." data-bi="Example: buy paper roll RM 300 → deduct Paper Fund.">Contoh: beli gulungan kertas RM 300 → tolak Dana Kertas.</div>
+            <div class="cfg-grid">
+              <div class="cfg-field">
+                <label data-bm="Saluran Dana" data-bi="Fund Channel">Saluran Dana</label>
+                <select id="purChannel" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); font-family:var(--font); font-size:13px; font-weight:600;">
+                  <option value="paper">📄 <span data-bm="Dana Kertas" data-bi="Paper Fund">Dana Kertas</span></option>
+                  <option value="ink">🖨️ <span data-bm="Dana Dakwat" data-bi="Ink Fund">Dana Dakwat</span></option>
+                  <option value="maintenance">🛠️ <span data-bm="Penyelenggaraan" data-bi="Maintenance">Penyelenggaraan</span></option>
+                  <option value="printhead">⚙️ <span data-bm="Dana Printhead" data-bi="Printhead Fund">Dana Printhead</span></option>
+                  <option value="profit">💰 <span data-bm="Untung Bersih" data-bi="Net Profit">Untung Bersih</span></option>
+                </select>
+              </div>
+              <div class="cfg-field"><label data-bm="Jumlah (RM)" data-bi="Amount (RM)">Jumlah (RM)</label><input type="number" id="purAmount" step="0.01" min="0.01" placeholder="0.00"></div>
+              <div class="cfg-field" style="grid-column:1 / -1"><label data-bm="Nota" data-bi="Note">Nota</label><input type="text" id="purNote" placeholder="Cth: 1 gulungan kertas A1" data-bm-ph="Cth: 1 gulungan kertas A1" data-bi-ph="Eg: 1 roll A1 paper"></div>
+            </div>
+            <button class="btn btn-main" onclick="addPurchaseBtn()" style="margin-top:14px;">➕ <span data-bm="Catat Pembelian" data-bi="Log Purchase">Catat Pembelian</span></button>
+          </div>
+          <div class="cfg-section">
+            <h4 data-bm="Sejarah Pembelian" data-bi="Purchase History">Sejarah Pembelian</h4>
+            <div style="overflow-x:auto; margin-top:10px;"><table id="purTbl"><tr><th>#</th><th data-bm="Tarikh" data-bi="Date">Tarikh</th><th data-bm="Saluran" data-bi="Channel">Saluran</th><th data-bm="Jumlah" data-bi="Amount">Jumlah</th><th data-bm="Nota" data-bi="Note">Nota</th><th></th></tr></table></div>
+            <div id="purEmpty" data-bm="Tiada rekod pembelian lagi." data-bi="No purchase records yet." style="display:none; text-align:center; color:#94a3b8; padding:20px; font-size:13px;">Tiada rekod pembelian lagi.</div>
           </div>
         </div>
 
@@ -1161,16 +1193,17 @@ function filterTable(tblId, searchId){
 //  ALLOCATION DASHBOARD + SETTINGS  (admin pane 1 & 2)
 // ============================================================
 
-// Sidebar navigation between the 3 admin panes.
+// Sidebar navigation between the admin panes.
 function swDash(n){
   _adminSubPane=n;
-  for(var i=0;i<3;i++){
+  for(var i=0;i<4;i++){
     var nav=document.getElementById('dn'+i); var pane=document.getElementById('dp'+i);
     if(nav) nav.classList.toggle('active', i===n);
     if(pane) pane.classList.toggle('active', i===n);
   }
   if(n===1) loadAllocation();
   if(n===2) loadConfig();
+  if(n===3) loadPurchases();
 }
 var _adminSubPane=0;
 
@@ -1216,22 +1249,36 @@ function renderAllocation(d){
   if(!d || !d.channels){ return; }
   var grid=document.getElementById('allocGrid'); if(!grid) return;
   var html='';
-  var sumRev=0, sumCost=0, sumProfit=0;
+  var sumAlloc=0, sumSpent=0, sumProfit=0;
   _ALLOC_META.forEach(function(m){
-    var ch=d.channels[m.key]||{amount:0,target:0,pct:null};
-    var amt=parseFloat(ch.amount)||0;
-    if(m.key==='profit') sumProfit+=amt; else sumCost+=amt;
-    sumRev+= (m.key==='profit')? amt : amt;
+    var ch=d.channels[m.key]||{amount:0,allocated:0,spent:0,target:0,pct:null};
+    var net=parseFloat(ch.amount)||0;
+    var alloc=parseFloat(ch.allocated)||net;
+    var spent=parseFloat(ch.spent)||0;
+    if(m.key==='profit') sumProfit+=net; else { sumAlloc+=alloc; sumSpent+=spent; }
     var perPrint = _allocPerPrint(m.key);
-    var pctLabel = (ch.pct==null) ? T('berterusan','ongoing') : ch.pct+'%';
-    var bar = (ch.pct==null) ? '' : '<div class="alloc-bar"><div class="alloc-bar-fill" style="width:'+ch.pct+'%; background:'+m.color+'"></div></div>';
+    var pctLabel, bar, surplus='';
+    if(ch.pct==null){
+      pctLabel = T('berterusan','ongoing');
+      bar='';
+    } else {
+      pctLabel = ch.pct+'%';
+      var over = ch.pct>100;
+      var barW = Math.min(ch.pct, 140); // visual cap so layout never breaks
+      var barColor = over ? '#16a34a' : m.color;
+      bar = '<div class="alloc-bar"><div class="alloc-bar-fill" style="width:'+barW+'%; background:'+barColor+'"></div></div>';
+      if(over){ var surplusAmt = net - (ch.target||0); surplus=' <span style="color:#16a34a;font-weight:800">+'+T('RM ','RM ')+_fmt(surplusAmt)+' '+T('lebihan','surplus')+'</span>'; }
+      if(net<0){ surplus=' <span style="color:var(--err);font-weight:800">'+T('defisit','deficit')+'</span>'; }
+    }
     var targetTxt = (ch.target && ch.target>0) ? ' / RM '+_fmt(ch.target) : '';
+    var spentLine = (spent>0) ? '<div class="ac-meta" style="margin-top:2px"><span style="color:var(--err)">−RM '+_fmt(spent)+'</span> '+T('dibelanjakan','spent')+' • <span style="color:var(--ok)">RM '+_fmt(alloc)+'</span> '+T('terkumpul','allocated')+'</div>' : '';
     html+='<div class="alloc-card">'
       + '<div class="ac-top"><div class="ac-icon" style="background:'+m.color+'1a; color:'+m.color+'">'+m.icon+'</div>'
       + '<div><div class="ac-name">'+T(m.name.bm,m.name.bi)+'</div>'
       + '<div class="ac-per">'+perPrint+' / '+T('cetakan','print')+'</div></div></div>'
-      + '<div class="ac-amt" style="color:'+m.color+'">RM '+_fmt(amt)+'</div>'
-      + '<div class="ac-meta">'+targetTxt+' • '+pctLabel+'</div>'
+      + '<div class="ac-amt" style="color:'+(net<0?'var(--err)':m.color)+'">RM '+_fmt(net)+'</div>'
+      + '<div class="ac-meta">'+targetTxt+' • '+pctLabel+surplus+'</div>'
+      + spentLine
       + bar
       + '</div>';
   });
@@ -1242,10 +1289,10 @@ function renderAllocation(d){
   if(s){
     s.innerHTML=
       _sumCard(T('Jumlah Cetakan','Total Prints'), totPrints, '#0f172a')
-      + _sumCard(T('Jumlah Kos','Total Costs'), 'RM '+_fmt(sumCost), '#d97706')
+      + _sumCard(T('Terkumpul','Allocated'), 'RM '+_fmt(sumAlloc), '#16a34a')
+      + _sumCard(T('Dibelanjakan','Spent'), 'RM '+_fmt(sumSpent), '#dc2626')
       + _sumCard(T('Untung Bersih','Net Profit'), 'RM '+_fmt(sumProfit), '#16a34a')
-      + _sumCard(T('Breakeven A1','A1 Breakeven'), 'RM '+_fmt(d.breakeven?d.breakeven.A1:0), '#2563eb')
-      + _sumCard(T('Breakeven A0','A0 Breakeven'), 'RM '+_fmt(d.breakeven?d.breakeven.A0:0), '#7c3aed');
+      + _sumCard(T('Breakeven A1','A1 Breakeven'), 'RM '+_fmt(d.breakeven?d.breakeven.A1:0), '#2563eb');
   }
 }
 function _sumCard(label, val, color){
@@ -1361,6 +1408,69 @@ function saveConfig(){
   dp2.addEventListener('change', function(){ updateConfigHints(); renderCfgPreview(); });
 })();
 
+// ============================================================
+//  PEMBELIAN (restock / spend records) — admin pane 3
+// ============================================================
+var _PUR_META={ paper:{icon:'📄',bm:'Dana Kertas',bi:'Paper Fund',color:'#2563eb'}, ink:{icon:'🖨️',bm:'Dana Dakwat',bi:'Ink Fund',color:'#7c3aed'}, maintenance:{icon:'🛠️',bm:'Penyelenggaraan',bi:'Maintenance',color:'#d97706'}, printhead:{icon:'⚙️',bm:'Dana Printhead',bi:'Printhead Fund',color:'#0891b2'}, profit:{icon:'💰',bm:'Untung Bersih',bi:'Net Profit',color:'#16a34a'} };
+
+function loadPurchases(){
+  if(!_adminPass) return;
+  google.script.run.withFailureHandler(function(e){ console.warn('[purchases]', e); }).withSuccessHandler(function(d){
+    if(d==='UNAUTHORIZED') return;
+    renderPurchases(d);
+  }).getPurchases(_adminPass);
+}
+
+function renderPurchases(list){
+  var tbl=document.getElementById('purTbl'); var empty=document.getElementById('purEmpty'); if(!tbl) return;
+  if(!list || !list.length){ empty.style.display='block'; tbl.innerHTML='<tr><th>#</th><th>'+T('Tarikh','Date')+'</th><th>'+T('Saluran','Channel')+'</th><th>'+T('Jumlah','Amount')+'</th><th>'+T('Nota','Note')+'</th><th></th></tr>'; return; }
+  empty.style.display='none';
+  var hdr='<tr><th>#</th><th>'+T('Tarikh','Date')+'</th><th>'+T('Saluran','Channel')+'</th><th>'+T('Jumlah','Amount')+'</th><th>'+T('Nota','Note')+'</th><th></th></tr>';
+  var body='';
+  list.forEach(function(p, idx){
+    var meta=_PUR_META[p.channel]||{icon:'❓',bm:p.channel,bi:p.channel,color:'#64748b'};
+    var d=p.date; var ds='';
+    try{ if(d){ var dt=new Date(d); ds=dt.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}); } }catch(e){}
+    body+='<tr><td style="color:#94a3b8;font-weight:700">'+(idx+1)+'</td>'
+      + '<td style="font-size:11px;white-space:nowrap">'+esc(ds)+'</td>'
+      + '<td><span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:12px;color:'+meta.color+'">'+meta.icon+' '+T(meta.bm,meta.bi)+'</span></td>'
+      + '<td><b style="color:var(--err);font-family:var(--mono)">−RM '+_fmt(p.amount)+'</b></td>'
+      + '<td style="font-size:12px;color:var(--ink-3);max-width:200px;word-break:break-word">'+esc(p.note||'-')+'</td>'
+      + '<td><button class="act-btn act-btn-del" onclick="deletePurchaseBtn('+p.rowIndex+')" title="'+T('Padam','Delete')+'">✕</button></td>'
+      + '</tr>';
+  });
+  tbl.innerHTML=hdr+body;
+}
+
+function addPurchaseBtn(){
+  var ch=document.getElementById('purChannel').value;
+  var amt=parseFloat(document.getElementById('purAmount').value);
+  var note=document.getElementById('purNote').value;
+  if(!isFinite(amt) || amt<=0){ myAlert(T('Sila masukkan jumlah yang sah.','Please enter a valid amount.'), true); return; }
+  ld(true);
+  google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){
+    ld(false);
+    if(res==='UNAUTHORIZED'){ myAlert(T('Tidak sah','Unauthorized'), true); return; }
+    if(res && res.status==='error'){ myAlert(res.message, true); return; }
+    document.getElementById('purAmount').value=''; document.getElementById('purNote').value='';
+    myAlert(res.message||T('Pembelian dicatat.','Purchase logged.'));
+    loadPurchases(); loadAllocation();
+  }).addPurchase(_adminPass, ch, amt, note);
+}
+
+function deletePurchaseBtn(rowIdx){
+  myConfirm(T('Padam rekod pembelian ini? Jumlah akan dikembalikan ke dana.','Delete this purchase? The amount returns to the fund.'), function(){
+    ld(true);
+    google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){
+      ld(false);
+      if(res==='UNAUTHORIZED'){ myAlert(T('Tidak sah','Unauthorized'), true); return; }
+      if(res && res.status==='error'){ myAlert(res.message, true); return; }
+      myAlert(res.message||T('Dipadam.','Deleted.'));
+      loadPurchases(); loadAllocation();
+    }).deletePurchase(_adminPass, rowIdx);
+  });
+}
+
 // Re-render admin JS-built content on language switch (allocation + config labels)
 (function(){
   var _origSetLang=setLang;
@@ -1368,6 +1478,7 @@ function saveConfig(){
     _origSetLang(l);
     try{ if(_adminLoggedIn && _adminSubPane===1 && _admRowsCache!==null){ /* allocation re-render */ var grid=document.getElementById('allocGrid'); if(grid && grid.innerHTML) loadAllocation(); } }catch(e){}
     try{ if(_adminLoggedIn && _adminSubPane===2){ renderCfgPreview(); updateConfigHints(); } }catch(e){}
+    try{ if(_adminLoggedIn && _adminSubPane===3){ loadPurchases(); } }catch(e){}
   };
 })();
 </script>

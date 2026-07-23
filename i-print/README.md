@@ -45,6 +45,7 @@ After login, the admin sees a sidebar with 3 sections:
 | 📋 **Tempahan** | Existing orders table (Active / History) + stat cards. |
 | 📊 **Peruntukan** | Financial allocation dashboard — revenue split into 5 funds. |
 | ⚙️ **Harga & Kos** | Price & cost constant editor (saved to Config sheet). |
+| 🧾 **Pembelian** | Restock / spend records. Logs a purchase against a fund; the matching channel balance is deducted. |
 
 Customers only see the **Borang** (form) and **Semak Status** tabs. Admin/Allocation/Settings
 are hidden behind the admin password.
@@ -74,7 +75,19 @@ Seeded with defaults from the MD. Holds three blocks:
 - **Costs:** `cost_paper`, `cost_ink`, `cost_printhead`, `cost_maintenance`, `fixed_profit`
   + target cycles (`target_paper`, `target_ink`, `target_printhead`)
 - **Ledger:** `total_prints` + `ledger_paper`/`ledger_ink`/`ledger_maintenance`/
-  `ledger_printhead`/`ledger_profit` (persisted running totals)
+  `ledger_printhead`/`ledger_profit` (net balances = allocated − spent)
+
+### Storage — Purchases sheet (restock spends)
+A separate sheet auto-created on first purchase. Schema: `[date, channel, amount, note]`.
+- `channel` is one of the 5 fund keys (`paper`/`ink`/`maintenance`/`printhead`/`profit`).
+- `amount` is the RM spent (positive); the matching fund balance is **deducted**.
+- **Recompute-safe:** `recomputeLedger` replays order revenue AND re-sums purchases, so
+  spends are never overwritten away by a recompute.
+- Deleting a purchase returns its amount to the fund.
+- A channel can go **negative** (deficit, shown in red) — e.g. restocking before enough
+  revenue has accumulated.
+- A channel can **exceed its target** (e.g. 400/300); the bar overflows past 100% in green
+  and a `+RM X surplus` label appears. It never stops accumulating.
 
 ### Dynamic pricing
 The form no longer hardcodes prices. On load it calls `getPrices()` and stores the result
@@ -90,6 +103,9 @@ legacy defaults (50/80/30) so the form never breaks.
 | `saveAllocationConfig` | `saveAllocationConfig(pass, cfg)` | yes |
 | `getAllocationLedger` | `getAllocationLedger(pass)` | yes |
 | `recomputeLedger` | `recomputeLedger(pass)` | yes |
+| `addPurchase` | `addPurchase(pass, channel, amount, note)` | yes |
+| `getPurchases` | `getPurchases(pass)` | yes |
+| `deletePurchase` | `deletePurchase(pass, rowIndex)` | yes |
 
 (plus the existing `startResumableUpload`, `processForm`, `updatePosterStatus`,
 `deleteRow`, `getAdminData`, `checkUserStatus`).
