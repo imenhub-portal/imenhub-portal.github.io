@@ -49,36 +49,10 @@ After login, the admin sees a sidebar with 3 sections:
 Customers only see the **Borang** (form) and **Semak Status** tabs. Admin/Allocation/Settings
 are hidden behind the admin password.
 
-## Sebut Harga (quotation) PDF
-
-Clicking 📦 (mark an order "Sudah Diambil" / Collected) auto-generates and downloads an
-official UKM IMEN quotation PDF for that order — no backend/Apps Script involved, it's
-rendered entirely client-side:
-
-- `#invoiceTemplate` (`index.html`) is a hidden off-screen copy of `SEBUT_HARGA_TEMPLATE.doc`'s
-  layout (header letterhead, info table, line item, terms, left-aligned signature, footer),
-  rebuilt in HTML/CSS. The header and footer are the official composite letterhead images
-  (`assets/header.jpg` / `assets/footer.jpg`).
-- `generateSebutHargaPdf(row)` fills the template's `sh*`-prefixed field IDs from a raw
-  18-column order row (same schema as `getAdminData`/`processForm` — see column mapping in the
-  function's comment) and renders it via `html2pdf.js` (CDN, `defer`-loaded so a slow/blocked
-  CDN can never stall page startup).
-- Fields are prefixed `sh*` (not `inv*`) deliberately — the Borang's own invoice-preview widget
-  already uses `#invQty`/`#invSpec`/etc., and reusing those names silently grabbed the wrong
-  element via `getElementById`.
-- **The header/footer images are inlined as base64 data URIs** in `#invoiceTemplate`, NOT
-  `<img src="assets/...">`. This is required, not cosmetic: html2canvas taints the export canvas
-  when it draws an image loaded over `file://` (local testing) or cross-origin (the Apps Script
-  iframe, where relative `assets/` paths 404 anyway), and a tainted canvas throws "Tainted
-  canvases may not be exported" — the exact "Gagal menjana" failure. Data URIs are same-origin
-  and never taint. The source JPGs live in `assets/header.jpg` / `assets/footer.jpg`; the
-  downscale (to ~1150px wide) + base64 step was done with Pillow — re-run it if either image
-  is updated.
-- A 🧾 button in the History table re-triggers generation for any already-collected order
-  (`reprintInvoice(id)`), without changing its status.
-- `html2canvas` cannot auto-measure this off-screen element's height (it silently measures 0
-  and produces a blank PDF) — `generateSebutHargaPdf` explicitly passes the measured
-  `width`/`height`/`windowWidth`/`windowHeight` to work around this.
+<!-- Sebut Harga (quotation PDF) feature was removed — client-side html2pdf rendering of the
+     off-screen invoice template produced blank/clipped output that wasn't worth shipping.
+     Source materials for a future attempt are kept: SEBUT_HARGA_TEMPLATE.doc (the original
+     Word template) and assets/header.jpg + assets/footer.jpg (the official letterhead). -->
 
 ## Printing cost & allocation logic
 
