@@ -2220,6 +2220,7 @@
                                             <option value="Quantity (pcs)">Quantity (pcs)</option>
                                             <option value="Weight (mg)">Weight (mg)</option>
                                             <option value="Weight (g)">Weight (g)</option>
+                                            <option value="Volume (ml)">Volume (ml)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -3308,34 +3309,49 @@
 
             // Every instrument in scope.
             const scopeEq = (state.equipment || []).filter(e => activeLab === 'All' || e.lab === activeLab);
+            const scopeNames = new Set(scopeEq.map(e => e.name));
 
-            // Seed stats for ALL equipment so zero-usage instruments still appear.
-            const stats = {};   // eqName -> { name, lab, unit, hours, samples, users:Set }
+            // Equipment-level accumulators — hours/distinct-users aren't tied to a
+            // tracking unit, so they stay per-equipment regardless of how many
+            // different units its logs were recorded under.
+            const eqMeta = {};   // eqName -> { lab, currentUnit, hours, users:Set }
             scopeEq.forEach(e => {
-                stats[e.name] = { name: e.name, lab: e.lab || '-', unit: e.trackingUnit || 'Samples',
-                                  hours: 0, samples: 0, users: new Set() };
+                eqMeta[e.name] = { lab: e.lab || '-', currentUnit: e.trackingUnit || 'Samples',
+                                    hours: 0, users: new Set() };
             });
+
+            // Per (equipment, unit) sample totals. A log's `unit` is captured at the
+            // moment it was recorded (see saveLog in Code.gs) — logs written before
+            // that existed have no unit and are bucketed as "Unspecified (legacy)"
+            // rather than being silently relabeled under whatever the equipment's
+            // CURRENT trackingUnit happens to be. This is what previously let
+            // switching e.g. Weight (g) → Volume (ml) merge old and new totals
+            // together under one (wrong) unit with no way to tell they'd mixed.
+            const unitSamples = {};   // "eqName::unit" -> total
 
             // ── 1. Actual usage logs (current year, in scope) ──
             (state.logs || []).forEach(l => {
-                if (l.action !== 'Usage') return;
+                if (l.action !== 'Usage' || !scopeNames.has(l.equipmentName)) return;
                 const t = new Date(l.timestamp);
                 if (isNaN(t) || t < yearStart || t > now) return;     // current year only
-                const st = stats[l.equipmentName];
-                if (!st) return;                                       // outside scope
-                st.hours += _durationToHours(l.duration);
-                const s = parseInt(l.samples);
-                if (!isNaN(s)) st.samples += s;
+                const meta = eqMeta[l.equipmentName];
+                meta.hours += _durationToHours(l.duration);
                 const uid = (l.userEmail || l.userName || '').trim().toLowerCase();
-                if (uid) st.users.add(uid);
+                if (uid) meta.users.add(uid);
+
+                const s = parseInt(l.samples);
+                if (!isNaN(s)) {
+                    const unit = l.unit || 'Unspecified (legacy)';
+                    const key = l.equipmentName + '::' + unit;
+                    unitSamples[key] = (unitSamples[key] || 0) + s;
+                }
             });
 
             // ── 2. No-show bookings (approved, slot passed, never checked in) ──
             //    Counted toward usage hours + distinct users (no samples — nothing ran).
             (state.bookings || []).forEach(b => {
-                if (b.status !== 'Approved') return;
-                const st = stats[b.equipmentName];
-                if (!st) return;                                       // outside scope
+                if (b.status !== 'Approved' || !scopeNames.has(b.equipmentName)) return;
+                const meta = eqMeta[b.equipmentName];
                 const bDateStr = (b.date || '').split('T')[0];
                 const [byr, bmo, bdy] = bDateStr.split('-').map(Number);
                 if (!byr) return;
@@ -3350,16 +3366,30 @@
                     localDayStr(l.timestamp) === bDateStr &&
                     (l.action === 'Usage' || l.action === 'Check-in' || l.action === 'Booking'));
                 if (checkedIn) return;                                 // actually used → already counted
-                st.hours += _durationToHours(b.duration);
+                meta.hours += _durationToHours(b.duration);
                 const uid = (b.userEmail || b.userName || '').trim().toLowerCase();
-                if (uid) st.users.add(uid);
+                if (uid) meta.users.add(uid);
             });
 
-            // ── 3. Group by lab; within each lab sort by highest usage first ──
+            // ── 3. One row per equipment, or one row per (equipment, unit) when its
+            //    logs this year span more than one unit. hours/users are shown once,
+            //    on the first row for that equipment, so lab/grand subtotals below
+            //    (which sum every row's hours/users) never double-count.
             const byLab = {};
             scopeEq.forEach(e => {
-                const lab = e.lab || '-';
-                (byLab[lab] = byLab[lab] || []).push(stats[e.name]);
+                const meta = eqMeta[e.name];
+                const unitKeys = Object.keys(unitSamples).filter(k => k.indexOf(e.name + '::') === 0);
+                const unitRows = unitKeys.length > 0
+                    ? unitKeys.map(k => ({ unit: k.slice(e.name.length + 2), samples: unitSamples[k] }))
+                    : [{ unit: meta.currentUnit, samples: 0 }];
+
+                unitRows.forEach((ur, idx) => {
+                    (byLab[meta.lab] = byLab[meta.lab] || []).push({
+                        name: e.name, unit: ur.unit, samples: ur.samples,
+                        hours: idx === 0 ? meta.hours : 0,
+                        users: idx === 0 ? meta.users : new Set()
+                    });
+                });
             });
 
             const grandUsers = new Set();
@@ -3392,7 +3422,7 @@
                 periodLabel: `1 Jan ${now.getFullYear()} – ${fmt(now)}`,
                 generated:   now.toLocaleString(),
                 totals: { hours: grandHours, samples: grandSamples, users: grandUsers.size,
-                          instruments: groups.reduce((n, g) => n + g.rows.length, 0) }
+                          instruments: scopeEq.length }
             };
         }
 
@@ -4543,6 +4573,7 @@
                                         <option value="Quantity (pcs)" ${eq.trackingUnit==='Quantity (pcs)'?'selected':''}>Quantity (pcs)</option>
                                         <option value="Weight (mg)" ${eq.trackingUnit==='Weight (mg)'?'selected':''}>Weight (mg)</option>
                                         <option value="Weight (g)" ${eq.trackingUnit==='Weight (g)'?'selected':''}>Weight (g)</option>
+                                        <option value="Volume (ml)" ${eq.trackingUnit==='Volume (ml)'?'selected':''}>Volume (ml)</option>
                                     </select>
                                 </div>
                             </div>
@@ -4838,6 +4869,9 @@
                         action: 'Usage',
                         duration: data.duration,
                         samples: data.samples,
+                        // Captured at log time so a later change to the equipment's
+                        // trackingUnit never retroactively relabels this entry.
+                        unit: eq.trackingUnit || 'Samples',
                         materials: data.materials,
                         paymentType: data.paymentType || '',
                         paymentRef:  (data.paymentType === 'Others') ? '' : (data.paymentRef || ''),

@@ -181,6 +181,22 @@ top 12 results) — never a bulk directory dump to the client.
 
 ## Recent major changes (most recent session first)
 
+- **Added "Volume (ml)" tracking unit + fixed historical unit-mixing bug** —
+  `trackingUnit` (per-equipment dropdown: Hour / Quantity (pcs) / Weight (mg) /
+  Weight (g), now also Volume (ml)) used to be a purely *live* display label —
+  a historical Usage log had zero memory of what unit it was recorded under, so
+  the Equipment Utilization Summary just summed ALL of an equipment's historical
+  `samples` and relabeled the whole total under whatever unit is currently
+  configured (e.g. switching Weight (g) → Volume (ml) silently merged old grams
+  into a number now shown as "ml", with no indication a change ever happened).
+  Fixed: `saveLog()` now writes a `unit` column (col 17/Q, auto-heals its header
+  the same way `userEmail`/col 16 already does) captured from `eq.trackingUnit`
+  at the moment each Usage log is created; `_buildUtilizationData()` now groups
+  samples by (equipment, unit) instead of equipment alone, so an equipment with
+  logs spanning two different units gets two separate rows instead of one merged
+  one. Logs written before this shipped have no `unit` and are bucketed as
+  "Unspecified (legacy)" rather than guessed at — old data isn't and can't be
+  retroactively relabeled, but nothing new will ever be silently mixed again.
 - **PIC name shown in the lab page header** — `getCoordinatorForLab()` (was already
   used internally for booking-email routing) is now also rendered for users to see,
   with a "No PIC assigned" fallback.

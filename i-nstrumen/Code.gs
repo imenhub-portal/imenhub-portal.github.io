@@ -754,12 +754,19 @@ function saveLog(logObj) {
   // the frontend always sent userEmail but it was never persisted, which weakened
   // no-show email-matching and distinct-user counts. Old rows simply stay blank.
   if (sheet.getRange(1, 16).getValue() === '') sheet.getRange(1, 16).setValue('userEmail');
+  // Auto-heal: ensure the unit header exists (col 17 / Q). Added Jul 2026 — the
+  // sample/quantity number was never tagged with which tracking unit it was
+  // recorded under, so changing an equipment's unit later silently relabeled
+  // ALL its historical totals under the new unit in the Utilization report. Old
+  // rows have no unit and are shown as "Unspecified (legacy)" going forward,
+  // rather than guessed at.
+  if (sheet.getRange(1, 17).getValue() === '') sheet.getRange(1, 17).setValue('unit');
   const row = [
     logObj.id, logObj.timestamp, logObj.equipmentId, logObj.equipmentName, logObj.lab,
     logObj.userName, logObj.affiliation, logObj.action, logObj.duration,
     logObj.samples, logObj.materials, logObj.issueDetails, logObj.sessionEnded || false,
     logObj.paymentType || '', logObj.paymentRef || '',
-    logObj.userEmail || ''
+    logObj.userEmail || '', logObj.unit || ''
   ];
   sheet.appendRow(row);
   
