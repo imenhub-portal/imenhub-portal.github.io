@@ -9,7 +9,6 @@ Online poster printing request form for UKM IMEN.
 | `index.html` | Public form UI. Static site served by GitHub Pages. Edit → commit → push (auto-deploys). |
 | `_backend/Code.gs.txt` | **Source copy** of the Google Apps Script backend. NOT auto-deployed. Paste its contents into the Apps Script editor that owns the spreadsheet + Drive. |
 | `_backend/appscript.json` | Apps Script manifest (OAuth scopes). |
-| `printing_allocation_logic.md` | **Reference spec** for the 5-channel allocation logic. The dashboard implements its math; admin settings are the live source of truth. |
 
 > `_backend/` is the canonical backend source. Any machine can `git pull` and re-paste
 > into Apps Script, so the latest logic always travels with the repo.
@@ -50,9 +49,43 @@ After login, the admin sees a sidebar with 3 sections:
 Customers only see the **Borang** (form) and **Semak Status** tabs. Admin/Allocation/Settings
 are hidden behind the admin password.
 
+## Sebut Harga (quotation) PDF
+
+Clicking 📦 (mark an order "Sudah Diambil" / Collected) auto-generates and downloads an
+official UKM IMEN quotation PDF for that order — no backend/Apps Script involved, it's
+rendered entirely client-side:
+
+- `#invoiceTemplate` (`index.html`) is a hidden off-screen copy of `SEBUT_HARGA_TEMPLATE.doc`'s
+  layout (header letterhead, info table, line item, terms, left-aligned signature, footer),
+  rebuilt in HTML/CSS. The header and footer are the official composite letterhead images
+  (`assets/header.jpg` / `assets/footer.jpg`).
+- `generateSebutHargaPdf(row)` fills the template's `sh*`-prefixed field IDs from a raw
+  18-column order row (same schema as `getAdminData`/`processForm` — see column mapping in the
+  function's comment) and renders it via `html2pdf.js` (CDN, `defer`-loaded so a slow/blocked
+  CDN can never stall page startup).
+- Fields are prefixed `sh*` (not `inv*`) deliberately — the Borang's own invoice-preview widget
+  already uses `#invQty`/`#invSpec`/etc., and reusing those names silently grabbed the wrong
+  element via `getElementById`.
+- **The header/footer images are inlined as base64 data URIs** in `#invoiceTemplate`, NOT
+  `<img src="assets/...">`. This is required, not cosmetic: html2canvas taints the export canvas
+  when it draws an image loaded over `file://` (local testing) or cross-origin (the Apps Script
+  iframe, where relative `assets/` paths 404 anyway), and a tainted canvas throws "Tainted
+  canvases may not be exported" — the exact "Gagal menjana" failure. Data URIs are same-origin
+  and never taint. The source JPGs live in `assets/header.jpg` / `assets/footer.jpg`; the
+  downscale (to ~1150px wide) + base64 step was done with Pillow — re-run it if either image
+  is updated.
+- A 🧾 button in the History table re-triggers generation for any already-collected order
+  (`reprintInvoice(id)`), without changing its status.
+- `html2canvas` cannot auto-measure this off-screen element's height (it silently measures 0
+  and produces a blank PDF) — `generateSebutHargaPdf` explicitly passes the measured
+  `width`/`height`/`windowWidth`/`windowHeight` to work around this.
+
 ## Printing cost & allocation logic
 
-Implements `printing_allocation_logic.md` — every order's revenue is split into 5 channels:
+This section is the canonical description of the logic — it must match `_backend/Code.gs.txt`'s
+`_allocate_()` / `_breakeven_()` functions (and their mirror in `index.html`'s `_allocMath()` /
+`_breakeven()`). The actual numbers live in the Config sheet (admin-editable); the defaults below
+just seed it on first run. Every order's revenue is split into 5 channels:
 
 1. **Paper Fund** — RM 6.67/A1 (×2 A0), target RM 300
 2. **Ink Fund** — RM 20.00/A1 (×2 A0), target RM 3,000
