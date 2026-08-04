@@ -78,7 +78,7 @@ just seed it on first run. Every order's revenue is split into 5 channels:
 ### Storage — Config sheet (sheet #2 of the spreadsheet)
 A key/value sheet auto-created on first access (`_configSheet_` / `_cfgAll_` / `_cfgSet_`).
 Seeded with defaults from the MD. Holds three blocks:
-- **Prices:** `price_A1_glossy`, `price_A0_glossy`, `price_A1_plain`, `enabled_plain`
+- **Prices:** `price_A1_glossy`, `price_A0_glossy`, `price_A1_plain`, `enabled_plain`, `price_A1_matte`, `enabled_matte`
 - **Costs:** `cost_paper`, `cost_ink`, `cost_printhead`, `cost_maintenance`, `fixed_profit`
   + target cycles (`target_paper`, `target_ink`, `target_printhead`)
 - **Ledger:** `total_prints` + `ledger_paper`/`ledger_ink`/`ledger_maintenance`/

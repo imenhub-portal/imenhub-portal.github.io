@@ -252,6 +252,8 @@ const CONFIG_DEFAULTS = {
   price_A0_glossy: 80,
   price_A1_plain:  30,
   enabled_plain:   true,
+  price_A1_matte:  35,
+  enabled_matte:   true,
   // Block 2 — cost constants (per A1; A0 = ×2 all)
   cost_paper:      6.67,
   cost_ink:        20.00,
@@ -390,7 +392,9 @@ function getPrices() {
     price_A1_glossy: cfg.price_A1_glossy,
     price_A0_glossy: cfg.price_A0_glossy,
     price_A1_plain:  cfg.price_A1_plain,
-    enabled_plain:   cfg.enabled_plain
+    enabled_plain:   cfg.enabled_plain,
+    price_A1_matte:  cfg.price_A1_matte,
+    enabled_matte:   cfg.enabled_matte
   };
 }
 
@@ -405,7 +409,9 @@ function getAllocationConfig(pass) {
       price_A1_glossy: cfg.price_A1_glossy,
       price_A0_glossy: cfg.price_A0_glossy,
       price_A1_plain:  cfg.price_A1_plain,
-      enabled_plain:   cfg.enabled_plain
+      enabled_plain:   cfg.enabled_plain,
+      price_A1_matte:  cfg.price_A1_matte,
+      enabled_matte:   cfg.enabled_matte
     },
     costs: {
       cost_paper:       cfg.cost_paper,
@@ -448,6 +454,8 @@ function saveAllocationConfig(pass, cfgIn) {
     w.price_A0_glossy = parseFloat(cfgIn.prices.price_A0_glossy);
     w.price_A1_plain  = parseFloat(cfgIn.prices.price_A1_plain);
     w.enabled_plain   = !!cfgIn.prices.enabled_plain;
+    w.price_A1_matte  = parseFloat(cfgIn.prices.price_A1_matte);
+    w.enabled_matte   = !!cfgIn.prices.enabled_matte;
   }
   if (cfgIn.costs) {
     w.cost_paper       = parseFloat(cfgIn.costs.cost_paper);
@@ -474,6 +482,8 @@ function saveAllocationConfig(pass, cfgIn) {
     offenders.push('A0 Glossy (min RM ' + beA0.toFixed(2) + ')');
   if (w.enabled_plain && (!isFinite(w.price_A1_plain) || w.price_A1_plain < beA1))
     offenders.push('A1 Plain (min RM ' + beA1.toFixed(2) + ')');
+  if (w.enabled_matte && (!isFinite(w.price_A1_matte) || w.price_A1_matte < beA1))
+    offenders.push('A1 Matte Premium (min RM ' + beA1.toFixed(2) + ')');
   if (offenders.length) {
     return {
       status: 'error',
@@ -487,6 +497,8 @@ function saveAllocationConfig(pass, cfgIn) {
     price_A0_glossy: w.price_A0_glossy,
     price_A1_plain:  w.price_A1_plain,
     enabled_plain:   w.enabled_plain,
+    price_A1_matte:  w.price_A1_matte,
+    enabled_matte:   w.enabled_matte,
     cost_paper:       w.cost_paper,
     cost_ink:         w.cost_ink,
     cost_printhead:   w.cost_printhead,

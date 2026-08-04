@@ -307,6 +307,17 @@
       opacity:.6;
     }
 
+    .media-art.matte{
+      background: linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 45%, #94a3b8 100%);
+    }
+    .media-art.matte::before{
+      content:''; position:absolute; inset:0;
+      background: linear-gradient(135deg, rgba(255,255,255,.40) 0%, transparent 55%);
+    }
+    .media-art.matte::after{
+      content:''; position:absolute; inset:8px; border:1px solid rgba(255,255,255,.25); border-radius:8px; background:repeating-linear-gradient(45deg, transparent 0 6px, rgba(255,255,255,.06) 6px 7px);
+    }
+
     .media-info b{ font-size:12.5px; font-weight:800; color:var(--ink); letter-spacing:-.01em; display:block; }
     .media-desc{ font-size:11px; font-weight:500; color:var(--muted); margin-top:4px; display:block; line-height:1.35; }
     .media-price{ font-size:11px; font-weight:800; color:var(--ink); font-family:var(--mono); margin-top:6px; display:inline-flex; padding:3px 8px; border-radius:999px; background:var(--paper-3); border:1px solid var(--border); }
@@ -568,7 +579,7 @@
 
       <!-- 2. Spesifikasi -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title" data-bm="2. Spesifikasi" data-bi="2. Specifications">2. Spesifikasi</div><div class="b-card-sub">📐 A1/A0 • ✨ Glossy/Plain • 🔢 Qty</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title" data-bm="2. Spesifikasi" data-bi="2. Specifications">2. Spesifikasi</div><div class="b-card-sub">📐 A1/A0 • ✨ Glossy/Matte/Plain • 🔢 Qty</div></div></div>
         <div class="b-card-body">
           
                     <div class="spec-hero" style="border-radius:14px; overflow:hidden; border:1px solid var(--border); background:#0b1220; position:relative; box-shadow:var(--shadow-sm);">
@@ -602,9 +613,13 @@
                 <div class="media-art plain"></div>
                 <div class="media-info"><b>Plain Paper</b><span class="media-desc" data-bm="Matte ekonomi • Sesuai draf &amp; dalaman • RM 30 — tidak tersedia untuk A0" data-bi="Matte economy • Great for drafts &amp; internal • RM 30 — not available for A0">Matte ekonomi • Sesuai draf &amp; dalaman • RM 30 — tidak tersedia untuk A0</span><span class="media-price" data-m="Plain Paper">RM 30</span></div>
               </div>
+              <div class="media-pill" id="pillMatte" data-media="Matte Premium" onclick="pickMedia('Matte Premium')">
+                <div class="media-art matte"></div>
+                <div class="media-info"><b>Matte Premium</b><span class="media-desc" data-bm="Kemasan matte premium • Warna lembut • Bebas silau — A1 sahaja" data-bi="Premium matte finish • Soft colors • Glare-free — A1 only">Kemasan matte premium • Warna lembut • Bebas silau — A1 sahaja</span><span class="media-price" data-m="Matte Premium">RM 35</span></div>
+              </div>
             </div>
           </div>
-          <select name="media" id="media" onchange="calcPrice()" style="display:none"><option value="High Glossy">High Glossy</option><option id="optPlain" value="Plain Paper">Plain Paper</option></select>
+          <select name="media" id="media" onchange="calcPrice()" style="display:none"><option value="High Glossy">High Glossy</option><option id="optPlain" value="Plain Paper">Plain Paper</option><option id="optMatte" value="Matte Premium">Matte Premium</option></select>
 
           <div style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><label style="margin:0" data-bm="Unit" data-bi="Quantity">Unit</label><div class="qty-row" style="margin:0"><button type="button" class="qty-btn" onclick="adjQty(-1)" aria-label="Kurang">−</button><input type="number" id="unit" name="unit" value="1" min="1" max="99" inputmode="numeric" oninput="calcPrice()" onkeydown="return qtyKeyFilter(event)" class="qty-input"><button type="button" class="qty-btn" onclick="adjQty(1)" aria-label="Tambah">+</button></div><span class="b-hint">≤99</span></div>
           <input type="hidden" name="harga_hidden" id="hh" value="50">
@@ -756,6 +771,8 @@
               <div class="cfg-field"><label data-bm="A0 High Glossy (RM)" data-bi="A0 High Glossy (RM)">A0 High Glossy (RM)</label><input type="number" id="cfgP2" step="0.01" min="0"><div class="hint" id="cfgP2h"></div></div>
               <div class="cfg-field"><label data-bm="A1 Plain Paper (RM)" data-bi="A1 Plain Paper (RM)">A1 Plain Paper (RM)</label><input type="number" id="cfgP3" step="0.01" min="0"><div class="hint" id="cfgP3h"></div></div>
               <div class="cfg-field"><label>&nbsp;</label><label class="cfg-toggle"><input type="checkbox" id="cfgPlainEn" checked> <span data-bm="Plain Paper tersedia" data-bi="Plain Paper enabled">Plain Paper tersedia</span></label></div>
+              <div class="cfg-field"><label data-bm="A1 Matte Premium (RM)" data-bi="A1 Matte Premium (RM)">A1 Matte Premium (RM)</label><input type="number" id="cfgP4" step="0.01" min="0"><div class="hint" id="cfgP4h"></div></div>
+              <div class="cfg-field"><label>&nbsp;</label><label class="cfg-toggle"><input type="checkbox" id="cfgMatteEn" checked> <span data-bm="Matte Premium tersedia" data-bi="Matte Premium enabled">Matte Premium tersedia</span></label></div>
             </div>
           </div>
           <div class="cfg-section">
@@ -838,7 +855,7 @@ function T(bm, bi){ return CUR_LANG==='bi' ? bi : bm; }
 // ── DYNAMIC PRICING ──────────────────────────────────────────
 // Prices live in the Config sheet (backend) and are fetched on load.
 // Falls back to the legacy hardcoded defaults so the form never breaks.
-var PRICES = { price_A1_glossy:50, price_A0_glossy:80, price_A1_plain:30, enabled_plain:true };
+var PRICES = { price_A1_glossy:50, price_A0_glossy:80, price_A1_plain:30, enabled_plain:true, price_A1_matte:35, enabled_matte:true };
 function fetchPrices(){
   try{
     google.script.run.withFailureHandler(function(e){
@@ -852,6 +869,11 @@ function fetchPrices(){
       var en = !(d && d.enabled_plain===false);
       if(pp){ pp.style.display = en ? '' : 'none'; }
       if(op){ op.disabled = !en; }
+      // reflect matte availability from server
+      var mp=document.getElementById('pillMatte'); var om=document.getElementById('optMatte');
+      var enm = !(d && d.enabled_matte===false);
+      if(mp){ mp.style.display = enm ? '' : 'none'; }
+      if(om){ om.disabled = !enm; }
     }).getPrices();
   }catch(e){ console.warn('[fetchPrices]', e); }
 }
@@ -903,6 +925,7 @@ function pickSize(sz){ var el=document.getElementById('size'); if(el) el.value=s
 function pickMedia(md){
   var s=document.getElementById('size') ? document.getElementById('size').value : 'A1';
   if(s==='A0' && md==='Plain Paper'){ myAlert(T('A0 tidak tersedia Plain Paper. High Glossy digunakan.','Plain Paper is not available for A0. High Glossy applied.'), true); md='High Glossy'; }
+  if(s==='A0' && md==='Matte Premium'){ myAlert(T('A0 tidak tersedia Matte Premium. High Glossy digunakan.','Matte Premium is not available for A0. High Glossy applied.'), true); md='High Glossy'; }
   var el=document.getElementById('media'); if(el) el.value=md; calcPrice();
 }
 function pickBayar(v){ var el=document.getElementById('payMethod'); if(el) el.value=v; toggleGeran({value:v}); }
@@ -919,13 +942,17 @@ function calcPrice(){
   var uEl=document.getElementById('unit'); var u=1; if(uEl){ u=parseInt(uEl.value,10); if(!u||u<1) u=1; if(u>99) u=99; }
   var optPlain=document.getElementById('optPlain'); if(optPlain) optPlain.disabled=(s==='A0');
   var pillPlain=document.getElementById('pillPlain'); if(pillPlain){ pillPlain.style.opacity=(s==='A0')?'.38':''; pillPlain.style.pointerEvents=(s==='A0')?'none':''; }
+  var optMatte=document.getElementById('optMatte'); if(optMatte) optMatte.disabled=(s==='A0');
+  var pillMatte=document.getElementById('pillMatte'); if(pillMatte){ pillMatte.style.opacity=(s==='A0')?'.38':''; pillMatte.style.pointerEvents=(s==='A0')?'none':''; }
   if(s==='A0' && m==='Plain Paper'){ if(selM) selM.value='High Glossy'; m='High Glossy'; }
+  if(s==='A0' && m==='Matte Premium'){ if(selM) selM.value='High Glossy'; m='High Glossy'; }
 
   // price matrix with size dependency — driven by backend PRICES (fallback to defaults)
   var PR = window.PRICES || {};
   var priceGlossy = (s==='A1') ? (PR.price_A1_glossy||50) : (PR.price_A0_glossy||80);
   var pricePlain  = (PR.price_A1_plain||30);
-  var p = (m==='High Glossy') ? priceGlossy : pricePlain;
+  var priceMatte  = (PR.price_A1_matte||35);
+  var p = (m==='High Glossy') ? priceGlossy : (m==='Matte Premium' ? priceMatte : pricePlain);
   var total = p * u;
 
   // visuals
@@ -941,8 +968,10 @@ function calcPrice(){
   // update media price badges to reflect size
   var glossyEl = document.querySelector('.media-price[data-m="High Glossy"]');
   var plainEl  = document.querySelector('.media-price[data-m="Plain Paper"]');
+  var matteEl  = document.querySelector('.media-price[data-m="Matte Premium"]');
   if(glossyEl) glossyEl.innerText = 'RM ' + priceGlossy + ' — ' + s;
   if(plainEl)  plainEl.innerText  = 'RM ' + pricePlain  + ' — A1 sahaja';
+  if(matteEl)  matteEl.innerText  = 'RM ' + priceMatte  + ' — A1 sahaja';
 
   var hintEl = document.getElementById('mediaSizeHint');
   if(hintEl) hintEl.innerText = s + ' • RM ' + p + ' / unit';
@@ -1333,8 +1362,9 @@ function loadConfig(){
     if(d==='UNAUTHORIZED') return;
     _cfgCache=d;
     var p=d.prices||{}, c=d.costs||{}, t=d.targets||{};
-    _setv('cfgP1', p.price_A1_glossy); _setv('cfgP2', p.price_A0_glossy); _setv('cfgP3', p.price_A1_plain);
+    _setv('cfgP1', p.price_A1_glossy); _setv('cfgP2', p.price_A0_glossy); _setv('cfgP3', p.price_A1_plain); _setv('cfgP4', p.price_A1_matte);
     document.getElementById('cfgPlainEn').checked = !!p.enabled_plain;
+    document.getElementById('cfgMatteEn').checked = !!p.enabled_matte;
     _setv('cfgC1', c.cost_paper); _setv('cfgC2', c.cost_ink); _setv('cfgC3', c.cost_printhead);
     _setv('cfgC4', c.cost_maintenance); _setv('cfgC5', c.fixed_profit);
     _setv('cfgT1', t.target_paper); _setv('cfgT2', t.target_ink); _setv('cfgT3', t.target_printhead);
@@ -1346,7 +1376,7 @@ function _getv(id){ var el=document.getElementById(id); return el? parseFloat(el
 
 function curCfgFromInputs(){
   return {
-    prices:{ price_A1_glossy:_getv('cfgP1'), price_A0_glossy:_getv('cfgP2'), price_A1_plain:_getv('cfgP3'), enabled_plain:document.getElementById('cfgPlainEn').checked },
+    prices:{ price_A1_glossy:_getv('cfgP1'), price_A0_glossy:_getv('cfgP2'), price_A1_plain:_getv('cfgP3'), enabled_plain:document.getElementById('cfgPlainEn').checked, price_A1_matte:_getv('cfgP4'), enabled_matte:document.getElementById('cfgMatteEn').checked },
     costs:{ cost_paper:_getv('cfgC1'), cost_ink:_getv('cfgC2'), cost_printhead:_getv('cfgC3'), cost_maintenance:_getv('cfgC4'), fixed_profit:_getv('cfgC5') },
     targets:{ target_paper:_getv('cfgT1'), target_ink:_getv('cfgT2'), target_printhead:_getv('cfgT3'), target_maintenance:0, target_profit:0 }
   };
@@ -1356,7 +1386,7 @@ function curCfgFromInputs(){
 function updateConfigHints(){
   var cfg=curCfgFromInputs().costs;
   var be1=_breakeven(cfg,'A1'), be0=_breakeven(cfg,'A0');
-  _hint('cfgP1h', _getv('cfgP1'), be1); _hint('cfgP2h', _getv('cfgP2'), be0); _hint('cfgP3h', _getv('cfgP3'), be1);
+  _hint('cfgP1h', _getv('cfgP1'), be1); _hint('cfgP2h', _getv('cfgP2'), be0); _hint('cfgP3h', _getv('cfgP3'), be1); _hint('cfgP4h', _getv('cfgP4'), be1);
 }
 function _hint(id, val, be){
   var el=document.getElementById(id); if(!el) return;
@@ -1370,18 +1400,19 @@ function renderCfgPreview(){
   var cfg=curCfgFromInputs(); var c=cfg.costs;
   var a1=_allocMath(c,'A1',cfg.prices.price_A1_glossy);
   var a0=_allocMath(c,'A0',cfg.prices.price_A0_glossy);
+  var am=_allocMath(c,'A1',cfg.prices.price_A1_matte);
   var rows=[
-    [T('Kertas','Paper'), a1.paper, a0.paper],
-    [T('Dakwat','Ink'), a1.ink, a0.ink],
-    [T('Penyelenggaraan','Maintenance'), a1.maintenance, a0.maintenance],
-    [T('Printhead','Printhead'), a1.printhead, a0.printhead],
-    [T('Untung','Profit'), a1.profit, a0.profit],
-    [T('JUMLAH','TOTAL'), a1.paper+a1.ink+a1.maintenance+a1.printhead+a1.profit, a0.paper+a0.ink+a0.maintenance+a0.printhead+a0.profit]
+    [T('Kertas','Paper'), a1.paper, a0.paper, am.paper],
+    [T('Dakwat','Ink'), a1.ink, a0.ink, am.ink],
+    [T('Penyelenggaraan','Maintenance'), a1.maintenance, a0.maintenance, am.maintenance],
+    [T('Printhead','Printhead'), a1.printhead, a0.printhead, am.printhead],
+    [T('Untung','Profit'), a1.profit, a0.profit, am.profit],
+    [T('JUMLAH','TOTAL'), a1.paper+a1.ink+a1.maintenance+a1.printhead+a1.profit, a0.paper+a0.ink+a0.maintenance+a0.printhead+a0.profit, am.paper+am.ink+am.maintenance+am.printhead+am.profit]
   ];
   var h='<div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:8px;">'+T('Pratonton peruntukan (1 unit)','Allocation preview (1 unit)')+'</div>';
-  h+='<div class="cfg-preview-row" style="font-weight:800;color:var(--ink-3)"><span></span><span>A1 Glossy</span><span>A0 Glossy</span></div>';
+  h+='<div class="cfg-preview-row" style="font-weight:800;color:var(--ink-3)"><span></span><span>A1 Glossy</span><span>A0 Glossy</span><span>A1 Matte</span></div>';
   rows.forEach(function(r,i){
-    h+='<div class="cfg-preview-row"'+(i===rows.length-1?' style="font-weight:800;border-top:2px solid var(--border)"':'')+'><span>'+r[0]+'</span><b>RM '+_fmt(r[1])+'</b><b>RM '+_fmt(r[2])+'</b></div>';
+    h+='<div class="cfg-preview-row"'+(i===rows.length-1?' style="font-weight:800;border-top:2px solid var(--border)"':'')+'><span>'+r[0]+'</span><b>RM '+_fmt(r[1])+'</b><b>RM '+_fmt(r[2])+'</b><b>RM '+_fmt(r[3])+'</b></div>';
   });
   var el=document.getElementById('cfgPreview'); if(el) el.innerHTML=h;
 }
@@ -1395,6 +1426,7 @@ function saveConfig(){
   if(cfg.prices.price_A1_glossy < be1) offenders.push('A1 Glossy');
   if(cfg.prices.price_A0_glossy < be0) offenders.push('A0 Glossy');
   if(cfg.prices.enabled_plain && cfg.prices.price_A1_plain < be1) offenders.push('A1 Plain');
+  if(cfg.prices.enabled_matte && cfg.prices.price_A1_matte < be1) offenders.push('A1 Matte Premium');
   if(offenders.length){ myAlert(T('Harga di bawah breakeven: ','Prices below breakeven: ')+offenders.join(', '), true); return; }
   ld(true);
   google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){
