@@ -638,8 +638,10 @@
             </div>
           </div>
           <div style="margin-top:12px;">
-            <select name="bayaran" id="payMethod" style="display:none"><option value="Geran">Geran</option></select>
+            <div class="pay-seg" id="paySeg"><div class="pay-opt sel" data-bayaran="Geran" onclick="pickBayar('Geran')"><b data-bm="🎓 Geran" data-bi="🎓 Grant">🎓 Geran</b></div><div class="pay-opt" data-bayaran="Online" id="payOnline" onclick="pickBayar('Online')" style="display:none"><b data-bm="💳 Dalam Talian" data-bi="💳 Online">💳 Dalam Talian</b></div></div>
+            <select name="bayaran" id="payMethod" onchange="toggleBayaran(this)" style="display:none"><option value="Geran">Geran</option><option id="optOnline" value="Online">Online</option></select>
             <div class="geran-wrap open" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran" data-bm-ph="No. Geran" data-bi-ph="Grant No." required></div>
+            <div class="geran-wrap" id="onlineWrap" style="display:none"><div class="b-field-note" id="onlineNote" style="background:var(--paper-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:4px;text-align:center;font-weight:600;font-size:12px;"></div></div>
           </div>
           <div class="trust-row" style="margin-top:10px"><span class="trust">🔒</span><span class="trust">✅ 300dpi</span><span class="trust">💬 WA</span><span class="trust" data-bm="📦 2–3 hari" data-bi="📦 2–3 days">📦 2–3 hari</span></div>
         </div>
@@ -775,6 +777,13 @@
             </div>
           </div>
           <div class="cfg-section">
+            <h4 data-bm="Kaedah Bayaran" data-bi="Payment Methods">Kaedah Bayaran</h4>
+            <div class="cfg-sub" data-bm="Dayakan pembayaran dalam talian dan tetapkan nombor akaun (akan dipaparkan di borang pelanggan)." data-bi="Enable online payment and set account number (shown on the customer form).">Dayakan pembayaran dalam talian dan tetapkan nombor akaun (akan dipaparkan di borang pelanggan).</div>
+            <div class="cfg-grid">
+              <div class="cfg-field"><label>&nbsp;</label><label class="cfg-toggle"><input type="checkbox" id="cfgOnlineEn"> <span data-bm="Pembayaran Dalam Talian tersedia" data-bi="Online Payment enabled">Pembayaran Dalam Talian tersedia</span></label></div>
+              <div class="cfg-field"><label data-bm="No. Akaun" data-bi="Account No.">No. Akaun</label><input type="text" id="cfgAcct" placeholder="Cth: 1234-5678-9012 (Bank XYZ)" data-bm-ph="Cth: 1234-5678-9012 (Bank XYZ)" data-bi-ph="Eg: 1234-5678-9012 (Bank XYZ)"></div>
+            </div>
+          <div class="cfg-section">
             <h4 data-bm="Pemalar Kos (per A1)" data-bi="Cost Constants (per A1)">Pemalar Kos (per A1)</h4>
             <div class="cfg-sub" data-bm="A0 = ×2 semua kos. Untuk A1 sahaja, ikut nilai ini. Sumber: README.md" data-bi="A0 = ×2 all costs. For A1 only, use these values. Source: README.md">A0 = ×2 semua kos. Untuk A1 sahaja, ikut nilai ini. Sumber: README.md</div>
             <div class="cfg-grid">
@@ -854,7 +863,7 @@ function T(bm, bi){ return CUR_LANG==='bi' ? bi : bm; }
 // ── DYNAMIC PRICING ──────────────────────────────────────────
 // Prices live in the Config sheet (backend) and are fetched on load.
 // Falls back to the legacy hardcoded defaults so the form never breaks.
-var PRICES = { price_A1_glossy:50, price_A0_glossy:80, price_A1_plain:30, enabled_plain:true, price_A1_matte:35, enabled_matte:true };
+var PRICES = { price_A1_glossy:50, price_A0_glossy:80, price_A1_plain:30, enabled_plain:true, price_A1_matte:35, enabled_matte:true, enabled_online:false, account_online:'' };
 function fetchPrices(){
   try{
     google.script.run.withFailureHandler(function(e){
@@ -873,7 +882,14 @@ function fetchPrices(){
       var enm = !(d && d.enabled_matte===false);
       if(mp){ mp.style.display = enm ? '' : 'none'; }
       if(om){ om.disabled = !enm; }
-    }).getPrices();
+      // reflect online payment availability from server
+      var onlineEn = !!(d && d.enabled_online);
+      var po=document.getElementById('payOnline'); var oo=document.getElementById('optOnline');
+      if(po){ po.style.display = onlineEn ? '' : 'none'; }
+      if(oo){ oo.disabled = !onlineEn; }
+      // if currently on Online but server says disabled, fall back to Geran
+      var pm=document.getElementById('payMethod');
+      if(pm && pm.value==='Online' && !onlineEn){ pm.value='Geran'; toggleBayaran(pm); }
   }catch(e){ console.warn('[fetchPrices]', e); }
 }
 
@@ -927,6 +943,7 @@ function pickMedia(md){
   if(s==='A0' && md==='Matte Premium'){ myAlert(T('A0 tidak tersedia Matte Premium. High Glossy digunakan.','Matte Premium is not available for A0. High Glossy applied.'), true); md='High Glossy'; }
   var el=document.getElementById('media'); if(el) el.value=md; calcPrice();
 }
+function pickBayar(v){ var el=document.getElementById('payMethod'); if(el) el.value=v; toggleBayaran({value:v}); }
 function adjQty(d){
   var el=document.getElementById('unit'); var cur=parseInt(el.value,10)||1; cur=Math.min(99, Math.max(1, cur+d)); el.value=cur; calcPrice();
 }
@@ -974,6 +991,9 @@ function calcPrice(){
   var hintEl = document.getElementById('mediaSizeHint');
   if(hintEl) hintEl.innerText = s + ' • RM ' + p + ' / unit';
 
+  var b=document.getElementById('payMethod') ? document.getElementById('payMethod').value : 'Geran';
+  document.querySelectorAll('.pay-opt').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-bayaran')===b); });
+
   var disp=document.getElementById('priceDisplay'); if(disp){ disp.innerText='RM '+total.toFixed(2); disp.classList.remove('price-pulse'); void disp.offsetWidth; disp.classList.add('price-pulse'); }
   var cta=document.getElementById('ctaPrice'); if(cta) cta.innerText='RM '+total.toFixed(2);
   document.querySelectorAll('.ctaPrice').forEach(function(el){ el.innerText='RM '+total.toFixed(2); });
@@ -995,11 +1015,26 @@ function calcPrice(){
     if(steps[1]) steps[1].classList.toggle('active', true);
   }catch(e){}
 }
-function toggleGeran(el){
+function toggleBayaran(el){
   var v=(el&&el.value)?el.value:'Geran';
-  var wrap=document.getElementById('geranWrap'); var inp=document.getElementById('inpGeran');
-  if(wrap) wrap.classList.toggle('open', true);
-  if(inp){ inp.required=true; }
+  var isGeran=(v==='Geran');
+  var geranWrap=document.getElementById('geranWrap'); var geranInp=document.getElementById('inpGeran');
+  var onlineWrap=document.getElementById('onlineWrap');
+  if(geranWrap){ geranWrap.classList.toggle('open', isGeran); geranWrap.style.display = isGeran ? '' : 'none'; }
+  if(geranInp){ geranInp.required = isGeran; if(!isGeran) geranInp.value=''; }
+  if(onlineWrap){ onlineWrap.classList.toggle('open', !isGeran); onlineWrap.style.display = isGeran ? 'none' : ''; }
+  document.querySelectorAll('.pay-opt').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-bayaran')===v); });
+  if(!isGeran){ updateOnlineNote(); }
+}
+function updateOnlineNote(){
+  var PR = window.PRICES || {};
+  var note=document.getElementById('onlineNote'); if(!note) return;
+  var acct = PR.account_online || '';
+  if(acct){
+    note.innerHTML = T('Sila buat pembayaran ke akaun berikut dan simpan resit:<br><b style=\"font-family:var(--mono);font-size:15px;letter-spacing:.02em;\">','Please pay to the following account and keep the receipt:<br><b style=\"font-family:var(--mono);font-size:15px;letter-spacing:.02em;\">') + esc(acct) + '</b>';
+  } else {
+    note.innerHTML = T('Sila buat pembayaran dalam talian dan simpan resit.<br><small style=\"color:var(--muted);\">(No. akaun akan dimaklumkan kemudian)</small>', 'Please pay online and keep the receipt.<br><small style=\"color:var(--muted);\">(Account number will be provided later)</small>');
+  }
 }
 function clearFileChoice(){
   if(_filePreviewUrl){ try{ URL.revokeObjectURL(_filePreviewUrl);}catch(e){} _filePreviewUrl=null; }
@@ -1359,6 +1394,8 @@ function loadConfig(){
     _setv('cfgP1', p.price_A1_glossy); _setv('cfgP2', p.price_A0_glossy); _setv('cfgP3', p.price_A1_plain); _setv('cfgP4', p.price_A1_matte);
     document.getElementById('cfgPlainEn').checked = !!p.enabled_plain;
     document.getElementById('cfgMatteEn').checked = !!p.enabled_matte;
+    document.getElementById('cfgOnlineEn').checked = !!p.enabled_online;
+    document.getElementById('cfgAcct').value = p.account_online || '';
     _setv('cfgC1', c.cost_paper); _setv('cfgC2', c.cost_ink); _setv('cfgC3', c.cost_printhead);
     _setv('cfgC4', c.cost_maintenance); _setv('cfgC5', c.fixed_profit);
     _setv('cfgT1', t.target_paper); _setv('cfgT2', t.target_ink); _setv('cfgT3', t.target_printhead);
@@ -1370,7 +1407,7 @@ function _getv(id){ var el=document.getElementById(id); return el? parseFloat(el
 
 function curCfgFromInputs(){
   return {
-    prices:{ price_A1_glossy:_getv('cfgP1'), price_A0_glossy:_getv('cfgP2'), price_A1_plain:_getv('cfgP3'), enabled_plain:document.getElementById('cfgPlainEn').checked, price_A1_matte:_getv('cfgP4'), enabled_matte:document.getElementById('cfgMatteEn').checked },
+    prices:{ price_A1_glossy:_getv('cfgP1'), price_A0_glossy:_getv('cfgP2'), price_A1_plain:_getv('cfgP3'), enabled_plain:document.getElementById('cfgPlainEn').checked, price_A1_matte:_getv('cfgP4'), enabled_matte:document.getElementById('cfgMatteEn').checked, enabled_online:document.getElementById('cfgOnlineEn').checked, account_online:document.getElementById('cfgAcct').value },
     costs:{ cost_paper:_getv('cfgC1'), cost_ink:_getv('cfgC2'), cost_printhead:_getv('cfgC3'), cost_maintenance:_getv('cfgC4'), fixed_profit:_getv('cfgC5') },
     targets:{ target_paper:_getv('cfgT1'), target_ink:_getv('cfgT2'), target_printhead:_getv('cfgT3'), target_maintenance:0, target_profit:0 }
   };

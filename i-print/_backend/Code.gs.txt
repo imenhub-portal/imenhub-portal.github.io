@@ -254,6 +254,8 @@ const CONFIG_DEFAULTS = {
   enabled_plain:   true,
   price_A1_matte:  35,
   enabled_matte:   true,
+  enabled_online:  false,
+  account_online:  '',
   // Block 2 — cost constants (per A1; A0 = ×2 all)
   cost_paper:      6.67,
   cost_ink:        20.00,
@@ -394,7 +396,9 @@ function getPrices() {
     price_A1_plain:  cfg.price_A1_plain,
     enabled_plain:   cfg.enabled_plain,
     price_A1_matte:  cfg.price_A1_matte,
-    enabled_matte:   cfg.enabled_matte
+    enabled_matte:   cfg.enabled_matte,
+    enabled_online:  cfg.enabled_online,
+    account_online:  cfg.account_online
   };
 }
 
@@ -411,7 +415,9 @@ function getAllocationConfig(pass) {
       price_A1_plain:  cfg.price_A1_plain,
       enabled_plain:   cfg.enabled_plain,
       price_A1_matte:  cfg.price_A1_matte,
-      enabled_matte:   cfg.enabled_matte
+      enabled_matte:   cfg.enabled_matte,
+      enabled_online:  cfg.enabled_online,
+      account_online:  cfg.account_online
     },
     costs: {
       cost_paper:       cfg.cost_paper,
@@ -456,6 +462,8 @@ function saveAllocationConfig(pass, cfgIn) {
     w.enabled_plain   = !!cfgIn.prices.enabled_plain;
     w.price_A1_matte  = parseFloat(cfgIn.prices.price_A1_matte);
     w.enabled_matte   = !!cfgIn.prices.enabled_matte;
+    w.enabled_online  = !!cfgIn.prices.enabled_online;
+    w.account_online  = cfgIn.prices.account_online || '';
   }
   if (cfgIn.costs) {
     w.cost_paper       = parseFloat(cfgIn.costs.cost_paper);
@@ -499,6 +507,8 @@ function saveAllocationConfig(pass, cfgIn) {
     enabled_plain:   w.enabled_plain,
     price_A1_matte:  w.price_A1_matte,
     enabled_matte:   w.enabled_matte,
+    enabled_online:  w.enabled_online,
+    account_online:  w.account_online,
     cost_paper:       w.cost_paper,
     cost_ink:         w.cost_ink,
     cost_printhead:   w.cost_printhead,
