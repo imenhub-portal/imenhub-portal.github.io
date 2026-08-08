@@ -890,6 +890,7 @@ function fetchPrices(){
       // if currently on Online but server says disabled, fall back to Geran
       var pm=document.getElementById('payMethod');
       if(pm && pm.value==='Online' && !onlineEn){ pm.value='Geran'; toggleBayaran(pm); }
+    }).getPrices();
   }catch(e){ console.warn('[fetchPrices]', e); }
 }
 
@@ -1129,7 +1130,7 @@ function saveBooking(formEl, file, fileId, ui){
     fileId: fileId, fileMime: file.type
   };
   google.script.run.withFailureHandler(function(e){ ld(false); uploadFailed(ui, e.toString()); }).withSuccessHandler(function(r){
-    ld(false); myAlert(r.message, r.status==='error'); if(r.status!=='error'){ formEl.reset(); clearFileChoice(); var gw=document.getElementById('geranWrap'); if(gw) gw.classList.remove('open'); calcPrice(); } resetBtn(ui.btn);
+    ld(false); myAlert(r.message, r.status==='error'); if(r.status!=='error'){ formEl.reset(); clearFileChoice(); toggleBayaran(document.getElementById('payMethod')); calcPrice(); } resetBtn(ui.btn);
   }).processForm(data);
 }
 function uploadFailed(ui, msg){ ui.pStat.style.color='#b91c1c'; ui.pStat.innerText='❌ '+msg; myAlert(msg, true); resetBtn(ui.btn); }
