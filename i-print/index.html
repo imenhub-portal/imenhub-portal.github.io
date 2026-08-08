@@ -628,7 +628,7 @@
 
       <!-- 3. Harga & Bayaran -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="3. Harga &amp; Bayaran" data-bi="3. Price &amp; Payment">3. Harga &amp; Bayaran</div><div class="b-card-sub" data-bm="💵 Cash • 🎓 Geran • 📦 Aras 4" data-bi="💵 Cash • 🎓 Grant • 📦 Level 4">💵 Cash • 🎓 Geran • 📦 Aras 4</div></div></div>
+        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="3. Harga &amp; Bayaran" data-bi="3. Price &amp; Payment">3. Harga &amp; Bayaran</div><div class="b-card-sub" data-bm="🎓 Geran • 📦 Aras 4" data-bi="🎓 Grant • 📦 Level 4">🎓 Geran • 📦 Aras 4</div></div></div>
         <div class="b-card-body">
           <div class="invoice" id="invoiceBox">
             <div class="invoice-head"><b data-bm="🧾 Jumlah" data-bi="🧾 Total">🧾 Jumlah</b><span class="rm" id="priceDisplay" style="font-size:16px">RM 50.00</span></div>
@@ -638,9 +638,8 @@
             </div>
           </div>
           <div style="margin-top:12px;">
-            <div class="pay-seg" id="paySeg"><div class="pay-opt sel" data-bayaran="Cash" onclick="pickBayar('Cash')"><b data-bm="💵 Cash" data-bi="💵 Cash">💵 Cash</b></div><div class="pay-opt" data-bayaran="Geran" onclick="pickBayar('Geran')"><b data-bm="🎓 Geran" data-bi="🎓 Grant">🎓 Geran</b></div></div>
-            <select name="bayaran" id="payMethod" onchange="toggleGeran(this)" style="display:none"><option value="Cash">Cash</option><option value="Geran">Geran</option></select>
-            <div class="geran-wrap" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran" data-bm-ph="No. Geran" data-bi-ph="Grant No."></div>
+            <select name="bayaran" id="payMethod" style="display:none"><option value="Geran">Geran</option></select>
+            <div class="geran-wrap open" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran" data-bm-ph="No. Geran" data-bi-ph="Grant No." required></div>
           </div>
           <div class="trust-row" style="margin-top:10px"><span class="trust">🔒</span><span class="trust">✅ 300dpi</span><span class="trust">💬 WA</span><span class="trust" data-bm="📦 2–3 hari" data-bi="📦 2–3 days">📦 2–3 hari</span></div>
         </div>
@@ -928,7 +927,6 @@ function pickMedia(md){
   if(s==='A0' && md==='Matte Premium'){ myAlert(T('A0 tidak tersedia Matte Premium. High Glossy digunakan.','Matte Premium is not available for A0. High Glossy applied.'), true); md='High Glossy'; }
   var el=document.getElementById('media'); if(el) el.value=md; calcPrice();
 }
-function pickBayar(v){ var el=document.getElementById('payMethod'); if(el) el.value=v; toggleGeran({value:v}); }
 function adjQty(d){
   var el=document.getElementById('unit'); var cur=parseInt(el.value,10)||1; cur=Math.min(99, Math.max(1, cur+d)); el.value=cur; calcPrice();
 }
@@ -976,9 +974,6 @@ function calcPrice(){
   var hintEl = document.getElementById('mediaSizeHint');
   if(hintEl) hintEl.innerText = s + ' • RM ' + p + ' / unit';
 
-  var b=document.getElementById('payMethod') ? document.getElementById('payMethod').value : 'Cash';
-  document.querySelectorAll('.pay-opt').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-bayaran')===b); });
-
   var disp=document.getElementById('priceDisplay'); if(disp){ disp.innerText='RM '+total.toFixed(2); disp.classList.remove('price-pulse'); void disp.offsetWidth; disp.classList.add('price-pulse'); }
   var cta=document.getElementById('ctaPrice'); if(cta) cta.innerText='RM '+total.toFixed(2);
   document.querySelectorAll('.ctaPrice').forEach(function(el){ el.innerText='RM '+total.toFixed(2); });
@@ -1001,11 +996,10 @@ function calcPrice(){
   }catch(e){}
 }
 function toggleGeran(el){
-  var v=(el&&el.value)?el.value:(document.getElementById('payMethod')?document.getElementById('payMethod').value:'Cash');
+  var v=(el&&el.value)?el.value:'Geran';
   var wrap=document.getElementById('geranWrap'); var inp=document.getElementById('inpGeran');
-  var isGeran=(v==='Geran'); if(wrap) wrap.classList.toggle('open', isGeran);
-  if(inp){ if(isGeran){ inp.required=true; setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 220);} else { inp.required=false; inp.value=''; } }
-  document.querySelectorAll('.pay-opt').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-bayaran')===v); });
+  if(wrap) wrap.classList.toggle('open', true);
+  if(inp){ inp.required=true; }
 }
 function clearFileChoice(){
   if(_filePreviewUrl){ try{ URL.revokeObjectURL(_filePreviewUrl);}catch(e){} _filePreviewUrl=null; }
