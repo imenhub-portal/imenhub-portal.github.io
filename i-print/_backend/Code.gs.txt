@@ -841,7 +841,7 @@ function updatePosterStatus(id, newStatus, reason, pass) {
     } else if (newStatus === 'Dah Boleh Collect') {
       const bayar = method === 'Cash'
         ? 'Sila bawa wang tunai <b>RM ' + _esc_(harga) + '</b> semasa mengambil poster.'
-        : 'Bayaran melalui Geran (No: <b>' + _esc_(sheet.getRange(rowIndex, 15).getValue()) + '</b>) — hadir ke pejabat untuk urusan dokumen.';
+        : 'Bayaran melalui Geran (Kod Peruntukan: <b>' + _esc_(sheet.getRange(rowIndex, 15).getValue()) + '</b>) — hadir ke pejabat untuk urusan dokumen.';
       notaHtml  = '<p>Poster telah <b style="color:#15803d;">SIAP</b> dicetak! 🎉</p>' +
                   '<p>📍 <b>Lokasi:</b> Aras 4 (En. Hazde)<br>💰 <b>Pembayaran:</b> ' + bayar + '</p>';
       notaPlain = 'Poster telah SIAP. Lokasi: Aras 4 (En. Hazde). Bayaran: RM ' + harga + ' (' + method + ').';
