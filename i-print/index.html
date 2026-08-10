@@ -103,7 +103,7 @@
     input, select, textarea{
       width:100%; padding:13px 14px; border:1.5px solid var(--border); border-radius:13px;
       font-family:inherit; font-size:15.5px; transition:border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
-      outline:none; background:var(--paper); color:var(--ink-2);
+      outline:none; background:rgba(255,255,255,.72); color:var(--ink-2);
     }
     input::placeholder, textarea::placeholder{ color:var(--muted-2); font-size:14px; }
     input:focus, select:focus, textarea:focus{ border-color:var(--ink); box-shadow:var(--ring); }
@@ -226,11 +226,11 @@
 
     /* Cards */
     .b-flow{ display:flex; flex-direction:column; gap:16px; }
-    .b-card{ background:var(--paper); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--shadow-sm); overflow:hidden; transition:transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s; }
-    .b-card:hover{ transform:translateY(-1px); box-shadow:var(--shadow); }
-    .b-card-head{ display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, var(--paper), var(--paper-2)); position:relative; }
-    .b-card-head::after{ content:''; position:absolute; left:16px; right:16px; bottom:-1px; height:1px; background:linear-gradient(90deg, var(--orange), transparent 60%); opacity:.35; }
-    .b-card-icon{ width:32px; height:32px; border-radius:10px; display:grid; place-items:center; font-size:15px; background:var(--paper); border:1px solid var(--border); box-shadow:0 1px 0 rgba(255,255,255,.8) inset; }
+    .b-card{ background:rgba(255,255,255,.66); backdrop-filter:blur(14px) saturate(1.1); -webkit-backdrop-filter:blur(14px) saturate(1.1); border:1px solid rgba(255,255,255,.7); border-radius:var(--r); box-shadow:0 1px 2px rgba(15,23,42,.05), 0 14px 34px rgba(15,23,42,.07); overflow:hidden; transition:transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s; }
+    .b-card:hover{ transform:translateY(-2px); box-shadow:0 2px 4px rgba(15,23,42,.06), 0 22px 44px rgba(15,23,42,.10); border-color:rgba(255,255,255,.9); }
+    .b-card-head{ display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,.6); position:relative; }
+    .b-step-badge{ width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff; background:linear-gradient(135deg, var(--ink), var(--ink-3)); box-shadow:0 2px 8px rgba(15,23,42,.2); flex-shrink:0; }
+    .b-card-icon{ width:32px; height:32px; border-radius:10px; display:grid; place-items:center; font-size:15px; background:rgba(255,255,255,.8); border:1px solid var(--border); box-shadow:0 1px 0 rgba(255,255,255,.8) inset; }
     .b-card-title{ font-size:12.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
     .b-card-sub{ font-size:11.5px; color:var(--muted); margin-top:2px; font-weight:500; text-transform:none; letter-spacing:0; }
     .b-card-body{ padding:16px; }
@@ -329,9 +329,9 @@
     .qty-btn:hover{ border-color:var(--ink); background:var(--paper-3); } .qty-btn:active{ transform:scale(.96); }
     .qty-input{ width:80px !important; text-align:center; font-weight:800 !important; font-size:19px !important; font-variant-numeric:tabular-nums; border-radius:13px !important; }
 
-    .invoice{ border:1px solid var(--border); border-radius:16px; background:
+    .invoice{ border:1px solid rgba(255,255,255,.7); border-radius:16px; background:
         radial-gradient(200px 120px at 88% 0%, rgba(249,115,22,.10), transparent 70%),
-        linear-gradient(180deg, var(--paper), var(--paper-2)); overflow:hidden; }
+        linear-gradient(180deg, rgba(255,255,255,.8), rgba(248,250,252,.7)); overflow:hidden; }
     .invoice-head{ display:flex; align-items:center; justify-content:space-between; padding:13px 14px; border-bottom:1px dashed var(--border); }
     .invoice-head b{ font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
     .invoice-body{ padding:12px 14px 14px; }
@@ -544,12 +544,10 @@
         <div class="b-loc-icon">📍</div>
         <div class="b-loc-text">
           <b data-bm="Pejabat Am IMEN, Aras 4" data-bi="General Office IMEN, Level 4">Pejabat Am IMEN, Aras 4</b>
-          <span data-bm="Kompleks Penyelidikan UKM" data-bi="Research Complex UKM">Kompleks Penyelidikan UKM</span>
         </div>
         <div class="b-loc-pills">
           <span class="b-loc-pill">🕘 9AM–5PM</span>
           <span class="b-loc-pill" data-bm="📦 Ambil di Aras 4" data-bi="📦 Pickup at Level 4">📦 Ambil di Aras 4</span>
-          <span class="b-loc-pill">💬 WhatsApp admin</span>
         </div>
       </div>
     <form id="mainForm" onsubmit="submitForm(this); return false;" style="display:flex; flex-direction:column; gap:16px;">
@@ -557,7 +555,7 @@
       <!-- FORM CARDS -->
       <!-- 1. Maklumat Pemohon -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">👤</div><div><div class="b-card-title" data-bm="1. Maklumat Pemohon" data-bi="1. Applicant Info">1. Maklumat Pemohon</div>        <div class="b-card-sub" data-bm="💬 WA + ✉️ Emel — untuk notifikasi" data-bi="💬 WA + ✉️ Email — for notifications">💬 WA + ✉️ Emel — untuk notifikasi</div></div></div>
+        <div class="b-card-head"><div class="b-step-badge">1</div><div class="b-card-icon">👤</div><div><div class="b-card-title" data-bm="Maklumat Pemohon" data-bi="Applicant Info">Maklumat Pemohon</div></div></div>
         <div class="b-card-body">
           <div class="form-row">
             <div><label for="inpNama" data-bm="Nama *" data-bi="Name *">Nama *</label><input type="text" id="inpNama" name="nama" required autocomplete="name" placeholder="Nama" data-bm-ph="Nama" data-bi-ph="Full name" style="margin-top:2px"></div>
@@ -565,21 +563,21 @@
           </div>
           <div class="form-row">
             <div><label for="inpEmail" data-bm="Emel *" data-bi="Email *">Emel *</label><input type="email" id="inpEmail" name="email" required autocomplete="email" placeholder="emel@ukm.edu.my" data-bm-ph="emel@ukm.edu.my" data-bi-ph="email@ukm.edu.my"></div>
-            <div><label for="inpUk" data-bm="UKMPer / Matrik *" data-bi="UKMPer / Matrix *">UKMPer / Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
+            <div><label for="inpUk" data-bm="Matrik *" data-bi="Matrix *">Matrik *</label><input type="text" id="inpUk" name="ukmper" required autocomplete="off" placeholder="A123456"></div>
           </div>
           <div class="form-row" style="margin-bottom:0">
             <div><label for="inpPtj" data-bm="PTJ *" data-bi="Dept *">PTJ *</label><input type="text" id="inpPtj" name="ptj" required placeholder="IMEN"></div>
             <div><label for="inpTujuan" data-bm="Tajuk *" data-bi="Title *">Tajuk *</label><input type="text" id="inpTujuan" name="tujuan" required placeholder="Tajuk poster" data-bm-ph="Tajuk poster" data-bi-ph="Poster title"><div class="b-field-note" id="tujuanCount" style="text-align:right; margin-top:4px; font-size:10px; opacity:.7;">0</div></div>
           </div>
           <div class="form-row" style="margin-bottom:0; margin-top:14px;">
-            <div style="flex:1"><label for="inpPenyelia" data-bm="Nama Penyelia" data-bi="Supervisor Name">Nama Penyelia</label><input type="text" id="inpPenyelia" name="penyelia_nama" autocomplete="off" placeholder="Nama penyelia" data-bm-ph="Nama penyelia" data-bi-ph="Supervisor name"></div>
+            <div style="flex:1"><label for="inpPenyelia" data-bm="Penyelia" data-bi="Supervisor">Penyelia</label><input type="text" id="inpPenyelia" name="penyelia_nama" autocomplete="off" placeholder="Nama penyelia" data-bm-ph="Nama penyelia" data-bi-ph="Supervisor name"></div>
           </div>
         </div>
       </div>
 
       <!-- 2. Spesifikasi -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">🖨️</div><div><div class="b-card-title" data-bm="2. Spesifikasi" data-bi="2. Specifications">2. Spesifikasi</div><div class="b-card-sub">📐 A1/A0 • ✨ Glossy/Matte/Plain • 🔢 Qty</div></div></div>
+        <div class="b-card-head"><div class="b-step-badge">2</div><div class="b-card-icon">🖨️</div><div><div class="b-card-title" data-bm="Spesifikasi" data-bi="Specifications">Spesifikasi</div></div></div>
         <div class="b-card-body">
           
                     <div class="spec-hero" style="border-radius:14px; overflow:hidden; border:1px solid var(--border); background:#0b1220; position:relative; box-shadow:var(--shadow-sm);">
@@ -628,7 +626,7 @@
 
       <!-- 3. Harga & Bayaran -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="3. Harga &amp; Bayaran" data-bi="3. Price &amp; Payment">3. Harga &amp; Bayaran</div><div class="b-card-sub" data-bm="🎓 Geran • 📦 Aras 4" data-bi="🎓 Grant • 📦 Level 4">🎓 Geran • 📦 Aras 4</div></div></div>
+        <div class="b-card-head"><div class="b-step-badge">3</div><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="Harga &amp; Bayaran" data-bi="Price &amp; Payment">Harga &amp; Bayaran</div></div></div>
         <div class="b-card-body">
           <div class="invoice" id="invoiceBox">
             <div class="invoice-head"><b data-bm="🧾 Jumlah" data-bi="🧾 Total">🧾 Jumlah</b><span class="rm" id="priceDisplay" style="font-size:16px">RM 50.00</span></div>
@@ -643,13 +641,12 @@
             <div class="geran-wrap open" id="geranWrap"><input type="text" name="no_geran" id="inpGeran" placeholder="No. Geran" data-bm-ph="No. Geran" data-bi-ph="Grant No." required></div>
             <div class="geran-wrap" id="onlineWrap" style="display:none"><div class="b-field-note" id="onlineNote" style="background:var(--paper-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:4px;text-align:center;font-weight:600;font-size:12px;"></div></div>
           </div>
-          <div class="trust-row" style="margin-top:10px"><span class="trust">🔒</span><span class="trust">✅ 300dpi</span><span class="trust">💬 WA</span><span class="trust" data-bm="📦 2–3 hari" data-bi="📦 2–3 days">📦 2–3 hari</span></div>
         </div>
       </div>
 
       <!-- 4. Fail Poster -->
       <div class="b-card">
-        <div class="b-card-head"><div class="b-card-icon">📎</div><div><div class="b-card-title" data-bm="4. Fail Poster" data-bi="4. Poster File">4. Fail Poster</div><div class="b-card-sub">📄 PDF • 🖼️ JPG • 🖼️ PNG • ≤300MB</div></div></div>
+        <div class="b-card-head"><div class="b-step-badge">4</div><div class="b-card-icon">📎</div><div><div class="b-card-title" data-bm="Fail Poster" data-bi="Poster File">Fail Poster</div></div></div>
         <div class="b-card-body">
           <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Muat naik fail poster">
             <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" onchange="onFileChosen(this)">
