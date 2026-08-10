@@ -24,13 +24,21 @@
 
         .a4-page {
             width: 210mm;
-            min-height: 297mm;
+            height: 297mm;           /* fixed, not min-height, so it never spills to 2 pages */
             background-color: white;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             position: relative;
             display: flex;
             flex-direction: column;
+            overflow: hidden;         /* clip anything that tries to overflow */
+            font-size: 13px;
         }
+
+        /* Header & footer images pinned to top/bottom edges */
+        .sh-header { flex: 0 0 auto; line-height: 0; }
+        .sh-header img, .sh-footer img { display: block; width: 100%; height: auto; max-height: 42mm; object-fit: cover; object-position: top; }
+        .sh-footer { flex: 0 0 auto; margin-top: auto; line-height: 0; }
+        .sh-footer img { max-height: 34mm; object-position: bottom; }
 
         /* Print Specific Styles */
         @media print {
@@ -41,24 +49,22 @@
             .a4-page {
                 box-shadow: none;
                 width: 100%;
-                height: 100%;
-                min-height: auto;
-                page-break-after: always;
+                height: 297mm;
+                page-break-after: avoid;
             }
             /* Hide print button when printing */
             #print-btn, #pdf-btn {
                 display: none;
             }
         }
-        /* On screen: shrink content slightly so everything fits one A4 page */
-        .a4-page {
-            font-size: 13px;
-        }
 
         /* Content Area */
         .content {
-            padding: 20mm 15mm; /* Margins for content inside the A4 page */
-            flex-grow: 1;
+            padding: 8mm 15mm;   /* tighter so everything fits on one page */
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Table Styles */
@@ -85,14 +91,14 @@
 
     <div class="a4-page">
         <!-- Header Image -->
-        <div class="w-full">
+        <div class="w-full sh-header">
             <img src="assets/header.jpg" alt="" crossorigin="anonymous" class="w-full h-auto object-cover" onerror="this.src='https://placehold.co/800x200/ffffff/ffffff?text=+'">
         </div>
 
         <div class="content">
-            <h1 class="text-center font-bold text-lg mb-8 uppercase underline">SEBUT HARGA</h1>
+            <h1 class="text-center font-bold text-lg mb-5 uppercase underline">SEBUT HARGA</h1>
 
-            <div class="flex justify-between mb-8">
+            <div class="flex justify-between mb-5">
                 <!-- Left Side: Recipient Details -->
                 <div class="w-1/2 pr-4">
                     <table class="w-full text-sm">
@@ -137,7 +143,7 @@
             </div>
 
             <!-- Quotation Table -->
-            <table class="w-full quotation-table text-sm mb-8 border-collapse">
+            <table class="w-full quotation-table text-sm mb-5 border-collapse">
                 <thead>
                     <tr>
                         <th class="w-12 text-center">NO</th>
@@ -171,17 +177,17 @@
             </table>
 
             <!-- Terms and Conditions -->
-            <div class="text-sm mb-12">
+            <div class="text-sm mb-6">
                 <p class="font-bold mb-2 underline">Syarat-syarat :</p>
-                <ol class="list-decimal pl-5 space-y-2">
+                <ol class="list-decimal pl-5 space-y-1">
                     <li>Pembayaran boleh dibuat secara pesanan rasmi (PO/LO)/cek/tunai ke akaun Bendahari UKM <span class="font-bold">[CIMB : 8605955374]</span>. Sila nyatakan bayaran ke atas Akaun Aktiviti Penjanaan IMEN : <span class="font-bold">IMN1</span>.</li>
                     <li>Sila kemukakan bukti bayaran serta mendapatkan resit bagi pembayaran secara cek/tunai dan kemukakan kepada pegawai yang dihubungi.</li>
                 </ol>
             </div>
 
             <!-- Signature Area -->
-            <div class="text-sm mt-16">
-                <p class="mb-16">Yang Benar,</p>
+            <div class="text-sm mt-6">
+                <p class="mb-10">Yang Benar,</p>
                 <p class="font-bold uppercase">SITI AZURA BINTI ABD RAHIM</p>
                 <p>Penolong Pendaftar Kanan</p>
                 <p>Institut Kejuruteraan Mikro & Nanoelektronik (IMEN)</p>
@@ -189,7 +195,7 @@
         </div>
 
         <!-- Footer Image -->
-        <div class="w-full mt-auto">
+        <div class="w-full sh-footer">
             <img src="assets/footer.jpg" alt="" crossorigin="anonymous" class="w-full h-auto object-cover" onerror="this.src='https://placehold.co/800x200/ffffff/ffffff?text=+'">
         </div>
     </div>
