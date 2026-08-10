@@ -509,6 +509,26 @@
     .cfg-preview-row{ display:flex; justify-content:space-between; padding:5px 0; font-size:13px; border-bottom:1px solid var(--border-3); }
     .cfg-preview-row:last-child{ border:none; }
     .cfg-preview-row b{ font-family:var(--mono); }
+
+    /* ── History (Sejarah) record cards ─────────────────────── */
+    .hist-list{ display:flex; flex-direction:column; gap:12px; }
+    .hist-card{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px 16px; box-shadow:var(--shadow-sm); transition:box-shadow .18s var(--ease), transform .18s var(--ease); }
+    .hist-card:hover{ box-shadow:var(--shadow); transform:translateY(-1px); }
+    .hist-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .hist-id{ font-family:var(--mono); font-size:11px; color:var(--muted); font-weight:700; }
+    .hist-main{ display:flex; gap:16px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; }
+    .hist-who{ flex:1.4; min-width:180px; }
+    .hist-name{ font-family:var(--disp); font-size:15px; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
+    .hist-tajuk{ font-size:12.5px; color:var(--ink-3); margin-top:3px; line-height:1.45; word-break:break-word; }
+    .hist-contact{ margin-top:6px; }
+    .hist-meta{ flex:1; min-width:150px; display:flex; flex-direction:column; gap:3px; font-size:12.5px; color:var(--ink-3); }
+    .hist-meta b{ color:var(--ink); }
+    .hist-amt{ text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+    .hist-total{ font-family:var(--disp); font-size:20px; font-weight:800; color:var(--ink); letter-spacing:-.02em; }
+    .hist-unit{ font-size:11px; color:var(--muted); font-family:var(--mono); }
+    .hist-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; padding-top:11px; border-top:1px dashed var(--border); flex-wrap:wrap; }
+    .hist-pay{ font-size:12px; font-weight:700; color:var(--ink-3); }
+    .hist-acts{ display:flex; gap:6px; align-items:center; }
   </style>
 </head>
 <body>
@@ -771,7 +791,7 @@
               <span style="width:1px; height:16px; background:#fde68a; display:inline-block;"></span>
               <span style="display:flex; align-items:center; gap:5px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fef3c7; border-radius:7px;">↩️</span> <span data-bm="Kembali ke Siap" data-bi="Back to Ready">Kembali ke Siap</span></span>
             </div>
-            <div style="overflow-x:auto;"><table id="tblHist"></table></div>
+            <div id="tblHist"></div>
             <div id="histEmpty" data-bm="Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini." data-bi="No history records yet. Mark a poster as <b>Collected</b> to move it here." style="display:none; text-align:center; color:#94a3b8; padding:24px 12px; font-size:13px;">Tiada rekod sejarah lagi. Tandakan poster sebagai <b>Sudah Diambil</b> untuk mengalihkannya ke sini.</div>
           </div>
         </div>
@@ -1212,8 +1232,10 @@ function statusLabel(st){
   return m[st]||st;
 }
 function _renderAdminTable(tableId, rows){
+  var isHist=tableId==='tblHist';
+  if(isHist) return _renderHistCards(rows);
   if(!rows.length) return '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px;">'+T('Tiada rekod','No records')+'</td></tr>';
-  var isHist=tableId==='tblHist'; var pref=isHist?'h':''; var html='';
+  var pref=''; var html='';
   for(var k=0;k<rows.length;k++){
     var r=rows[k]; var i=r._idx; var id=r[0]; var st=r[11]; var cls=badgeCls(st);
     var unitP=parseFloat(r[8])||0; var qty=parseInt(r[16],10)||1; var tot=(unitP*qty).toFixed(2);
@@ -1237,6 +1259,38 @@ function _renderAdminTable(tableId, rows){
   }
   return html;
 }
+// Sejarah (history) rendered as structured record cards — cleaner for read-only
+// completed/rejected orders. Returns a full HTML block (not a <tr>).
+function _renderHistCards(rows){
+  if(!rows.length) return '';
+  var h='<div class="hist-list">';
+  for(var k=0;k<rows.length;k++){
+    var r=rows[k]; var i=r._idx; var id=r[0]; var st=r[11]; var cls=badgeCls(st);
+    var unitP=parseFloat(r[8])||0; var qty=parseInt(r[16],10)||1; var tot=(unitP*qty).toFixed(2);
+    var eid=String(id).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var namaEsc=esc(r[2]); var tajuk=esc(r[15]||''); var penyelia=esc(r[17]||'-');
+    var tarikh=esc(r[1]||'');
+    var method=String(r[9]||''); var noGeran=r[14];
+    var payLabel = method.toLowerCase()==='cash' ? T('💵 Cash','💵 Cash') : (method==='Online' ? T('💳 Dalam Talian','💳 Online') : T('🎓 Geran','🎓 Grant'));
+    if(method!=='cash' && method!=='Online' && noGeran && noGeran!=='-' && noGeran!=='') payLabel+=' <span style="color:var(--muted);font-weight:600;">('+esc(noGeran)+')</span>';
+    var contact=_contactCell(r[4], r[13], namaEsc, i);
+    h+='<div class="hist-card">';
+    h+='<div class="hist-top"><span class="hist-id">'+esc(id)+'</span><span class="badge '+cls+'">'+esc(statusLabel(st))+'</span></div>';
+    h+='<div class="hist-main">';
+    h+='<div class="hist-who"><div class="hist-name">'+namaEsc+'</div>'+(tajuk?'<div class="hist-tajuk">'+tajuk+'</div>':'')+'<div class="hist-contact">'+contact+'</div></div>';
+    h+='<div class="hist-meta"><div><b>'+esc(r[6])+'</b> · '+esc(r[7])+' × '+esc(r[16])+'</div><div>'+T('Penyelia','Supervisor')+': <b>'+penyelia+'</b></div><div style="color:var(--muted);font-size:11.5px;">'+tarikh+'</div></div>';
+    h+='<div class="hist-amt"><div class="hist-total">RM '+tot+'</div><div class="hist-unit">@RM'+unitP.toFixed(2)+' × '+qty+'</div></div>';
+    h+='</div>';
+    h+='<div class="hist-foot"><span class="hist-pay">'+payLabel+'</span>';
+    h+='<span class="hist-acts"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Kembalikan ke Siap (Aktif)','Restore to Ready (Active)')+'">↩️</button>';
+    h+='<button class="act-btn" style="background:#fef3c7;border-color:#fde68a;" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾</button>';
+    h+='<a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a>';
+    h+='<button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam Kekal','Delete Permanently')+'">✕</button></span>';
+    h+='</div></div>';
+  }
+  h+='</div>';
+  return h;
+}
 function loadAdmin(){
   ld(true); _adminPass=document.getElementById('pass').value;
   google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(d){
@@ -1257,7 +1311,7 @@ function renderAdminFromCache(){
     if(st==='Dalam Proses'){ cPr++; active.push(row); } else if(st==='Dah Boleh Collect'){ cS++; active.push(row); } else if(st==='Sudah Diambil'){ cCd++; hist.push(row); } else if(st==='Ditolak'){ hist.push(row); } else { cP++; active.push(row); } }
   var hdr='<tr><th>#</th><th>'+T('Pemohon','Applicant')+'</th><th>'+T('Penyelia','Supervisor')+'</th><th>'+T('Saiz/Media','Size/Media')+'</th><th>'+T('Harga','Price')+'</th><th>Status</th><th>'+T('Bayaran','Payment')+'</th><th>'+T('Tindakan','Action')+'</th></tr>';
   document.getElementById('tbl').innerHTML=hdr+_renderAdminTable('tbl', active);
-  document.getElementById('tblHist').innerHTML=hdr+_renderAdminTable('tblHist', hist);
+  document.getElementById('tblHist').innerHTML=_renderAdminTable('tblHist', hist);
   document.getElementById('cTot').innerText=cT; document.getElementById('cP').innerText=cP; document.getElementById('cPr').innerText=cPr; document.getElementById('cS').innerText=cS; document.getElementById('cCd').innerText=cCd;
   document.getElementById('cActive').innerText=active.length; document.getElementById('cHist').innerText=hist.length;
   var dnB=document.getElementById('dnBadge'); if(dnB) dnB.innerText=cT;
@@ -1295,7 +1349,14 @@ function toggleTajuk(rowKey){
 }
 function filterTable(tblId, searchId){
   var tid=tblId||'tbl'; var sid=searchId||'sAdm'; var sEl=document.getElementById(sid); if(!sEl) return;
-  var v=sEl.value.toUpperCase(); var tr=document.getElementById(tid).getElementsByTagName('tr');
+  var v=sEl.value.toUpperCase(); var container=document.getElementById(tid); if(!container) return;
+  // History pane uses record cards, not table rows — match full card text.
+  if(tid==='tblHist'){
+    var cards=container.getElementsByClassName('hist-card');
+    for(var c=0;c<cards.length;c++){ var txt=(cards[c].innerText||'').toUpperCase(); cards[c].style.display=txt.indexOf(v)>-1?'':'none'; }
+    return;
+  }
+  var tr=container.getElementsByTagName('tr');
   for(var i=1;i<tr.length;i++){ var td=tr[i].getElementsByTagName('td')[1]; if(td) tr[i].style.display=td.innerText.toUpperCase().indexOf(v)>-1?'':'none'; }
 }
 
