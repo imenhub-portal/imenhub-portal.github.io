@@ -99,10 +99,10 @@
     /* Form primitives */
     .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
     @media (max-width:600px){ .form-row{ grid-template-columns:1fr; } }
-    label{ font-family:var(--disp); font-weight:700; font-size:13px; margin-bottom:6px; display:block; color:var(--ink-3); letter-spacing:.01em; }
+    label{ font-family:var(--disp); font-weight:700; font-size:15px; margin-bottom:6px; display:block; color:var(--ink-3); letter-spacing:.01em; }
     input, select, textarea{
-      width:100%; padding:13px 14px; border:1.5px solid var(--border); border-radius:13px;
-      font-family:inherit; font-size:15.5px; transition:border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+      width:100%; padding:14px 15px; border:1.5px solid var(--border); border-radius:13px;
+      font-family:inherit; font-size:17px; transition:border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
       outline:none; background:rgba(255,255,255,.72); color:var(--ink-2);
     }
     input::placeholder, textarea::placeholder{ color:var(--muted-2); font-size:14px; }
@@ -111,7 +111,7 @@
     .btn{ padding:8px 12px; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:11px; margin-right:5px; transition:all .18s var(--ease); font-family:inherit; }
     .btn:hover{ transform:translateY(-1px);} .btn:active{ transform:translateY(0) scale(.98); }
     .btn-blue{ background:#eff6ff; color:#1d4ed8;} .btn-green{ background:#f0fdf4; color:#15803d;} .btn-red{ background:#fef2f2; color:#b91c1c;}
-    .btn-main{ background:var(--ink); color:#fff; width:100%; padding:15px 18px; margin-top:18px; border-radius:14px; font-family:var(--disp); font-size:16px; font-weight:800; letter-spacing:.01em; box-shadow:var(--shadow-ink); }
+    .btn-main{ background:var(--ink); color:#fff; width:100%; padding:16px 18px; margin-top:18px; border-radius:14px; font-family:var(--disp); font-size:18px; font-weight:800; letter-spacing:.01em; box-shadow:var(--shadow-ink); }
     .btn-main:hover{ background:#162032; } .btn-main:disabled{ opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
 
     .badge{ padding:5px 10px; border-radius:8px; font-weight:800; font-size:10px; text-transform:uppercase; display:inline-block; letter-spacing:.03em; }
@@ -226,14 +226,27 @@
 
     /* Cards */
     .b-flow{ display:flex; flex-direction:column; gap:16px; }
-    .b-card{ background:rgba(255,255,255,.66); backdrop-filter:blur(14px) saturate(1.1); -webkit-backdrop-filter:blur(14px) saturate(1.1); border:1px solid rgba(255,255,255,.7); border-radius:var(--r); box-shadow:0 1px 2px rgba(15,23,42,.05), 0 14px 34px rgba(15,23,42,.07); overflow:hidden; transition:transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s; }
+    .b-card{ background:rgba(255,255,255,.66); backdrop-filter:blur(14px) saturate(1.1); -webkit-backdrop-filter:blur(14px) saturate(1.1); border:1px solid rgba(255,255,255,.7); border-radius:var(--r); box-shadow:0 1px 2px rgba(15,23,42,.05), 0 14px 34px rgba(15,23,42,.07); overflow:hidden; transition:transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s; border-top:5px solid transparent; }
     .b-card:hover{ transform:translateY(-2px); box-shadow:0 2px 4px rgba(15,23,42,.06), 0 22px 44px rgba(15,23,42,.10); border-color:rgba(255,255,255,.9); }
     .b-card-head{ display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,.6); position:relative; }
-    .b-step-badge{ width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-family:var(--disp); font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg, var(--ink), var(--ink-3)); box-shadow:0 2px 8px rgba(15,23,42,.2); flex-shrink:0; }
-    .b-card-icon{ width:32px; height:32px; border-radius:10px; display:grid; place-items:center; font-size:15px; background:rgba(255,255,255,.8); border:1px solid var(--border); box-shadow:0 1px 0 rgba(255,255,255,.8) inset; }
-    .b-card-title{ font-family:var(--disp); font-size:15px; font-weight:800; letter-spacing:.01em; text-transform:none; color:var(--ink); }
+    .b-step-badge{ width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-family:var(--disp); font-size:15px; font-weight:800; color:#fff; background:linear-gradient(135deg, var(--ink), var(--ink-3)); box-shadow:0 2px 8px rgba(15,23,42,.2); flex-shrink:0; }
+    .b-card-icon{ width:38px; height:38px; border-radius:12px; display:grid; place-items:center; font-size:19px; background:rgba(255,255,255,.85); border:1px solid var(--border); box-shadow:0 1px 0 rgba(255,255,255,.8) inset; }
+    .b-card-title{ font-family:var(--disp); font-size:18px; font-weight:800; letter-spacing:.01em; text-transform:none; color:var(--ink); }
     .b-card-sub{ font-size:11.5px; color:var(--muted); margin-top:2px; font-weight:500; text-transform:none; letter-spacing:0; }
     .b-card-body{ padding:16px; }
+    /* Per-card accent colours to distinguish sections */
+    .b-card.c-blue{ border-top-color:var(--accent); }
+    .b-card.c-blue .b-step-badge{ background:linear-gradient(135deg, var(--accent), var(--accent-2)); }
+    .b-card.c-blue .b-card-icon{ color:var(--accent); border-color:#bfdbfe; background:var(--accent-soft); }
+    .b-card.c-orange{ border-top-color:var(--orange); }
+    .b-card.c-orange .b-step-badge{ background:linear-gradient(135deg, var(--orange), var(--orange-2)); }
+    .b-card.c-orange .b-card-icon{ color:#ea580c; border-color:#fed7aa; background:var(--orange-soft); }
+    .b-card.c-green{ border-top-color:var(--ok); }
+    .b-card.c-green .b-step-badge{ background:linear-gradient(135deg, var(--ok), #22c55e); }
+    .b-card.c-green .b-card-icon{ color:var(--ok); border-color:#bbf7d0; background:var(--ok-soft); }
+    .b-card.c-purple{ border-top-color:#8b5cf6; }
+    .b-card.c-purple .b-step-badge{ background:linear-gradient(135deg, #8b5cf6, #a78bfa); }
+    .b-card.c-purple .b-card-icon{ color:#7c3aed; border-color:#ddd6fe; background:#f5f3ff; }
     /* Two-column pair for Harga & Fail */
     .b-duo{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch; }
     @media (max-width:760px){ .b-duo{ grid-template-columns:1fr; } }
@@ -557,7 +570,7 @@
 
       <!-- FORM CARDS -->
       <!-- 1. Maklumat Pemohon -->
-      <div class="b-card">
+      <div class="b-card c-blue">
         <div class="b-card-head"><div class="b-step-badge">1</div><div class="b-card-icon">👤</div><div><div class="b-card-title" data-bm="Maklumat Pemohon" data-bi="Applicant Info">Maklumat Pemohon</div></div></div>
         <div class="b-card-body">
           <div class="form-row">
@@ -579,7 +592,7 @@
       </div>
 
       <!-- 2. Spesifikasi -->
-      <div class="b-card">
+      <div class="b-card c-orange">
         <div class="b-card-head"><div class="b-step-badge">2</div><div class="b-card-icon">🖨️</div><div><div class="b-card-title" data-bm="Spesifikasi" data-bi="Specifications">Spesifikasi</div></div></div>
         <div class="b-card-body">
           
@@ -629,7 +642,7 @@
 
       <!-- 3. Harga & Bayaran -->
       <div class="b-duo">
-      <div class="b-card">
+      <div class="b-card c-green">
         <div class="b-card-head"><div class="b-step-badge">3</div><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="Harga &amp; Bayaran" data-bi="Price &amp; Payment">Harga &amp; Bayaran</div></div></div>
         <div class="b-card-body">
           <div class="invoice" id="invoiceBox">
@@ -649,7 +662,7 @@
       </div>
 
       <!-- 4. Fail Poster -->
-      <div class="b-card">
+      <div class="b-card c-purple">
         <div class="b-card-head"><div class="b-step-badge">4</div><div class="b-card-icon">📎</div><div><div class="b-card-title" data-bm="Fail Poster" data-bi="Poster File">Fail Poster</div></div></div>
         <div class="b-card-body">
           <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Muat naik fail poster">
