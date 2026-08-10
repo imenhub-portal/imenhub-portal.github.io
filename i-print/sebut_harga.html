@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sebut Harga - IMEN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2pdf: auto-download as A4 PDF. If CDN blocked, we fall back to window.print(). -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* A4 Size Setup */
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        body {
+            background-color: #f3f4f6; /* Light gray background for screen viewing */
+            display: flex;
+            justify-content: center;
+            padding: 2rem;
+            font-family: Arial, sans-serif;
+            color: #000;
+        }
+
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            background-color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Print Specific Styles */
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            .a4-page {
+                box-shadow: none;
+                width: 100%;
+                height: 100%;
+                min-height: auto;
+                page-break-after: always;
+            }
+            /* Hide print button when printing */
+            #print-btn, #pdf-btn {
+                display: none;
+            }
+        }
+        /* On screen: shrink content slightly so everything fits one A4 page */
+        .a4-page {
+            font-size: 13px;
+        }
+
+        /* Content Area */
+        .content {
+            padding: 20mm 15mm; /* Margins for content inside the A4 page */
+            flex-grow: 1;
+        }
+
+        /* Table Styles */
+        .quotation-table th, .quotation-table td {
+            border: 1px solid #000;
+            padding: 8px;
+        }
+        .quotation-table th {
+            background-color: #f9fafb;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Action buttons -->
+    <div class="fixed top-4 right-4 z-50 flex gap-2">
+        <button id="pdf-btn" onclick="downloadPDF()" class="bg-emerald-600 text-white px-4 py-2 rounded shadow hover:bg-emerald-700">
+            ⬇ Muat Turun PDF
+        </button>
+        <button id="print-btn" onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700">
+            Print / Save to PDF
+        </button>
+    </div>
+
+    <div class="a4-page">
+        <!-- Header Image -->
+        <div class="w-full">
+            <img src="assets/header.jpg" alt="" crossorigin="anonymous" class="w-full h-auto object-cover" onerror="this.src='https://placehold.co/800x200/ffffff/ffffff?text=+'">
+        </div>
+
+        <div class="content">
+            <h1 class="text-center font-bold text-lg mb-8 uppercase underline">SEBUT HARGA</h1>
+
+            <div class="flex justify-between mb-8">
+                <!-- Left Side: Recipient Details -->
+                <div class="w-1/2 pr-4">
+                    <table class="w-full text-sm">
+                        <tr>
+                            <td class="w-20 font-bold align-top pb-1">Kepada</td>
+                            <td class="w-4 align-top pb-1">:</td>
+                            <td class="align-top pb-1" id="f-nama">[NAMA]</td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold align-top pb-1">Alamat</td>
+                            <td class="align-top pb-1">:</td>
+                            <td class="align-top pb-1" id="f-ptj">[PTJ]</td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold align-top pb-1">No. Tel</td>
+                            <td class="align-top pb-1">:</td>
+                            <td class="align-top pb-1" id="f-tel">[TELEFON]</td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold align-top pb-1">Email</td>
+                            <td class="align-top pb-1">:</td>
+                            <td class="align-top pb-1" id="f-emel">[EMEL]</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Right Side: Document Details -->
+                <div class="w-1/2 pl-4">
+                    <table class="w-full text-sm">
+                        <tr>
+                            <td class="w-20 font-bold align-top pb-1">Tarikh</td>
+                            <td class="w-4 align-top pb-1">:</td>
+                            <td class="align-top pb-1" id="f-tarikh">[TARIKH PERMOHONAN]</td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold align-top pb-1">Rujukan</td>
+                            <td class="align-top pb-1">:</td>
+                            <td class="align-top pb-1">UKM.IMN.400-3/4/1</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quotation Table -->
+            <table class="w-full quotation-table text-sm mb-8 border-collapse">
+                <thead>
+                    <tr>
+                        <th class="w-12 text-center">NO</th>
+                        <th class="text-left">DESCRIPTION</th>
+                        <th class="w-24 text-center">QUANTITY (UNIT)</th>
+                        <th class="w-32 text-center">PRICE/UNIT (RM)</th>
+                        <th class="w-32 text-center">TOTAL (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Item Row -->
+                    <tr>
+                        <td class="text-center align-top">1</td>
+                        <td class="align-top">
+                            <p class="font-semibold mb-1">Cetak Poster</p>
+                            <p id="f-media">[High Gloss / Plain]</p>
+                            <p>Poster: <span id="f-tajuk">[TAJUK]</span></p>
+                            <p id="f-penyelia">[NAMA PENYELIA]</p>
+                            <p>Saiz : <span id="f-saiz">[A1 / A0]</span></p>
+                        </td>
+                        <td class="text-center align-top" id="f-qty">1</td>
+                        <td class="text-right align-top" id="f-price">[PRICE]</td>
+                        <td class="text-right align-top" id="f-linetotal">[TOTAL PRICE]</td>
+                    </tr>
+                    <!-- Total Row -->
+                    <tr>
+                        <td colspan="4" class="text-right font-bold pr-4">Total</td>
+                        <td class="text-right font-bold" id="f-total">[TOTAL PRICE]</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Terms and Conditions -->
+            <div class="text-sm mb-12">
+                <p class="font-bold mb-2 underline">Syarat-syarat :</p>
+                <ol class="list-decimal pl-5 space-y-2">
+                    <li>Pembayaran boleh dibuat secara pesanan rasmi (PO/LO)/cek/tunai ke akaun Bendahari UKM <span class="font-bold">[CIMB : 8605955374]</span>. Sila nyatakan bayaran ke atas Akaun Aktiviti Penjanaan IMEN : <span class="font-bold">IMN1</span>.</li>
+                    <li>Sila kemukakan bukti bayaran serta mendapatkan resit bagi pembayaran secara cek/tunai dan kemukakan kepada pegawai yang dihubungi.</li>
+                </ol>
+            </div>
+
+            <!-- Signature Area -->
+            <div class="text-sm mt-16">
+                <p class="mb-16">Yang Benar,</p>
+                <p class="font-bold uppercase">SITI AZURA BINTI ABD RAHIM</p>
+                <p>Penolong Pendaftar Kanan</p>
+                <p>Institut Kejuruteraan Mikro & Nanoelektronik (IMEN)</p>
+            </div>
+        </div>
+
+        <!-- Footer Image -->
+        <div class="w-full mt-auto">
+            <img src="assets/footer.jpg" alt="" crossorigin="anonymous" class="w-full h-auto object-cover" onerror="this.src='https://placehold.co/800x200/ffffff/ffffff?text=+'">
+        </div>
+    </div>
+
+    <script>
+    // Fill the [PLACEHOLDER] cells from the order data that index.html stashes in
+    // localStorage right before opening this page (same-origin, so no PII in the URL).
+    // If no data is present (page opened directly), the bracket placeholders stay as-is.
+    (function () {
+        var raw;
+        try { raw = localStorage.getItem('imen_sh_data'); } catch (e) {}
+        if (!raw) return;
+        var d;
+        try { d = JSON.parse(raw); } catch (e) { return; }
+        function set(id, val) {
+            var el = document.getElementById(id);
+            if (el && val != null && String(val).length) el.textContent = val;
+        }
+        set('f-nama', d.nama);
+        set('f-ptj', d.ptj);
+        set('f-tel', d.tel);
+        set('f-emel', d.emel);
+        set('f-tarikh', d.tarikh);
+        set('f-media', d.media);
+        set('f-tajuk', d.tajuk);
+        set('f-penyelia', d.penyelia);
+        set('f-saiz', d.saiz);
+        set('f-qty', d.qty);
+        set('f-price', d.price);
+        set('f-linetotal', d.total);
+        set('f-total', d.total);
+        // Reflect the applicant name in the tab/file name suggested by Save-to-PDF.
+        if (d.nama) document.title = 'SebutHarga - ' + d.nama;
+    }());
+
+    // Auto-download as a single A4 PDF via html2pdf; falls back to the browser
+    // print dialog (which is also A4, one page, via @page/@media print) if the
+    // library or a resource fails to load.
+    function downloadPDF() {
+        var el = document.querySelector('.a4-page');
+        if (!el) { window.print(); return; }
+        if (typeof html2pdf === 'undefined') { window.print(); return; }
+        var name = (document.title && document.title.indexOf('SebutHarga') === 0) ? document.title : 'SebutHarga';
+        var opt = {
+            margin: 0,
+            filename: name + '.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all'] }
+        };
+        try {
+            html2pdf().set(opt).from(el).save().catch(function(){ window.print(); });
+        } catch (e) {
+            window.print();
+        }
+    }
+    </script>
+
+</body>
+</html>
