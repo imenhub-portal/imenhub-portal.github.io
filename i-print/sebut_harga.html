@@ -75,6 +75,49 @@
         .quotation-table th {
             background-color: #f9fafb;
         }
+
+        /* ── Redesigned list / structure ───────────────────── */
+        .sh-title{
+            text-align:center; font-weight:800; letter-spacing:3px;
+            font-size:20px; color:#0f172a; margin:0 0 18px;
+            padding:10px 0; border-top:3px solid #0f172a; border-bottom:3px solid #0f172a;
+        }
+        .info-grid{ display:flex; gap:16px; margin-bottom:18px; }
+        .info-card{
+            flex:1; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden;
+            background:#fff;
+        }
+        .info-card .ic-head{
+            background:#0f172a; color:#fff; font-size:11px; font-weight:700;
+            letter-spacing:1.5px; text-transform:uppercase; padding:7px 14px;
+        }
+        .info-card .ic-body{ padding:12px 14px; }
+        .info-row{ display:flex; padding:4px 0; font-size:13px; }
+        .info-row .k{ width:78px; flex-shrink:0; font-weight:700; color:#334155; }
+        .info-row .c{ width:14px; flex-shrink:0; color:#94a3b8; }
+        .info-row .v{ flex:1; color:#0f172a; }
+        /* Quotation table polish */
+        .quotation-table{ border:1px solid #0f172a; }
+        .quotation-table thead th{
+            background:#0f172a; color:#fff; border:1px solid #0f172a;
+            font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:10px 8px;
+        }
+        .quotation-table td{ border-color:#cbd5e1; padding:10px 8px; }
+        .quotation-table .total-row td{
+            background:#f1f5f9; border-top:2px solid #0f172a; font-size:14px;
+        }
+        /* Terms box */
+        .terms{
+            border:1px solid #cbd5e1; border-left:4px solid #0f172a;
+            border-radius:8px; background:#f8fafc; padding:12px 16px; margin-bottom:8px;
+        }
+        .terms .t-head{ font-weight:800; font-size:13px; color:#0f172a; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+        .terms ol{ margin:0; padding-left:18px; }
+        .terms li{ font-size:12.5px; line-height:1.55; padding:2px 0; color:#1e293b; }
+        /* Signature */
+        .sig{ margin-top:8px; font-size:13px; }
+        .sig .name{ font-weight:800; text-transform:uppercase; }
+        .sig .role{ color:#334155; }
     </style>
 </head>
 <body>
@@ -96,49 +139,26 @@
         </div>
 
         <div class="content">
-            <h1 class="text-center font-bold text-lg mb-5 uppercase underline">SEBUT HARGA</h1>
+            <h1 class="sh-title">SEBUT HARGA</h1>
 
-            <div class="flex justify-between mb-5">
-                <!-- Left Side: Recipient Details -->
-                <div class="w-1/2 pr-4">
-                    <table class="w-full text-sm">
-                        <tr>
-                            <td class="w-20 font-bold align-top pb-1">Kepada</td>
-                            <td class="w-4 align-top pb-1">:</td>
-                            <td class="align-top pb-1" id="f-nama">[NAMA]</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold align-top pb-1">Alamat</td>
-                            <td class="align-top pb-1">:</td>
-                            <td class="align-top pb-1" id="f-ptj">[PTJ]</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold align-top pb-1">No. Tel</td>
-                            <td class="align-top pb-1">:</td>
-                            <td class="align-top pb-1" id="f-tel">[TELEFON]</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold align-top pb-1">Email</td>
-                            <td class="align-top pb-1">:</td>
-                            <td class="align-top pb-1" id="f-emel">[EMEL]</td>
-                        </tr>
-                    </table>
+            <div class="info-grid">
+                <!-- Recipient -->
+                <div class="info-card">
+                    <div class="ic-head">Kepada</div>
+                    <div class="ic-body">
+                        <div class="info-row"><span class="k">Nama</span><span class="c">:</span><span class="v" id="f-nama">[NAMA]</span></div>
+                        <div class="info-row"><span class="k">Alamat</span><span class="c">:</span><span class="v" id="f-ptj">[PTJ]</span></div>
+                        <div class="info-row"><span class="k">No. Tel</span><span class="c">:</span><span class="v" id="f-tel">[TELEFON]</span></div>
+                        <div class="info-row"><span class="k">Email</span><span class="c">:</span><span class="v" id="f-emel">[EMEL]</span></div>
+                    </div>
                 </div>
-
-                <!-- Right Side: Document Details -->
-                <div class="w-1/2 pl-4">
-                    <table class="w-full text-sm">
-                        <tr>
-                            <td class="w-20 font-bold align-top pb-1">Tarikh</td>
-                            <td class="w-4 align-top pb-1">:</td>
-                            <td class="align-top pb-1" id="f-tarikh">[TARIKH PERMOHONAN]</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold align-top pb-1">Rujukan</td>
-                            <td class="align-top pb-1">:</td>
-                            <td class="align-top pb-1">UKM.IMN.400-3/4/1</td>
-                        </tr>
-                    </table>
+                <!-- Document -->
+                <div class="info-card">
+                    <div class="ic-head">Dokumen</div>
+                    <div class="ic-body">
+                        <div class="info-row"><span class="k">Tarikh</span><span class="c">:</span><span class="v" id="f-tarikh">[TARIKH]</span></div>
+                        <div class="info-row"><span class="k">Rujukan</span><span class="c">:</span><span class="v">UKM.IMN.400-3/4/1</span></div>
+                    </div>
                 </div>
             </div>
 
@@ -146,11 +166,11 @@
             <table class="w-full quotation-table text-sm mb-5 border-collapse">
                 <thead>
                     <tr>
-                        <th class="w-12 text-center">NO</th>
-                        <th class="text-left">DESCRIPTION</th>
-                        <th class="w-24 text-center">QUANTITY (UNIT)</th>
-                        <th class="w-32 text-center">PRICE/UNIT (RM)</th>
-                        <th class="w-32 text-center">TOTAL (RM)</th>
+                        <th class="w-12 text-center">No</th>
+                        <th class="text-left">Perkara</th>
+                        <th class="w-24 text-center">Kuantiti (Unit)</th>
+                        <th class="w-32 text-center">Harga/Unit (RM)</th>
+                        <th class="w-32 text-center">Jumlah (RM)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -169,28 +189,28 @@
                         <td class="text-right align-top" id="f-linetotal">[TOTAL PRICE]</td>
                     </tr>
                     <!-- Total Row -->
-                    <tr>
-                        <td colspan="4" class="text-right font-bold pr-4">Total</td>
+                    <tr class="total-row">
+                        <td colspan="4" class="text-right font-bold pr-4">JUMLAH KESELURUHAN</td>
                         <td class="text-right font-bold" id="f-total">[TOTAL PRICE]</td>
                     </tr>
                 </tbody>
             </table>
 
             <!-- Terms and Conditions -->
-            <div class="text-sm mb-6">
-                <p class="font-bold mb-2 underline">Syarat-syarat :</p>
-                <ol class="list-decimal pl-5 space-y-1">
+            <div class="terms">
+                <div class="t-head">Syarat-syarat</div>
+                <ol class="list-decimal">
                     <li>Pembayaran boleh dibuat secara pesanan rasmi (PO/LO)/cek/tunai ke akaun Bendahari UKM <span class="font-bold">[CIMB : 8605955374]</span>. Sila nyatakan bayaran ke atas Akaun Aktiviti Penjanaan IMEN : <span class="font-bold">IMN1</span>.</li>
                     <li>Sila kemukakan bukti bayaran serta mendapatkan resit bagi pembayaran secara cek/tunai dan kemukakan kepada pegawai yang dihubungi.</li>
                 </ol>
             </div>
 
             <!-- Signature Area -->
-            <div class="text-sm mt-6">
-                <p class="mb-10">Yang Benar,</p>
-                <p class="font-bold uppercase">SITI AZURA BINTI ABD RAHIM</p>
-                <p>Penolong Pendaftar Kanan</p>
-                <p>Institut Kejuruteraan Mikro & Nanoelektronik (IMEN)</p>
+            <div class="sig">
+                <p style="margin-bottom:40px;">Yang Benar,</p>
+                <p class="name">SITI AZURA BINTI ABD RAHIM</p>
+                <p class="role">Penolong Pendaftar Kanan</p>
+                <p class="role">Institut Kejuruteraan Mikro &amp; Nanoelektronik (IMEN)</p>
             </div>
         </div>
 
