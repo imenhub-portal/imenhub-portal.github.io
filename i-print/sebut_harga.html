@@ -35,11 +35,10 @@
             font-size: 13px;
         }
 
-        /* Header & footer images pinned to top/bottom edges */
+        /* Header & footer images pinned to top/bottom edges, natural aspect kept */
         .sh-header { flex: 0 0 auto; line-height: 0; }
-        .sh-header img, .sh-footer img { display: block; width: 100%; height: auto; max-height: 42mm; object-fit: cover; object-position: top; }
+        .sh-header img, .sh-footer img { display: block; width: 100%; height: auto; }
         .sh-footer { flex: 0 0 auto; margin-top: auto; line-height: 0; }
-        .sh-footer img { max-height: 34mm; object-position: bottom; }
 
         /* Print Specific Styles */
         @media print {
