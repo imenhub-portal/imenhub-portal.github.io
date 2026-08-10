@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sebut Harga - IMEN</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- html2pdf: auto-download as A4 PDF. If CDN blocked, we fall back to window.print(). -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- html2canvas + jsPDF: capture page as one image → single-page A4 PDF. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         /* A4 Size Setup */
         @page {
@@ -231,27 +232,29 @@
         if (d.nama) document.title = 'SebutHarga - ' + d.nama;
     }());
 
-    // Auto-download as a single A4 PDF via html2pdf; falls back to the browser
-    // print dialog (which is also A4, one page, via @page/@media print) if the
-    // library or a resource fails to load.
+    // Auto-download as a single A4 PDF. Strategy: rasterise the whole .a4-page
+    // into ONE image and place it on ONE A4 page — this can never split into
+    // multiple pages (the earlier html2pdf pagination bug that produced 3
+    // pages). Falls back to the browser print dialog if anything fails.
     function downloadPDF() {
         var el = document.querySelector('.a4-page');
         if (!el) { window.print(); return; }
-        if (typeof html2pdf === 'undefined') { window.print(); return; }
-        var name = (document.title && document.title.indexOf('SebutHarga') === 0) ? document.title : 'SebutHarga';
-        var opt = {
-            margin: 0,
-            filename: name + '.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all'] }
-        };
-        try {
-            html2pdf().set(opt).from(el).save().catch(function(){ window.print(); });
-        } catch (e) {
-            window.print();
+        if (typeof html2canvas === 'undefined' || typeof (window.jspdf && window.jspdf.jsPDF) === 'undefined') {
+            window.print(); return;
         }
+        var name = (document.title && document.title.indexOf('SebutHarga') === 0) ? document.title : 'SebutHarga';
+        try {
+            html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(function (canvas) {
+                try {
+                    var jsPDF = window.jspdf.jsPDF;
+                    var pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+                    var img = canvas.toDataURL('image/jpeg', 0.98);
+                    // Fit the whole capture onto a single A4 page (210 x 297 mm).
+                    pdf.addImage(img, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+                    pdf.save(name + '.pdf');
+                } catch (e) { window.print(); }
+            }).catch(function () { window.print(); });
+        } catch (e) { window.print(); }
     }
     </script>
 
