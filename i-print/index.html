@@ -234,6 +234,9 @@
     .b-card-title{ font-size:12.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
     .b-card-sub{ font-size:11.5px; color:var(--muted); margin-top:2px; font-weight:500; text-transform:none; letter-spacing:0; }
     .b-card-body{ padding:16px; }
+    /* Two-column pair for Harga & Fail */
+    .b-duo{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch; }
+    @media (max-width:760px){ .b-duo{ grid-template-columns:1fr; } }
 
     .b-label-row{ display:flex; align-items:center; gap:8px; }
     .b-hint{ font-size:11px; color:var(--muted); font-weight:600; }
@@ -625,6 +628,7 @@
       </div>
 
       <!-- 3. Harga & Bayaran -->
+      <div class="b-duo">
       <div class="b-card">
         <div class="b-card-head"><div class="b-step-badge">3</div><div class="b-card-icon">💰</div><div><div class="b-card-title" data-bm="Harga &amp; Bayaran" data-bi="Price &amp; Payment">Harga &amp; Bayaran</div></div></div>
         <div class="b-card-body">
@@ -657,9 +661,10 @@
           </div>
           <div class="progress-wrap" id="progressWrap"><div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div><div class="progress-info"><span id="progChunk">0 MB</span><span id="progPct">0%</span><span id="progSize">0 MB</span></div><div class="progress-status" id="progStatus"></div></div>
           <div class="b-field-note" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:10.5px;"><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#f0fdf4;border:1px solid #bbf7d0;display:grid;place-items:center;font-size:10px">✓</span>300dpi</span><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#eff6ff;border:1px solid #bfdbfe;display:grid;place-items:center;font-size:10px">↔</span>3mm bleed</span><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#fff7ed;border:1px solid #fed7aa;display:grid;place-items:center;font-size:10px">🔤</span>Embed font</span><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:18px;height:18px;border-radius:5px;background:#f5f3ff;border:1px solid #ddd6fe;display:grid;place-items:center;font-size:10px">◧</span>A0/A1 1:1</span></div>
-          <button class="btn btn-main cta-main" id="submitBtn" type="submit">🚀 HANTAR — <span id="ctaPrice">RM 50.00</span></button>
         </div>
       </div>
+      </div>
+      <button class="btn btn-main cta-main" id="submitBtn" type="submit">🚀 HANTAR — <span id="ctaPrice">RM 50.00</span></button>
       <div class="price-box" style="display:none"><span id="priceDisplayLegacy">50.00</span></div>
     </form>
   </div>
