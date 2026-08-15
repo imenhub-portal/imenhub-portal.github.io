@@ -131,6 +131,11 @@ window.__earlyPending = false;
   --r-shell:26px; --r-card:18px; --r-sm:11px; --r-pill:999px;
   --shadow-xs:0 1px 2px rgba(22,24,29,.04);
   --shadow-sm:0 2px 8px rgba(22,24,29,.06);
+  /* Resting elevation for every card surface: a tight contact shadow plus a
+     wider soft one, so cards read as lifted off the canvas rather than drawn
+     on it. */
+  --shadow-card:0 1px 2px rgba(22,24,29,.05), 0 4px 14px rgba(22,24,29,.06);
+  --shadow-card-hover:0 2px 4px rgba(22,24,29,.06), 0 10px 26px rgba(22,24,29,.10);
   --shadow-lg:0 24px 60px rgba(22,24,29,.18);
   --shadow-shell:0 8px 40px rgba(22,24,29,.07);
   --font:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -158,6 +163,10 @@ window.__earlyPending = false;
   --err-bg:#2e1414;  --err-bd:#5a2523;
   --shadow-shell:0 8px 40px rgba(0,0,0,.5);
   --shadow-lg:0 24px 60px rgba(0,0,0,.6);
+  /* Dark surfaces need a deeper, tighter shadow — the soft light-mode one
+     is invisible against a near-black canvas. */
+  --shadow-card:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.35);
+  --shadow-card-hover:0 2px 6px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.45);
 }
 
 *{box-sizing:border-box}
@@ -310,7 +319,7 @@ h1,h2,h3,h4{margin:0; font-weight:600; letter-spacing:-.02em}
 .btn-block{width:100%}
 
 /* ═══ CARDS ══════════════════════════════════════════════════════════ */
-.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card)}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card)}
 .card-head{padding:16px 18px 12px; display:flex; align-items:center; gap:10px}
 .card-head h3{font-size:15px}
 .card-head .spacer{flex:1}
@@ -326,7 +335,7 @@ h1,h2,h3,h4{margin:0; font-weight:600; letter-spacing:-.02em}
 .dash-mid{display:grid; grid-template-columns:1fr 2fr; gap:14px; margin-top:14px; align-items:start}
 
 /* Hero value card */
-.hero{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card); padding:18px}
+.hero{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card); padding:18px; box-shadow:var(--shadow-card)}
 .hero .lbl{font-size:12.5px; color:var(--muted); font-weight:500}
 .hero .big{font-size:31px; font-weight:700; letter-spacing:-.04em; margin:7px 0 8px}
 .trend{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600}
@@ -340,7 +349,7 @@ h1,h2,h3,h4{margin:0; font-weight:600; letter-spacing:-.02em}
 .substrip .cap{font-size:12px; color:var(--muted); margin-bottom:10px}
 .substrip .cap b{color:var(--ink)}
 .chips{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
-.chip{border:1px solid var(--border-2); border-radius:12px; padding:9px 10px; min-width:0}
+.chip{border:1px solid var(--border-2); border-radius:12px; padding:9px 10px; min-width:0; box-shadow:var(--shadow-xs)}
 .chip .t{font-size:11.5px; font-weight:600; display:flex; align-items:center; gap:5px; margin-bottom:5px}
 .chip .v{font-size:13px; font-weight:700; letter-spacing:-.02em}
 .chip .s{font-size:9.5px; color:var(--muted-2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -350,9 +359,10 @@ h1,h2,h3,h4{margin:0; font-weight:600; letter-spacing:-.02em}
 .tiles{display:grid; grid-template-columns:1fr 1fr; gap:14px}
 .tile{
   background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
-  padding:16px; cursor:pointer; transition:border-color .15s, box-shadow .15s;
+  padding:16px; cursor:pointer; box-shadow:var(--shadow-card);
+  transition:border-color .15s, box-shadow .15s, transform .15s;
 }
-.tile:hover{border-color:var(--muted-3); box-shadow:var(--shadow-sm)}
+.tile:hover{border-color:var(--muted-3); box-shadow:var(--shadow-card-hover); transform:translateY(-1px)}
 .tile .top{display:flex; align-items:flex-start; gap:8px; margin-bottom:14px}
 .tile .lbl{font-size:12.5px; color:var(--muted); font-weight:500}
 .tile .ico{
@@ -551,8 +561,10 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 /* Loan highlight cards (the "My Cards" analogue) */
 .loancard{
   border-radius:16px; padding:14px; color:#fff; min-height:118px; display:flex; flex-direction:column;
-  background:var(--ink); position:relative; overflow:hidden;
+  background:var(--ink); position:relative; overflow:hidden; box-shadow:var(--shadow-card);
+  transition:box-shadow .15s, transform .15s;
 }
+.loancard:hover{box-shadow:var(--shadow-card-hover); transform:translateY(-1px)}
 .loancard.warn{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-deep) 100%)}
 .loancard .tag{font-size:10px; font-weight:700; letter-spacing:.04em; opacity:.85}
 .loancard .nm{font-size:13.5px; font-weight:600; margin-top:5px; line-height:1.3}
@@ -640,7 +652,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 <!-- ═══ LOGIN GATE ═══════════════════════════════════════════════════ -->
 <div id="gate" class="hide">
   <div class="gate-card">
-    <div class="gate-logo"><svg width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
+    <div class="gate-logo"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
     <h1>i-Nventori OFFICE</h1>
     <p>Sistem Inventori &amp; Pengurusan Aset — IMEN</p>
     <div id="gateErr" class="err-box hide"></div>
@@ -649,7 +661,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       <input type="password" id="gatePass" autocomplete="current-password" placeholder="••••••••">
     </div>
     <button class="btn btn-accent btn-block" id="gateBtn" onclick="doLogin()">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-lock"/></svg>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-lock"/></svg>
       Log Masuk
     </button>
     <p style="margin-top:18px;font-size:11.5px;color:var(--muted-2);text-align:center">
@@ -664,7 +676,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 
   <header id="topbar">
     <div class="logo">
-      <div class="mark"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
+      <div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
       <div><b>i-Nventori</b><span>OFFICE</span></div>
     </div>
 
@@ -679,23 +691,23 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 
     <div class="tb-right">
       <button class="icon-btn" onclick="openPalette()" title="Cari (Ctrl+K)">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>
       </button>
       <button class="icon-btn" onclick="openScanner()" title="Imbas kod QR">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
       </button>
       <button class="icon-btn" onclick="go('dashboard')" title="Amaran">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg>
         <span class="dot hide" id="bellDot">0</span>
       </button>
       <button class="btn btn-accent btn-sm" onclick="openItemDrawer()">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><use href="#i-plus"/></svg>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><use href="#i-plus"/></svg>
         Tambah
       </button>
       <div class="userchip" onclick="doLogout()" title="Log keluar">
         <div class="avatar">AD</div>
         <div><div class="nm">admin</div><div class="em">imenmakmal@gmail.com</div></div>
-        <svg width="14" height="14" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-down"/></svg>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-down"/></svg>
       </div>
     </div>
   </header>
@@ -704,22 +716,22 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
     <aside id="rail">
       <div class="rail-theme">
         <button id="thLight" class="active" onclick="setTheme('light')" title="Tema cerah">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun"/></svg>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun"/></svg>
         </button>
         <button id="thDark" onclick="setTheme('dark')" title="Tema gelap">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
         </button>
       </div>
-      <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
-      <button class="rail-btn" data-view="items" onclick="go('items')" title="Inventori"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
-      <button class="rail-btn" data-view="loans" onclick="go('loans')" title="Daftar Keluar/Masuk"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-swap"/></svg></button>
-      <button class="rail-btn" data-view="stock" onclick="go('stock')" title="Stok"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
-      <button class="rail-btn" data-view="ledger" onclick="go('ledger')" title="Log Audit"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg></button>
-      <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
-      <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
+      <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
+      <button class="rail-btn" data-view="items" onclick="go('items')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
+      <button class="rail-btn" data-view="loans" onclick="go('loans')" title="Daftar Keluar/Masuk"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-swap"/></svg></button>
+      <button class="rail-btn" data-view="stock" onclick="go('stock')" title="Stok"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
+      <button class="rail-btn" data-view="ledger" onclick="go('ledger')" title="Log Audit"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg></button>
+      <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
+      <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
       <div class="rail-sep"></div>
-      <button class="rail-btn" onclick="refresh();toast('Data disegarkan','ok')" title="Segar semula"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg></button>
-      <button class="rail-btn" onclick="doLogout()" title="Log keluar"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-logout"/></svg></button>
+      <button class="rail-btn" onclick="refresh();toast('Data disegarkan','ok')" title="Segar semula"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg></button>
+      <button class="rail-btn" onclick="doLogout()" title="Log keluar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-logout"/></svg></button>
     </aside>
 
     <main id="content"><div id="loading">Memuatkan data inventori…</div></main>
@@ -734,7 +746,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
   <div class="dr-head">
     <div style="flex:1"><h3 id="drTitle">—</h3><p id="drSub"></p></div>
     <button class="icon-btn" onclick="closeDrawer()" aria-label="Tutup">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-x"/></svg>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-x"/></svg>
     </button>
   </div>
   <div class="dr-body" id="drBody"></div>
@@ -827,8 +839,12 @@ function bookValue(item, asOf) {
 }
 
 function icon(name, size) {
-  return '<svg width="' + (size || 16) + '" height="' + (size || 16) + '" fill="none" stroke="currentColor" ' +
-         'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#' + name + '"/></svg>';
+  // viewBox is REQUIRED: the sprite is drawn on a 24x24 grid, and without
+  // it the icon renders at 1 user unit per px and gets clipped to its
+  // top-left corner at any size below 24.
+  return '<svg viewBox="0 0 24 24" width="' + (size || 16) + '" height="' + (size || 16) + '" ' +
+         'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+         'stroke-linejoin="round"><use href="#' + name + '"/></svg>';
 }
 
 // Status pill — the fintech badge vocabulary, one place.

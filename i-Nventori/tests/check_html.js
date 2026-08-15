@@ -98,6 +98,18 @@ const missingIcons = [...used].filter((i) => !sprite.has(i));
 check('every icon referenced exists in the sprite', missingIcons.length === 0, 'missing: ' + missingIcons.join(', '));
 console.log('Icons: ' + sprite.size + ' defined, ' + used.size + ' used.');
 
+// ── 4b. Every sprite <svg> declares a viewBox ─────────────────────────
+// The sprite is authored on a 24x24 grid. An <svg> that uses it without a
+// viewBox maps 1 user unit to 1 px, so any icon rendered below 24px is
+// silently clipped to its top-left corner — which is exactly what shipped
+// once. Cheap to assert, hard to spot by eye.
+const spriteSvgs = html.match(/<svg[^>]*>\s*<use href="#i-/g) || [];
+const missingVB = spriteSvgs.filter((t) => !/viewBox/.test(t));
+check('every sprite <svg> has a viewBox', missingVB.length === 0,
+  missingVB.length + ' of ' + spriteSvgs.length + ' missing');
+// The JS helper builds icons for everything generated at runtime.
+check('the icon() helper emits a viewBox', /function icon\([^)]*\)[\s\S]{0,320}?viewBox="0 0 24 24"/.test(allJs));
+
 // ── 5. No blocking CDN dependency ─────────────────────────────────────
 // Heavy libraries must be lazy-loaded, so nothing but fonts may appear as
 // a <script src> or stylesheet in the document head.
