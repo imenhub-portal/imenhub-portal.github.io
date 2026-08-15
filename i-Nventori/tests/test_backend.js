@@ -462,6 +462,9 @@ section('7. Authorization');
   S2.ensureSheets_();
   eq('with no ADMIN_PASSWORD set, nobody is admin', S2.adminLogin('').ok, false);
   eq('and gated actions stay denied', S2.handleAction('AddItem', { __pass: '' }).success, false);
+  // A fresh deployment must not look like a typo.
+  eq('an unset password reports itself as unconfigured', S2.adminLogin('apa-apa').unconfigured, true);
+  ok('a configured password does not', S.adminLogin('salah').unconfigured === undefined);
 
   // Anonymous reads must not leak the custodian directory.
   const S3 = fresh();

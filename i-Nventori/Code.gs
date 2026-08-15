@@ -24,7 +24,7 @@
 // The admin password may NOT — see _adminPassword_().
 const SPREADSHEET_ID = '1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E';
 const FOLDER_ID      = '1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7';
-const ADMIN_EMAIL    = 'imenmakmal@ukm.edu.my';
+const ADMIN_EMAIL    = 'imenmakmal@gmail.com';
 const APP_NAME       = 'i-Nventori OFFICE';
 
 // Where doGet fetches the live UI from (single source of truth: the repo).
@@ -608,6 +608,11 @@ function _requireAdmin_(pass) {
 function adminLogin(pass) {
   // Deliberately returns only a boolean — no token, no echo of the
   // password. The client re-sends the password on each gated call.
+  //
+  // `unconfigured` distinguishes "no ADMIN_PASSWORD property set yet" from
+  // "wrong password". Without it, a fresh deployment looks like a typo and
+  // sends you hunting for the wrong problem.
+  if (!_adminPassword_()) return { ok: false, unconfigured: true };
   return { ok: _isAdmin_(pass) };
 }
 

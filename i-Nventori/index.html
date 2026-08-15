@@ -627,7 +627,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
     <p>Sistem Inventori &amp; Pengurusan Aset — IMEN</p>
     <div id="gateErr" class="err-box hide"></div>
     <div class="field">
-      <label for="gatePass">Kata Laluan Pentadbir</label>
+      <label for="gatePass">Kata Laluan Admin</label>
       <input type="password" id="gatePass" autocomplete="current-password" placeholder="••••••••">
     </div>
     <button class="btn btn-accent btn-block" id="gateBtn" onclick="doLogin()">
@@ -635,7 +635,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       Log Masuk
     </button>
     <p style="margin-top:18px;font-size:11.5px;color:var(--muted-2);text-align:center">
-      Akses terhad kepada pentadbir inventori IMEN.
+      Akses terhad kepada admin inventori IMEN.
     </p>
   </div>
 </div>
@@ -676,7 +676,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       </button>
       <div class="userchip" onclick="doLogout()" title="Log keluar">
         <div class="avatar">AD</div>
-        <div><div class="nm">Pentadbir</div><div class="em">imenmakmal@ukm.edu.my</div></div>
+        <div><div class="nm">admin</div><div class="em">imenmakmal@gmail.com</div></div>
         <svg width="14" height="14" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-down"/></svg>
       </div>
     </div>
@@ -926,6 +926,11 @@ function doLogin() {
     .withSuccessHandler(function (r) {
       btn.disabled = false;
       btn.innerHTML = icon('i-lock', 15) + ' Log Masuk';
+      if (r && r.unconfigured) {
+        showGateErr('ADMIN_PASSWORD belum ditetapkan dalam Script Properties. ' +
+                    'Buka Apps Script → Project Settings → Script Properties.');
+        return;
+      }
       if (r && r.ok) {
         PASS = pass;
         try { localStorage.setItem('inv_pass', pass); } catch (e) {}
@@ -1177,7 +1182,7 @@ function viewDashboard() {
   var deprPct = p.acquisition_cost ? (p.depreciation / p.acquisition_cost) * 100 : 0;
 
   var h = '<div class="page-head"><div>' +
-    '<h2>' + greeting() + ', Pentadbir</h2>' +
+    '<h2>' + greeting() + ', admin</h2>' +
     '<p>Pantau aset, stok dan pinjaman IMEN dalam satu tempat.</p></div>' +
     '<div class="spacer"></div>' +
     '<button class="btn" onclick="runDateCheck(this)">' + icon('i-clock', 15) + ' Semak Tarikh</button>' +
@@ -1882,7 +1887,7 @@ function viewSettings() {
 
   h += '<div class="card" style="margin-top:16px"><div class="card-head">' + icon('i-shield', 16) +
     '<h3>Keselamatan &amp; Automasi</h3></div><div class="card-body">' +
-    '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Kata laluan pentadbir</div>' +
+    '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Kata laluan admin</div>' +
     '<div class="t-sub">Disimpan dalam Script Properties Apps Script, bukan dalam kod sumber.</div></div>' +
     '<div class="spacer"></div><span class="pill pill-ok"><i></i>Aktif</span></div>' +
     '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Semakan tarikh harian</div>' +

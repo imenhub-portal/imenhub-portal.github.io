@@ -95,7 +95,7 @@ Already wired in — do not re-enter these:
 |---|---|---|
 | `SPREADSHEET_ID` | `1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E` | `Code.gs:25` |
 | `FOLDER_ID` | `1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7` | `Code.gs:26` |
-| `ADMIN_EMAIL` | `imenmakmal@ukm.edu.my` | `Code.gs:27` |
+| `ADMIN_EMAIL` | `imenmakmal@gmail.com` | `Code.gs:27` |
 | `API_URL` (`/exec`) | deployment `AKfycbyY2fSJbt6…` | `index.html`, in the shim |
 
 **Two different URLs, easy to confuse:**
