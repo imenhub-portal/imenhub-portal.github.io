@@ -862,7 +862,7 @@ function pill(status) {
 
 var TYPE_LABEL = { fixed_asset: 'Aset Tetap', consumable: 'Bahan Guna Habis' };
 var ACTION_LABEL = {
-  stock_add: 'Tambah Stok', stock_remove: 'Kurang Stok', check_out: 'Daftar Keluar',
+  stock_add: 'Tambah Stok', stock_remove: 'Keluar Stok', check_out: 'Daftar Keluar',
   check_in: 'Daftar Masuk', decommission: 'Pelupusan', audit_adjust: 'Pelarasan Audit'
 };
 var ACTION_PILL = {
@@ -1215,15 +1215,75 @@ function moneyAxis(v) {
   return Math.round(v);
 }
 
+// Section divider — the dashboard is split into fixed assets and
+// consumables because the two are measured in different units. A laptop's
+// worth is its depreciated book value; a box of pens is just cost x stock
+// on hand. Averaging them into one "total" number told the user nothing.
+function sectionHead(title, sub, right) {
+  return '<div style="display:flex;align-items:flex-end;gap:12px;margin:26px 0 12px">' +
+    '<div><h3 style="font-size:17px;letter-spacing:-.02em">' + title + '</h3>' +
+    '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted)">' + sub + '</p></div>' +
+    '<div style="flex:1"></div>' + (right || '') + '</div>';
+}
+
+// Consumption per staff member, straight from the ledger. Only possible
+// because a stock issue now records custodian_id.
+function issueStats(sinceDays) {
+  var cutoff = sinceDays ? new Date(Date.now() - sinceDays * 86400000) : null;
+  var byStaff = {}, byItem = {}, totalUnits = 0, totalValue = 0;
+  (D.transactions || []).forEach(function (t) {
+    if (t.action_type !== 'stock_remove') return;
+    var d = toDate(t.transaction_date);
+    if (cutoff && d && d < cutoff) return;
+    var qty = Math.abs(Number(t.quantity || 0));
+    var it = itemById(t.item_id);
+    var value = it ? qty * Number(it.unit_cost || 0) : 0;
+    totalUnits += qty;
+    totalValue += value;
+    if (t.custodian_id) {
+      var k = String(t.custodian_id);
+      if (!byStaff[k]) byStaff[k] = { id: t.custodian_id, units: 0, value: 0, items: {} };
+      byStaff[k].units += qty;
+      byStaff[k].value += value;
+      if (it) byStaff[k].items[it.name] = (byStaff[k].items[it.name] || 0) + qty;
+    }
+    if (it) {
+      if (!byItem[it.id]) byItem[it.id] = { item: it, units: 0, value: 0 };
+      byItem[it.id].units += qty;
+      byItem[it.id].value += value;
+    }
+  });
+  return {
+    staff: Object.keys(byStaff).map(function (k) { return byStaff[k]; })
+             .sort(function (a, b) { return b.units - a.units; }),
+    items: Object.keys(byItem).map(function (k) { return byItem[k]; })
+             .sort(function (a, b) { return b.units - a.units; }),
+    totalUnits: totalUnits, totalValue: totalValue
+  };
+}
+
 function viewDashboard() {
   var p = D.portfolio || {};
   var a = D.alerts || {};
   var items = D.items || [];
   var active = items.filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
+  var assets = active.filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var cons   = active.filter(function (i) { return i.item_type === 'consumable'; });
   var onLoan = items.filter(function (i) { return i.open_loan; });
   var overdue = (a.overdue || []).length;
   var low = (a.low_stock || []).length;
-  var deprPct = p.acquisition_cost ? (p.depreciation / p.acquisition_cost) * 100 : 0;
+
+  // Asset figures exclude consumables, so "book value" means what it says.
+  var assetCost = assets.reduce(function (s, i) { return s + Number(i.unit_cost || 0); }, 0);
+  var assetBook = assets.reduce(function (s, i) { return s + (i.book_value != null ? i.book_value : bookValue(i)); }, 0);
+  var deprPct = assetCost ? ((assetCost - assetBook) / assetCost) * 100 : 0;
+
+  // Consumable figures are simply cost x quantity on hand — no depreciation.
+  var stockValue = cons.reduce(function (s, i) {
+    return s + Number(i.unit_cost || 0) * Number(i.quantity_available || 0); }, 0);
+  var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
+
+  var issued30 = issueStats(30);
 
   var h = '<div class="page-head"><div>' +
     '<h2>' + greeting() + ', admin</h2>' +
@@ -1233,31 +1293,33 @@ function viewDashboard() {
     '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport</button>' +
     '</div>';
 
-  // ── Row 1: hero · stat tiles · chart ──────────────────────────────
+  // ══════════════ SECTION 1 — ASET TETAP ══════════════
+  h += sectionHead('Aset Tetap',
+    'Peralatan tahan lama — komputer, monitor, perabot. Dinilai selepas susut nilai.',
+    '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'items\')">Lihat semua ' + icon('i-out', 13) + '</button>');
+
   h += '<div class="dash-top">';
 
-  // Hero — total book value, with the top categories underneath.
   var byCat = {};
-  active.forEach(function (i) {
+  assets.forEach(function (i) {
     var k = catName(i.category_id);
-    var qty = i.item_type === 'consumable' ? Number(i.quantity_available || 0) : 1;
     if (!byCat[k]) byCat[k] = { n: 0, v: 0 };
     byCat[k].n++;
-    byCat[k].v += (i.book_value != null ? i.book_value : bookValue(i)) * qty;
+    byCat[k].v += (i.book_value != null ? i.book_value : bookValue(i));
   });
   var topCats = Object.keys(byCat).sort(function (x, y) { return byCat[y].v - byCat[x].v; }).slice(0, 3);
 
   h += '<div class="hero">' +
-    '<div class="lbl">Jumlah Nilai Buku</div>' +
-    '<div class="big mono">' + money(p.book_value) + '</div>' +
+    '<div class="lbl">Nilai Buku Aset ' + hintDot('Kos belian asal tolak susut nilai terkumpul. Ini nilai aset anda hari ini untuk tujuan audit — bukan harga belian dahulu.') + '</div>' +
+    '<div class="big mono">' + money(assetBook) + '</div>' +
     '<div class="trend ' + (deprPct > 0 ? 'down' : 'flat') + '">' +
       (deprPct > 0 ? '↓ ' + deprPct.toFixed(1) + '%' : '—') +
-      ' <span>susut nilai dari ' + money(p.acquisition_cost) + '</span></div>' +
+      ' <span>susut nilai dari kos ' + money(assetCost) + '</span></div>' +
     '<div class="hero-actions">' +
-      '<button class="btn btn-primary" onclick="openItemDrawer()">' + icon('i-plus', 15) + ' Tambah Item</button>' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset</button>' +
       '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
     '</div>' +
-    '<div class="substrip"><div class="cap">Kategori teratas <b>· ' + Object.keys(byCat).length + ' kategori</b></div>' +
+    '<div class="substrip"><div class="cap">Kategori aset teratas <b>· ' + Object.keys(byCat).length + ' kategori</b></div>' +
     '<div class="chips">' +
       (topCats.length ? topCats.map(function (k, n) {
         var c = byCat[k];
@@ -1266,26 +1328,23 @@ function viewDashboard() {
             (n === 0 ? 'var(--accent)' : n === 1 ? 'var(--ink)' : 'var(--muted-2)') + ';display:block"></span>' +
           esc(k.length > 11 ? k.slice(0, 10) + '…' : k) + '</div>' +
           '<div class="v mono">' + moneyShort(c.v) + '</div>' +
-          '<div class="s">' + c.n + ' item</div></div>';
-      }).join('') : '<div class="chip"><div class="s">Belum ada kategori</div></div>') +
+          '<div class="s">' + c.n + ' aset</div></div>';
+      }).join('') : '<div class="chip"><div class="s">Belum ada aset</div></div>') +
     '</div></div></div>';
 
-  // Stat tiles — first one filled with the accent, as in the reference.
   h += '<div class="tiles">' +
-    tile('i-box', 'Aset Aktif', active.length, 'Belum dilupuskan', 'items', true,
+    tile('i-box', 'Jumlah Aset', assets.length, 'Belum dilupuskan', 'items', true,
          '<div class="trend">' + (items.length - active.length) + ' <span>telah dilupuskan</span></div>') +
     tile('i-out', 'Sedang Dipinjam', onLoan.length,
-         overdue ? overdue + ' lewat dipulangkan' : 'Semua mengikut jadual', 'loans', false,
-         overdue ? '<div class="trend down">↑ ' + overdue + ' <span>lewat</span></div>'
+         overdue ? overdue + ' lewat' : 'Mengikut jadual', 'loans', false,
+         overdue ? '<div class="trend down">↑ ' + overdue + ' <span>lewat dipulangkan</span></div>'
                  : '<div class="trend up">✓ <span>tiada lewat</span></div>') +
-    tile('i-layers', 'Stok Rendah', low, 'Perlu diisi semula', 'stock', false,
-         low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
-             : '<div class="trend up">✓ <span>paras selamat</span></div>') +
     tile('i-shield', 'Waranti Akan Tamat', (a.warranty || []).length, 'Dalam 30 hari', 'items', false,
-         '<div class="trend flat"><span>' + (a.inspection || []).length + ' pemeriksaan tertunggak</span></div>') +
+         '<div class="trend flat"><span>dalam 30 hari</span></div>') +
+    tile('i-clock', 'Pemeriksaan', (a.inspection || []).length, 'Tertunggak', 'items', false,
+         '<div class="trend flat"><span>' + (a.audit || []).length + ' audit tertunggak</span></div>') +
     '</div>';
 
-  // Chart card.
   h += '<div class="card">' +
     '<div class="card-head"><div style="flex:1"><h3>Aliran Nilai Inventori</h3>' +
       '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Nilai masuk berbanding keluar, 8 bulan terakhir</p></div>' +
@@ -1293,65 +1352,137 @@ function viewDashboard() {
       '<span><i style="background:var(--accent)"></i>Keluar</span></div></div>' +
     '<div class="card-body">' + flowChart() + '</div></div>';
 
-  h += '</div>'; // /dash-top
+  h += '</div>';   // /dash-top
 
-  // ── Row 2: alerts column · recent activity table ──────────────────
-  h += '<div class="dash-mid">';
+  // Asset-specific alerts
+  h += '<div class="grid g-2" style="margin-top:14px">';
+  h += alertCard('Pinjaman Lewat', 'i-warn', 'var(--err)', (a.overdue || []).map(function (o) {
+    return { tag: o.asset_tag, name: o.name, right: '<span class="pill pill-err"><i></i>' + o.days_overdue + ' hari</span>',
+             sub: custName(o.custodian_id) + ' · sepatutnya ' + fmtDate(o.expected_return_date), id: o.id };
+  }), 'Tiada pinjaman lewat. Semua aset dipulangkan mengikut jadual.');
+  h += alertCard('Waranti Akan Tamat', 'i-shield', 'var(--info)', (a.warranty || []).map(function (o) {
+    var d = daysBetween(today(), o.date_warranty_expiry);
+    return { tag: o.asset_tag, name: o.name,
+             right: '<span class="pill ' + (d <= 7 ? 'pill-err' : 'pill-warn') + '"><i></i>' + d + ' hari</span>',
+             sub: 'Tamat ' + fmtDate(o.date_warranty_expiry), id: o.id };
+  }), 'Tiada waranti akan tamat dalam 30 hari.');
+  h += '</div>';
 
-  // Left column: stock limit gauge + loan highlight cards.
-  var cons = active.filter(function (i) { return i.item_type === 'consumable'; });
-  var totalMin = cons.reduce(function (s, i) { return s + Number(i.min_stock_alert || 0); }, 0);
-  var totalAvail = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
-  var gauge = totalMin ? Math.min(100, (totalAvail / (totalMin * 2)) * 100) : 100;
+  // ══════════════ SECTION 2 — INVENTORI GUNA HABIS ══════════════
+  h += sectionHead('Inventori Guna Habis',
+    'Alat tulis, kertas, kartrij — dikira mengikut baki stok, bukan susut nilai.',
+    '<button class="btn btn-sm" onclick="go(\'stock\')">Urus stok ' + icon('i-out', 13) + '</button>');
 
-  h += '<div class="stack">';
-  h += '<div class="card card-pad">' +
-    '<div style="display:flex;align-items:center;gap:9px"><h3 style="font-size:14.5px">Paras Stok Keseluruhan</h3>' +
-    '<div class="spacer" style="flex:1"></div>' +
-    '<span class="pill ' + (low ? 'pill-warn' : 'pill-ok') + '"><i></i>' + (low ? low + ' rendah' : 'Selamat') + '</span></div>' +
-    '<div class="limitbar"><span style="width:' + gauge.toFixed(1) + '%;background:' +
-      (low ? 'var(--accent)' : 'var(--ok)') + '"></span></div>' +
-    '<div style="display:flex;font-size:11.5px;color:var(--muted)">' +
-      '<span class="mono"><b style="color:var(--ink)">' + totalAvail + '</b> unit tersedia</span>' +
-      '<span style="margin-left:auto" class="mono">amaran pada ' + totalMin + '</span></div>' +
+  h += '<div class="dash-top">';
+
+  var topCons = cons.slice().sort(function (x, y) {
+    return (Number(y.unit_cost || 0) * Number(y.quantity_available || 0)) -
+           (Number(x.unit_cost || 0) * Number(x.quantity_available || 0));
+  }).slice(0, 3);
+
+  h += '<div class="hero">' +
+    '<div class="lbl">Nilai Stok Semasa ' + hintDot('Kos seunit didarab baki stok. Bahan guna habis tidak disusut nilai — ia hanya berkurang apabila dikeluarkan.') + '</div>' +
+    '<div class="big mono">' + money(stockValue) + '</div>' +
+    '<div class="trend ' + (low ? 'down' : 'up') + '">' +
+      (low ? '↓ ' + low + ' jenis stok rendah' : '✓ paras selamat') +
+      ' <span>· ' + stockUnits + ' unit di tangan</span></div>' +
+    '<div class="hero-actions">' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Bahan Baharu</button>' +
+      '<button class="btn" onclick="go(\'stock\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
+    '</div>' +
+    '<div class="substrip"><div class="cap">Nilai stok tertinggi <b>· ' + cons.length + ' jenis bahan</b></div>' +
+    '<div class="chips">' +
+      (topCons.length ? topCons.map(function (i, n) {
+        return '<div class="chip"><div class="t">' +
+          '<span style="width:7px;height:7px;border-radius:2px;background:' +
+            (n === 0 ? 'var(--accent)' : n === 1 ? 'var(--ink)' : 'var(--muted-2)') + ';display:block"></span>' +
+          esc(i.name.length > 11 ? i.name.slice(0, 10) + '…' : i.name) + '</div>' +
+          '<div class="v mono">' + moneyShort(Number(i.unit_cost || 0) * Number(i.quantity_available || 0)) + '</div>' +
+          '<div class="s">' + i.quantity_available + ' unit</div></div>';
+      }).join('') : '<div class="chip"><div class="s">Belum ada bahan</div></div>') +
+    '</div></div></div>';
+
+  h += '<div class="tiles">' +
+    tile('i-layers', 'Jenis Bahan', cons.length, 'Dalam inventori', 'stock', true,
+         '<div class="trend"><span>' + stockUnits + ' unit di tangan</span></div>') +
+    tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'stock', false,
+         low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
+             : '<div class="trend up">✓ <span>paras selamat</span></div>') +
+    tile('i-out', 'Dikeluarkan (30 hari)', issued30.totalUnits, 'unit', 'ledger', false,
+         '<div class="trend flat"><span>bernilai ' + moneyShort(issued30.totalValue) + '</span></div>') +
+    tile('i-users', 'Penerima', issued30.staff.length, 'staf dalam 30 hari', 'ledger', false,
+         '<div class="trend flat"><span>' + (issued30.staff.length ? 'tertinggi: ' +
+            esc(custName(issued30.staff[0].id).split(' ')[0]) : 'belum ada rekod') + '</span></div>') +
     '</div>';
 
-  // The two most urgent loans, styled like the reference's card widgets.
-  var urgent = onLoan.slice().sort(function (x, y) {
-    return toDate(x.open_loan.expected_return_date) - toDate(y.open_loan.expected_return_date);
-  }).slice(0, 2);
-
-  h += '<div class="card card-pad">' +
-    '<div style="display:flex;align-items:center;margin-bottom:13px"><h3 style="font-size:14.5px">Pinjaman Aktif</h3>' +
-    '<button class="btn btn-sm btn-ghost" style="margin-left:auto" onclick="go(\'loans\')">Lihat semua</button></div>';
-  if (!urgent.length) {
-    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;margin:14px 0">Tiada aset sedang dipinjam.</p>';
+  // Who took what — the reporting this whole change exists for.
+  h += '<div class="card"><div class="card-head"><div style="flex:1">' +
+    '<h3>Pengeluaran Mengikut Staf</h3>' +
+    '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">30 hari terakhir</p></div>' +
+    '<button class="btn btn-sm btn-ghost" onclick="go(\'ledger\')">Log penuh</button></div><div class="card-body">';
+  if (!issued30.staff.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">' +
+         'Belum ada pengeluaran stok direkodkan kepada staf.<br>' +
+         '<span style="font-size:11.5px">Pilih “Diberikan kepada” semasa keluar stok supaya penggunaan boleh dijejaki.</span></p>';
   } else {
-    h += '<div class="grid g-2">' + urgent.map(function (i) {
-      var l = i.open_loan;
-      var d = daysBetween(today(), l.expected_return_date);
-      return '<div class="loancard ' + (l.is_overdue ? 'warn' : '') + '" style="cursor:pointer" onclick="openCheckIn(' + i.id + ')">' +
-        '<div class="loanpill">' + (l.is_overdue ? Math.abs(d) + ' hari lewat' : d + ' hari lagi') + '</div>' +
-        '<div class="nm">' + esc(i.name.length > 26 ? i.name.slice(0, 25) + '…' : i.name) + '</div>' +
-        '<div class="foot"><div><span>Penjaga</span><b>' + esc(custName(l.custodian_id).split(' ')[0]) + '</b></div>' +
-        '<div style="margin-left:auto;text-align:right"><span>Tag</span><b class="mono">' + esc(i.asset_tag) + '</b></div></div>' +
+    var maxU = issued30.staff[0].units || 1;
+    h += issued30.staff.slice(0, 6).map(function (r) {
+      var top = Object.keys(r.items).sort(function (x, y) { return r.items[y] - r.items[x]; }).slice(0, 2);
+      return '<div class="alert-row">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(custName(r.id)) + '</div>' +
+        '<div class="t-sub">' + esc(top.map(function (n) { return n + ' ×' + r.items[n]; }).join(' · ') || '—') + '</div></div>' +
+        '<div class="spacer"></div>' +
+        '<div class="mini-bar"><span style="width:' + ((r.units / maxU) * 100).toFixed(0) + '%;background:var(--accent)"></span></div>' +
+        '<span class="mono" style="font-weight:700;min-width:64px;text-align:right">' + r.units + ' unit</span>' +
+        '<span class="mono" style="color:var(--muted);min-width:74px;text-align:right;font-size:12px">' + money(r.value) + '</span>' +
         '</div>';
-    }).join('') + '</div>';
+    }).join('');
   }
   h += '</div></div>';
 
-  // Recent activity table.
-  var recent = (D.transactions || []).slice().sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 6);
-  h += '<div class="card">' +
-    '<div class="card-head"><h3>Aktiviti Terkini</h3><div class="spacer"></div>' +
-    '<button class="btn btn-sm" onclick="go(\'ledger\')">Log penuh ' + icon('i-out', 13) + '</button></div>';
+  h += '</div>';   // /dash-top
 
+  // Consumable alerts
+  h += '<div class="grid g-2" style="margin-top:14px">';
+  h += alertCard('Stok Rendah', 'i-layers', 'var(--warn)', (a.low_stock || []).map(function (o) {
+    var pct = o.min_stock_alert ? Math.min(100, (o.quantity_available / o.min_stock_alert) * 100) : 0;
+    return { tag: o.asset_tag, name: o.name,
+             right: '<div class="mini-bar"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
+                    '<span class="mono" style="font-size:12px;font-weight:700;min-width:50px;text-align:right">' +
+                    o.quantity_available + '/' + o.min_stock_alert + '</span>',
+             sub: 'Baki di bawah paras minimum', id: o.id };
+  }), 'Semua stok berada pada paras selamat.');
+
+  h += '<div class="card"><div class="card-head">' +
+    '<span style="color:var(--muted)">' + icon('i-chart', 16) + '</span><h3>Bahan Paling Kerap Dikeluarkan</h3>' +
+    '<div class="spacer"></div><span class="pill pill-mute">30 hari</span></div><div class="card-body">';
+  if (!issued30.items.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">Tiada pengeluaran dalam 30 hari.</p>';
+  } else {
+    var maxI = issued30.items[0].units || 1;
+    h += issued30.items.slice(0, 6).map(function (r) {
+      return '<div class="alert-row" style="cursor:pointer" onclick="openHistory(' + r.item.id + ')">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(r.item.name) + '</div>' +
+        '<div class="t-sub mono">' + esc(r.item.asset_tag) + ' · baki ' + r.item.quantity_available + '</div></div>' +
+        '<div class="spacer"></div>' +
+        '<div class="mini-bar"><span style="width:' + ((r.units / maxI) * 100).toFixed(0) + '%;background:var(--ink)"></span></div>' +
+        '<span class="mono" style="font-weight:700;min-width:60px;text-align:right">' + r.units + ' unit</span></div>';
+    }).join('');
+  }
+  h += '</div></div></div>';
+
+  // ══════════════ SECTION 3 — AKTIVITI ══════════════
+  h += sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
+    '<button class="btn btn-sm" onclick="go(\'ledger\')">Log penuh ' + icon('i-out', 13) + '</button>');
+
+  var recent = (D.transactions || []).slice().sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 8);
+  h += '<div class="card">';
   if (!recent.length) {
     h += '<div class="empty">' + icon('i-history', 28) + '<p>Belum ada transaksi direkodkan.</p></div>';
   } else {
     h += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      '<th style="width:38px"></th><th>ID</th><th>Aktiviti</th><th class="t-num">Nilai</th>' +
-      '<th>Status</th><th>Tarikh</th><th style="width:38px"></th></tr></thead><tbody>';
+      '<th style="width:38px"></th><th>ID</th><th>Aktiviti</th><th>Penerima / Penjaga</th>' +
+      '<th class="t-num">Nilai</th><th>Status</th><th>Tarikh</th><th style="width:38px"></th></tr></thead><tbody>';
     h += recent.map(function (t) {
       var it = itemById(t.item_id);
       var q = Number(t.quantity || 0);
@@ -1366,6 +1497,9 @@ function viewDashboard() {
           '<div style="min-width:0"><div class="t-name" style="font-size:13px">' +
             esc(it ? it.name : 'Item #' + t.item_id) + '</div>' +
             '<div class="t-sub mono">' + esc(it ? it.asset_tag : '—') + '</div></div></div></td>' +
+        '<td style="font-size:12.5px">' + (t.custodian_id
+            ? esc(custName(t.custodian_id))
+            : '<span style="color:var(--muted-3)">—</span>') + '</td>' +
         '<td class="t-num mono" style="font-weight:600">' + (value ? money(value) : '—') + '</td>' +
         '<td><span class="dotstat"><i style="background:' + st.fg + '"></i>' + esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span></td>' +
         '<td class="mono" style="font-size:12px;color:var(--muted)">' + fmtDateTime(t.transaction_date) + '</td>' +
@@ -1374,42 +1508,17 @@ function viewDashboard() {
     }).join('');
     h += '</tbody></table></div>';
   }
-  h += '</div></div>'; // /card /dash-mid
-
-  // ── Row 3: alert panels ───────────────────────────────────────────
-  h += '<div class="grid g-2" style="margin-top:14px">';
-  h += alertCard('Pinjaman Lewat', 'i-warn', 'var(--err)', (a.overdue || []).map(function (o) {
-    return { tag: o.asset_tag, name: o.name, right: '<span class="pill pill-err"><i></i>' + o.days_overdue + ' hari</span>',
-             sub: custName(o.custodian_id) + ' · sepatutnya ' + fmtDate(o.expected_return_date), id: o.id };
-  }), 'Tiada pinjaman lewat. Semua aset dipulangkan mengikut jadual.');
-
-  h += alertCard('Stok Rendah', 'i-layers', 'var(--warn)', (a.low_stock || []).map(function (o) {
-    var pct = o.min_stock_alert ? Math.min(100, (o.quantity_available / o.min_stock_alert) * 100) : 0;
-    return { tag: o.asset_tag, name: o.name,
-             right: '<div class="mini-bar"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
-                    '<span class="mono" style="font-size:12px;font-weight:700;min-width:50px;text-align:right">' +
-                    o.quantity_available + '/' + o.min_stock_alert + '</span>',
-             sub: 'Baki di bawah paras minimum', id: o.id };
-  }), 'Semua stok berada pada paras selamat.');
-
-  h += alertCard('Waranti Akan Tamat', 'i-shield', 'var(--info)', (a.warranty || []).map(function (o) {
-    var d = daysBetween(today(), o.date_warranty_expiry);
-    return { tag: o.asset_tag, name: o.name,
-             right: '<span class="pill ' + (d <= 7 ? 'pill-err' : 'pill-warn') + '"><i></i>' + d + ' hari</span>',
-             sub: 'Tamat ' + fmtDate(o.date_warranty_expiry), id: o.id };
-  }), 'Tiada waranti akan tamat dalam 30 hari.');
-
-  h += alertCard('Pemeriksaan &amp; Audit', 'i-clock', 'var(--muted)',
-    (a.inspection || []).map(function (o) {
-      return { tag: o.asset_tag, name: o.name, right: '<span class="pill pill-warn"><i></i>Pemeriksaan</span>',
-               sub: 'Sepatutnya ' + fmtDate(o.date_next_inspection), id: o.id };
-    }).concat((a.audit || []).slice(0, 8).map(function (o) {
-      return { tag: o.asset_tag, name: o.name, right: '<span class="pill pill-mute"><i></i>Audit</span>',
-               sub: o.date_last_audited ? 'Terakhir ' + fmtDate(o.date_last_audited) : 'Belum pernah diaudit', id: o.id };
-    })), 'Semua pemeriksaan dan audit terkini.');
   h += '</div>';
 
   return h;
+}
+
+// Small "?" affordance carrying a plain-language definition, so an
+// accounting term never sits on the dashboard unexplained.
+function hintDot(text) {
+  return '<span title="' + esc(text) + '" style="display:inline-flex;align-items:center;justify-content:center;' +
+    'width:14px;height:14px;border-radius:50%;border:1px solid var(--muted-3);color:var(--muted-2);' +
+    'font-size:9.5px;font-weight:700;cursor:help;margin-left:4px;vertical-align:1px">?</span>';
 }
 
 // Colour + glyph per ledger action, shared by the activity table.
@@ -1624,7 +1733,7 @@ function rowMenu(ev, id) {
     else h += mi('i-out', 'Daftar Keluar', 'openCheckOut(' + id + ')');
     if (i.item_type === 'consumable') {
       h += mi('i-plus', 'Tambah Stok', 'openStock(' + id + ',"StockAdd")');
-      h += mi('i-layers', 'Kurang Stok', 'openStock(' + id + ',"StockRemove")');
+      h += mi('i-layers', 'Keluar Stok', 'openStock(' + id + ',"StockRemove")');
     }
     h += mi('i-check', 'Rekod Audit', 'openAudit(' + id + ')');
   }
@@ -2248,18 +2357,33 @@ function openStock(id, action) {
   var b = '<div class="info-box"><b class="mono">' + esc(it.asset_tag) + '</b> — ' + esc(it.name) +
     '<br>Baki semasa: <b class="mono">' + it.quantity_available + '</b>' +
     (it.min_stock_alert ? ' · minimum ' + it.min_stock_alert : '') + '</div>' +
-    field('Kuantiti', input('sQty', 'number', 1, 'min="1" step="1"' + (isAdd ? '' : ' max="' + it.quantity_available + '"')), null, true) +
-    field('Sebab', '<textarea id="sNote" placeholder="' +
-      (isAdd ? 'cth. pembelian baharu, pemulangan stok' : 'cth. diagihkan kepada jabatan, rosak') + '"></textarea>',
+    field('Kuantiti', input('sQty', 'number', 1, 'min="1" step="1"' + (isAdd ? '' : ' max="' + it.quantity_available + '"')), null, true);
+
+  // Recipient only applies to an issue. Optional, because stock also leaves
+  // for damage or loss — but recording it is what makes per-staff usage
+  // reportable instead of buried in free text.
+  if (!isAdd) {
+    b += field('Diberikan kepada',
+      select('sCust', [{ v: '', t: '— Tiada (rosak / hilang / pelupusan) —' }].concat(
+        (D.custodians || []).map(function (c) {
+          return { v: c.id, t: c.name + (c.department ? ' · ' + c.department : '') };
+        })), '', ''),
+      'Pilih staf supaya penggunaan boleh dijejaki per orang');
+  }
+
+  b += field('Sebab', '<textarea id="sNote" placeholder="' +
+      (isAdd ? 'cth. pembelian baharu, pemulangan stok' : 'cth. bekalan pejabat bulanan, rosak') + '"></textarea>',
       'Direkod dalam lejar audit', true);
 
-  openDrawer(isAdd ? 'Tambah Stok' : 'Kurangkan Stok', it.name, b,
+  openDrawer(isAdd ? 'Tambah Stok' : 'Keluarkan Stok', it.name, b,
     '<button class="btn" onclick="closeDrawer()">Batal</button>' +
     '<button class="btn btn-primary" onclick="doStock(this,' + id + ',\'' + action + '\')">' +
-      icon(isAdd ? 'i-plus' : 'i-layers', 15) + ' ' + (isAdd ? 'Tambah' : 'Kurangkan') + '</button>');
+      icon(isAdd ? 'i-plus' : 'i-layers', 15) + ' ' + (isAdd ? 'Tambah' : 'Keluarkan') + '</button>');
 }
 function doStock(btn, id, action) {
-  submitAction(btn, action, { id: id, quantity: num('sQty'), reason_notes: val('sNote') }, 'Stok dikemas kini.');
+  var p = { id: id, quantity: num('sQty'), reason_notes: val('sNote') };
+  if ($('sCust') && val('sCust')) p.custodian_id = num('sCust');
+  submitAction(btn, action, p, 'Stok dikemas kini.');
 }
 
 // ── Decommission ──────────────────────────────────────────────────────

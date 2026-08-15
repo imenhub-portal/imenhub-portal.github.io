@@ -211,6 +211,21 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   hard-coded hex anywhere, dark mode silently breaks for that element. The theme is
   applied by a tiny inline script in `<head>` **before first paint**, so dark-mode users
   never see a white flash.
+- **The dashboard is split into Aset Tetap and Inventori Guna Habis on
+  purpose — do not merge them back into one summary.** The two are measured
+  in different units: an asset's worth is its depreciated *book value*, while
+  a box of pens is simply *unit cost x quantity on hand* (consumables have
+  `useful_life_years: 0`, so `_bookValue_` correctly returns cost unchanged).
+  Averaging them produced a headline number that meant nothing for either,
+  which is what prompted the split.
+- **A stock issue records `custodian_id`, and that is the whole point of it.**
+  Before this, "who took the pens" could only be free text in `reason_notes`
+  — unsearchable and impossible to total per person. The field is *optional*
+  because stock also leaves for damage or loss with no recipient; those units
+  count toward total issuance but are excluded from per-staff figures.
+  `issueStats()` in `index.html` derives all per-staff and per-item
+  consumption from the ledger alone, so it can never drift from it. A
+  recipient on a stock *addition* is rejected — nobody receives a restock.
 - **The dashboard chart is real data, not decoration.** `monthlyFlow()` derives value in
   vs. value out per month by joining the ledger against each item's `unit_cost` — the
   asset-register analogue of a profit/loss chart.

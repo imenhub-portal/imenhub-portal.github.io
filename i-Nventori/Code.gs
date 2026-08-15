@@ -840,10 +840,16 @@ function svcDeleteItem(p) {
 }
 
 // ── Consumable stock in/out ─────────────────────────────────
+// `custodian_id` is optional and only meaningful on a removal: it records
+// WHO the stock was issued to. Without it, "who took the pens" could only
+// ever be free text in reason_notes — unsearchable and impossible to total
+// per person. Removals for damage or loss legitimately have no recipient,
+// which is why it is optional rather than required.
 function svcStockChange(p, action) {
   const v = _validate_({
     id:           { required: true, type: 'number', label: 'Item' },
     quantity:     { required: true, type: 'number', min: 1, label: 'Kuantiti' },
+    custodian_id: { type: 'number', label: 'Penerima' },
     reason_notes: { required: true, max: 500, label: 'Sebab' }
   }, p);
 
@@ -851,6 +857,15 @@ function svcStockChange(p, action) {
   if (!item) throw new Error('Item tidak dijumpai.');
   if (item.status === 'decommissioned' || item.status === 'disposed') {
     throw new Error('Item telah dilupuskan — stok tidak boleh diubah.');
+  }
+
+  var recipient = null;
+  if (v.custodian_id) {
+    recipient = _findById_(_readTable_('Custodians'), v.custodian_id);
+    if (!recipient) throw new Error('Penerima tidak wujud.');
+    if (action === 'stock_add') {
+      throw new Error('Penerima hanya untuk pengeluaran stok, bukan penambahan.');
+    }
   }
 
   const delta = (action === 'stock_add') ? v.quantity : -v.quantity;
@@ -869,10 +884,11 @@ function svcStockChange(p, action) {
 
   _ledger_({
     item_id: item.id, action_type: action, quantity: delta,
+    custodian_id: recipient ? recipient.id : null,
     reason_notes: v.reason_notes
   });
 
-  return { id: item.id, quantity_available: avail };
+  return { id: item.id, quantity_available: avail, custodian_id: recipient ? recipient.id : null };
 }
 
 // ── Check-out ───────────────────────────────────────────────

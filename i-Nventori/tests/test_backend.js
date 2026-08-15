@@ -394,6 +394,41 @@ section('5. Consumable stock movements');
 
   const zero = S._txn_(() => S.svcStockChange({ id, quantity: 0, reason_notes: 'x' }, 'stock_add'));
   eq('a zero-quantity movement is rejected by validation', zero.success, false);
+
+  // ── Issuing stock to a named member of staff ────────────────────────
+  // The point of this is reporting: "how many pens did Aminah take" must
+  // be answerable from structured data, not free text in the notes field.
+  const issued = S._txn_(() => S.svcStockChange(
+    { id, quantity: 3, custodian_id: 1, reason_notes: 'Bekalan pejabat' }, 'stock_remove'));
+  ok('stock can be issued to a custodian', issued.success, issued.error);
+  eq('and the recipient comes back', issued.result.custodian_id, 1);
+
+  const led = S._readTable_('Transactions').filter((t) => Number(t.item_id) === id);
+  const issueRow = led[led.length - 1];
+  eq('the ledger row records the recipient', issueRow.custodian_id, 1);
+  eq('as a removal', issueRow.action_type, 'stock_remove');
+  eq('with a negative quantity', issueRow.quantity, -3);
+
+  // Damage/loss has no recipient — the field must stay optional.
+  const noOne = S._txn_(() => S.svcStockChange({ id, quantity: 1, reason_notes: 'Rosak' }, 'stock_remove'));
+  ok('a removal with no recipient is still allowed', noOne.success, noOne.error);
+  eq('and records none', S._readTable_('Transactions').slice(-1)[0].custodian_id, null);
+
+  const ghost = S._txn_(() => S.svcStockChange(
+    { id, quantity: 1, custodian_id: 999, reason_notes: 'x' }, 'stock_remove'));
+  eq('an unknown recipient is rejected', ghost.success, false);
+  ok('with a clear reason', /Penerima tidak wujud/.test(ghost.error), ghost.error);
+
+  // A recipient on an ADDITION is nonsense — nobody "receives" a restock.
+  const addTo = S._txn_(() => S.svcStockChange(
+    { id, quantity: 1, custodian_id: 1, reason_notes: 'x' }, 'stock_add'));
+  eq('a recipient on a stock addition is rejected', addTo.success, false);
+
+  // Per-person totals must be derivable from the ledger alone.
+  const perPerson = S._readTable_('Transactions')
+    .filter((t) => t.action_type === 'stock_remove' && Number(t.custodian_id) === 1)
+    .reduce((sum, t) => sum + Math.abs(Number(t.quantity || 0)), 0);
+  eq('consumption per staff member totals correctly from the ledger', perPerson, 3);
 }
 
 // ══════════════════════════════════════════════════════════════════════
