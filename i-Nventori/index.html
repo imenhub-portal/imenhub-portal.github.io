@@ -63,14 +63,32 @@
 // whatever this parked on window.__early.
 window.__early = null;
 window.__earlyDone = null;
+// WHICH password this prefetch used. On a first visit that is '' (anonymous),
+// and the server correctly answers is_admin:false. boot() must therefore NEVER
+// consume this result under a different password than the one it was fetched
+// with — doing so made a successful login look like an expired session and
+// bounced the user straight back to the login screen.
+window.__earlyPass = null;
+// True only while a prefetch is genuinely in flight. Without this, a
+// prefetch that never got issued (the catch below) would leave boot()
+// waiting forever for a result that is never coming.
+window.__earlyPending = false;
 (function () {
   try {
     var pass = localStorage.getItem('inv_pass') || '';
+    window.__earlyPass = pass;
+    window.__earlyPending = true;
     google.script.run
-      .withSuccessHandler(function (d) { window.__early = d; if (window.__earlyDone) window.__earlyDone(d); })
-      .withFailureHandler(function (e) { console.warn('[early]', e); if (window.__earlyDone) window.__earlyDone(null); })
+      .withSuccessHandler(function (d) {
+        window.__early = d; window.__earlyPending = false;
+        if (window.__earlyDone) window.__earlyDone(d);
+      })
+      .withFailureHandler(function (e) {
+        console.warn('[early]', e); window.__earlyPending = false;
+        if (window.__earlyDone) window.__earlyDone(null);
+      })
       .getInitialData(pass);
-  } catch (e) { /* boot() will fetch normally */ }
+  } catch (e) { window.__earlyPending = false; /* boot() will fetch normally */ }
 })();
 </script>
 
@@ -985,8 +1003,10 @@ function boot() {
       // Skip the repaint entirely when nothing moved, so a background
       // refresh can never flicker the view the user is reading.
       if (changed) render();
-    } else if (d && !d.is_admin) {
-      // The stored password no longer works (changed server-side).
+    } else if (d && !d.is_admin && PASS) {
+      // A real rejection of a real password: the session is genuinely stale
+      // (someone changed ADMIN_PASSWORD server-side). Guarded on PASS being
+      // non-empty so an anonymous payload can never trigger a logout.
       doLogout();
     } else if (!painted) {
       $('content').innerHTML = '<div class="empty">' + icon('i-warn', 30) +
@@ -996,8 +1016,16 @@ function boot() {
     // still has usable data, and writes would surface their own errors.
   }
 
-  if (window.__early) accept(window.__early);
-  else { window.__earlyDone = accept; refresh(true); }
+  // Only reuse the <head> prefetch when it was made with the SAME password
+  // this session is now using. After a fresh login it was anonymous, so it
+  // is discarded and a proper authenticated fetch is issued instead.
+  if (window.__earlyPass === PASS && (window.__early || window.__earlyPending)) {
+    if (window.__early) accept(window.__early);   // already landed
+    else window.__earlyDone = accept;             // still in flight, wait for it
+  } else {
+    window.__earlyDone = null;   // discard any anonymous prefetch
+    refresh(true);               // and fetch properly with this session's password
+  }
 }
 
 window.addEventListener('DOMContentLoaded', function () {

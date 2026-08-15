@@ -194,6 +194,18 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   A failed background refresh is silent by design (`refresh(true)`), because the user
   still has usable data and any *write* would surface its own error. Do not "fix" this by
   adding a loading state to the cached path.
+- **The `<head>` prefetch is tagged with the password it used (`__earlyPass`),
+  and `boot()` must only consume it when that matches the current session.**
+  This is not defensive coding — it is a shipped bug that got fixed. On a first
+  visit the prefetch runs anonymously, so the server correctly answers
+  `is_admin:false`; `boot()` then read that stale anonymous payload *after* a
+  successful login, concluded the session was expired, and bounced the user
+  straight back to the login screen ("blinks in, then returns to login").
+  `__earlyPending` covers the case where the prefetch was never issued at all,
+  which would otherwise leave `boot()` waiting on a result that never arrives.
+  The logout branch is also guarded on `PASS` being non-empty, so an anonymous
+  payload can never trigger a logout. Five scenarios are covered by the browser
+  walk-through in "How to verify" — re-run them if you touch boot/login.
 - **Every colour is a CSS custom property**, which is what makes the dark theme a pure
   token swap under `[data-theme="dark"]` with no duplicated layout rules. If you add a
   hard-coded hex anywhere, dark mode silently breaks for that element. The theme is
