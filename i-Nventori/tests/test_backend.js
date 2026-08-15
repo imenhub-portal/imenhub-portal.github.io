@@ -676,6 +676,116 @@ section('11. Portfolio summary and notification');
   ok('a script-ish item name is escaped in the email', !/<img src=x/.test(html) && /&lt;img/.test(html));
 }
 
+section('12. Handover: ad-hoc recipients and two-way email');
+{
+  const S = fresh();
+  const mk = () => S._txn_(() => S.svcAddItem({
+    name: 'Projektor', category_id: 1, location_id: 1, item_type: 'fixed_asset',
+    date_acquired: '2026-01-10', unit_cost: 2200, serial_number: 'SN-EP-1'
+  })).result.id;
+
+  // ── Typing a name + email instead of picking an existing person ──
+  const id = mk();
+  const before = S._readTable_('Custodians').length;
+  const out = S._txn_(() => S.svcCheckOut({
+    id, recipient_name: 'Zulkifli bin Omar', recipient_email: 'zul@ukm.edu.my',
+    recipient_department: 'Kejuruteraan', expected_return_date: iso(daysFromNow(7))
+  }));
+  ok('an asset can be handed to someone typed in on the spot', out.success, out.error);
+  eq('the recipient is created as a real record', S._readTable_('Custodians').length, before + 1);
+  eq('and returned to the caller', out.result.custodian_email, 'zul@ukm.edu.my');
+
+  const created = S._readTable_('Custodians').filter((c) => c.email === 'zul@ukm.edu.my')[0];
+  ok('with a generated employee id', /^ADH-[0-9]{3}$/.test(created.employee_id), created.employee_id);
+
+  eq('a check-out email goes to them', S.__test.sentMail.length, 1);
+  const coMail = S.__test.sentMail[0];
+  eq('addressed correctly', coMail.to, 'zul@ukm.edu.my');
+  ok('with the asset tag in the subject', /AST-2026-0001/.test(coMail.subject));
+  ok('and a timestamp of the handover', /Masa Didaftar Keluar/.test(coMail.htmlBody));
+  ok('and a reference number', /TRX_0000/.test(coMail.htmlBody));
+  ok('and the expected return date', /Tarikh Jangka Pulang/.test(coMail.htmlBody));
+
+  // ── The same email must not create a duplicate person ──
+  const id2 = mk();
+  const out2 = S._txn_(() => S.svcCheckOut({
+    id: id2, recipient_name: 'Zulkifli B. Omar', recipient_email: 'ZUL@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(5))
+  }));
+  ok('a second handover to the same email succeeds', out2.success, out2.error);
+  eq('and reuses the existing person rather than duplicating them',
+    S._readTable_('Custodians').filter((c) => c.email === 'zul@ukm.edu.my').length, 1);
+  eq('matching case-insensitively', out2.result.custodian_id, created.id);
+
+  // ── Return closes the loop with a second email ──
+  S.__test.sentMail.length = 0;
+  const back = S._txn_(() => S.svcCheckIn({ id }));
+  ok('check-in succeeds', back.success, back.error);
+  eq('a return email is sent', S.__test.sentMail.length, 1);
+  const ciMail = S.__test.sentMail[0];
+  eq('to the person who held it', ciMail.to, 'zul@ukm.edu.my');
+  ok('confirming the return in the subject', /dipulangkan/i.test(ciMail.subject), ciMail.subject);
+  ok('with the return timestamp', /Masa Dipulangkan/.test(ciMail.htmlBody));
+  ok('the duration held', /Tempoh Dipinjam/.test(ciMail.htmlBody));
+  ok('and the on-time status', /tepat pada masa|Lewat/.test(ciMail.htmlBody));
+
+  // ── Neither a person nor a name/email is an error ──
+  const id3 = mk();
+  const none = S._txn_(() => S.svcCheckOut({ id: id3, expected_return_date: iso(daysFromNow(3)) }));
+  eq('a handover with no recipient at all is refused', none.success, false);
+  ok('explaining both options', /pilih penerima|nama dan emel/i.test(none.error), none.error);
+
+  const badMail = S._txn_(() => S.svcCheckOut({
+    id: id3, recipient_name: 'X', recipient_email: 'bukan-emel', expected_return_date: iso(daysFromNow(3))
+  }));
+  eq('a malformed recipient email is refused', badMail.success, false);
+
+  // ── Non-portable assets cannot be handed out ──
+  const deskId = S._txn_(() => S.svcAddItem({
+    name: 'Meja Pejabat', category_id: 1, location_id: 1, item_type: 'fixed_asset',
+    date_acquired: '2026-01-10', unit_cost: 700, is_portable: 'FALSE'
+  })).result.id;
+  const desk = S._findById_(S._readTable_('Items'), deskId);
+  eq('an asset can be marked not movable', desk.is_portable, 'FALSE');
+  const deskOut = S._txn_(() => S.svcCheckOut({
+    id: deskId, recipient_name: 'A', recipient_email: 'a@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(3))
+  }));
+  eq('and then cannot be checked out', deskOut.success, false);
+  ok('with a reason naming the flag', /bukan mudah alih/i.test(deskOut.error), deskOut.error);
+
+  // Default must stay permissive so rows predating the column still work.
+  const plain = S._findById_(S._readTable_('Items'), id3);
+  eq('new assets default to movable', plain.is_portable, 'TRUE');
+}
+
+section('13. A notification failure must never lose the record');
+{
+  // Mail quota is a real limit in Apps Script. If sending throws, the
+  // handover has already been written to the ledger and must stand.
+  const S = loadBackend();
+  S.MailApp.sendEmail = () => { throw new Error('quota exceeded'); };
+  S.ensureSheets_();
+  S._txn_(() => S.svcSeedReference());
+
+  const id = S._txn_(() => S.svcAddItem({
+    name: 'Kamera', category_id: 1, location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-01'
+  })).result.id;
+  const outc = S._txn_(() => S.svcCheckOut({
+    id, recipient_name: 'B', recipient_email: 'b@ukm.edu.my', expected_return_date: iso(daysFromNow(4))
+  }));
+  ok('the handover still succeeds when email fails', outc.success, outc.error);
+  eq('and reports that the notification did not go out', outc.result.mailed, false);
+  eq('the ledger still recorded it',
+    S._readTable_('Transactions').filter((t) => t.action_type === 'check_out').length, 1);
+
+  const backc = S._txn_(() => S.svcCheckIn({ id }));
+  ok('and the return likewise', backc.success, backc.error);
+  eq('reporting the same', backc.result.mailed, false);
+  eq('with the return in the ledger',
+    S._readTable_('Transactions').filter((t) => t.action_type === 'check_in').length, 1);
+}
+
 // ══════════════════════════════════════════════════════════════════════
 console.log('\n' + '─'.repeat(60));
 if (failures.length) {

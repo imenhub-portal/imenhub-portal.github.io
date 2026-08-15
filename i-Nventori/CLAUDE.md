@@ -218,6 +218,29 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   `useful_life_years: 0`, so `_bookValue_` correctly returns cost unchanged).
   Averaging them produced a headline number that meant nothing for either,
   which is what prompted the split.
+- **Terminology is the owner's, and the two words are not interchangeable.**
+  *Aset* = kerusi, meja, komputer, alat besar — tracked one by one, depreciated,
+  and loanable if movable. *Inventori* = alat tulis, kertas, kartrij — tracked
+  by quantity, issued not borrowed, never depreciated. The DB enum stays
+  `fixed_asset`/`consumable`; only the labels changed. Do not reintroduce
+  "Aset Tetap" or "Bahan Guna Habis".
+- **`is_portable` gates who can be handed an asset.** Blank counts as movable
+  so rows predating the column keep working; only an explicit `FALSE` (meja,
+  kerusi) blocks check-out. Enforced server-side in `svcCheckOut`, and the
+  check-out list filters to movable assets only so the admin is never offered
+  a choice the server will reject. Inventory is excluded from that list
+  entirely — pens are issued through Keluar Stok and never come back.
+- **A handover can name a recipient who does not exist yet.** Typing a name +
+  email in the check-out form creates (or matches by lowercased email) a real
+  Custodian row, so the ledger keeps a genuine foreign key and the person is
+  reusable — rather than the name living as loose text. `_resolveRecipient_`
+  owns this.
+- **Both ends of a handover send email**, each carrying a TRX reference, full
+  timestamps, and — on return — the duration held and whether it was late.
+  Sending is best-effort and wrapped in try/catch: the ledger row is already
+  written, and a mail-quota failure must never roll back a handover that
+  physically happened. Both actions return `mailed:true|false` so the toast
+  reports honestly instead of claiming an email that never left.
 - **A stock issue records `custodian_id`, and that is the whole point of it.**
   Before this, "who took the pens" could only be free text in `reason_notes`
   — unsearchable and impossible to total per person. The field is *optional*

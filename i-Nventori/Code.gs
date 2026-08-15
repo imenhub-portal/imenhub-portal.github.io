@@ -59,7 +59,7 @@ const SCHEMA = {
     'unit_cost', 'status',
     'date_acquired', 'date_warranty_expiry', 'date_last_maintained',
     'date_next_inspection', 'date_last_audited', 'date_decommissioned',
-    'salvage_value', 'useful_life_years',
+    'salvage_value', 'useful_life_years', 'is_portable',
     'custodian_id', 'photo_url', 'receipt_url', 'notes',
     'created_at', 'updated_at', 'deleted_at'
   ],
@@ -733,6 +733,7 @@ const ITEM_SCHEMA = {
   date_next_inspection: { type: 'date', label: 'Tarikh pemeriksaan seterusnya' },
   date_last_maintained: { type: 'date', label: 'Tarikh penyelenggaraan terakhir' },
   date_last_audited:    { type: 'date', label: 'Tarikh audit terakhir' },
+  is_portable:          { max: 5, label: 'Mudah alih' },
   photo_url:            { max: 500, label: 'Foto aset' },
   receipt_url:          { max: 500, label: 'Resit/Invois' },
   notes:                { max: 2000, label: 'Catatan' }
@@ -772,6 +773,7 @@ function svcAddItem(p) {
     date_decommissioned: null,
     salvage_value: v.salvage_value || 0,
     useful_life_years: v.useful_life_years || 0,
+    is_portable: (v.is_portable === 'FALSE') ? 'FALSE' : 'TRUE',
     custodian_id: null,
     photo_url: v.photo_url || '',
     receipt_url: v.receipt_url || '',
@@ -813,6 +815,7 @@ function svcUpdateItem(p) {
     unit_cost: v.unit_cost || 0,
     salvage_value: v.salvage_value || 0,
     useful_life_years: v.useful_life_years || 0,
+    is_portable: (v.is_portable === 'FALSE') ? 'FALSE' : 'TRUE',
     date_acquired: v.date_acquired,
     date_warranty_expiry: v.date_warranty_expiry,
     date_last_maintained: v.date_last_maintained,
@@ -895,7 +898,10 @@ function svcStockChange(p, action) {
 function svcCheckOut(p) {
   const v = _validate_({
     id:                   { required: true, type: 'number', label: 'Item' },
-    custodian_id:         { required: true, type: 'number', label: 'Penjaga' },
+    custodian_id:         { type: 'number', label: 'Penerima' },
+    recipient_name:       { max: 120, label: 'Nama penerima' },
+    recipient_email:      { type: 'email', max: 120, label: 'Emel penerima' },
+    recipient_department: { max: 80, label: 'Jabatan' },
     expected_return_date: { required: true, type: 'date', label: 'Tarikh jangka pulang' },
     quantity:             { type: 'number', min: 1, def: 1, label: 'Kuantiti' },
     reason_notes:         { max: 500, label: 'Catatan' }
@@ -906,9 +912,13 @@ function svcCheckOut(p) {
   if (item.status === 'decommissioned' || item.status === 'disposed') {
     throw new Error('Item telah dilupuskan dan tidak boleh dipinjam.');
   }
+  // Fixed furniture is explicitly marked non-portable. Blank means portable,
+  // so existing rows keep working after this column was added.
+  if (item.item_type === 'fixed_asset' && String(item.is_portable) === 'FALSE') {
+    throw new Error('Aset ini ditanda bukan mudah alih — tidak boleh didaftar keluar.');
+  }
 
-  const custodian = _findById_(_readTable_('Custodians'), v.custodian_id);
-  if (!custodian) throw new Error('Penjaga tidak wujud.');
+  const custodian = _resolveRecipient_(v);
 
   // A fixed asset already on loan has no second unit to hand out. This is
   // checked BEFORE the stock check: an asset that is out on loan also has
@@ -943,11 +953,21 @@ function svcCheckOut(p) {
     reason_notes: v.reason_notes || ''
   });
 
-  // Notification is best-effort: a mail quota failure must not roll back
-  // a check-out that already happened.
-  try { _mailCheckOut_(item, custodian, v.expected_return_date, qty); } catch (e) { /* logged below */ }
+  const txnId = _nextId_('Transactions') - 1;   // the row just appended
+  const cat = (_findById_(_readTable_('Categories'), item.category_id) || {}).name;
+  const locRow = _findById_(_readTable_('Locations'), item.location_id);
+  const loc = locRow ? [locRow.building, locRow.floor, locRow.room_number].filter(String).join(' · ') : '';
 
-  return { id: item.id, custodian_id: custodian.id, quantity_available: avail };
+  // Notification is best-effort: a mail quota failure must not roll back a
+  // check-out that already happened and is already in the ledger.
+  var mailed = true;
+  try { _mailCheckOut_(item, custodian, v.expected_return_date, qty, txnId, loc, cat); }
+  catch (e) { mailed = false; }
+
+  return {
+    id: item.id, custodian_id: custodian.id, custodian_name: custodian.name,
+    custodian_email: custodian.email, quantity_available: avail, mailed: mailed
+  };
 }
 
 // ── Check-in ────────────────────────────────────────────────
@@ -986,9 +1006,26 @@ function svcCheckIn(p) {
     reason_notes: v.reason_notes || ''
   });
 
-  return { id: item.id, returned_late: SCOPES.overdue({
-    expected_return_date: loan.expected_return_date, actual_return_date: null
-  }, _startOfDay_(returned)) };
+  const txnId = _nextId_('Transactions') - 1;
+  const custodian = _findById_(_readTable_('Custodians'), loan.custodian_id);
+  const cat = (_findById_(_readTable_('Categories'), item.category_id) || {}).name;
+  const locRow = _findById_(_readTable_('Locations'), item.location_id);
+  const loc = locRow ? [locRow.building, locRow.floor, locRow.room_number].filter(String).join(' · ') : '';
+
+  // Closes the handover in writing on both ends — the person who took the
+  // asset gets written proof they gave it back.
+  var mailed = true;
+  try { _mailCheckIn_(item, custodian, loan, returned, txnId, loc, cat); }
+  catch (e) { mailed = false; }
+
+  return {
+    id: item.id, mailed: mailed,
+    custodian_name: custodian ? custodian.name : null,
+    custodian_email: custodian ? custodian.email : null,
+    returned_late: SCOPES.overdue({
+      expected_return_date: loan.expected_return_date, actual_return_date: null
+    }, _startOfDay_(returned))
+  };
 }
 
 // ── Decommission / disposal (spec 5.2) ──────────────────────
@@ -1201,25 +1238,114 @@ function _fmtDate_(d) {
   return dd + '/' + mm + '/' + x.getFullYear();
 }
 
-// Sent to the custodian on check-out (spec 5.3).
-function _mailCheckOut_(item, custodian, expected, qty) {
+function _fmtDateTime_(d) {
+  if (!d) return '—';
+  const x = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(x.getTime())) return '—';
+  return _fmtDate_(x) + ', ' + ('0' + x.getHours()).slice(-2) + ':' + ('0' + x.getMinutes()).slice(-2);
+}
+
+// Sent to the recipient on check-out (spec 5.3).
+function _mailCheckOut_(item, custodian, expected, qty, txnId, loc, cat) {
   if (!custodian || !custodian.email) return;
+  const now = new Date();
   const body = _emailLayout_('Aset Didaftar Keluar',
-    '<p>Salam ' + _esc_(custodian.name) + ',</p>' +
-    '<p>Aset berikut telah didaftarkan keluar kepada anda:</p>' +
+    '<p>Salam <b>' + _esc_(custodian.name) + '</b>,</p>' +
+    '<p>Aset berikut telah <b>didaftarkan keluar kepada anda</b> dan kini di bawah jagaan anda:</p>' +
     _kvRows_([
+      ['Rujukan', 'TRX_' + ('00000' + txnId).slice(-6)],
       ['Tag Aset', item.asset_tag],
-      ['Nama Item', item.name],
+      ['Nama Aset', item.name],
+      ['Kategori', cat || '—'],
+      ['Lokasi Asal', loc || '—'],
+      ['Nombor Siri', item.serial_number || '—'],
       ['Kuantiti', String(qty)],
-      ['Tarikh Jangka Pulang', _fmtDate_(expected)]
+      ['Tarikh & Masa Didaftar Keluar', _fmtDateTime_(now)],
+      ['Tarikh Jangka Pulang', _fmtDate_(expected)],
+      ['Direkod Oleh', 'Admin i-Nventori']
     ]) +
-    '<p style="color:#b45309;">Sila pulangkan sebelum atau pada tarikh di atas. Anda akan menerima peringatan jika lewat.</p>'
+    '<p style="color:#b45309;margin-top:14px;">Sila pulangkan sebelum atau pada <b>' + _fmtDate_(expected) + '</b>. ' +
+    'Peringatan automatik akan dihantar jika aset belum dipulangkan selepas tarikh tersebut.</p>' +
+    '<p style="font-size:12px;color:#64748b;">Simpan emel ini sebagai rekod penerimaan anda.</p>'
   );
   MailApp.sendEmail({
     to: custodian.email, cc: ADMIN_EMAIL,
-    subject: '[i-Nventori] Aset ' + item.asset_tag + ' didaftar keluar',
+    subject: '[i-Nventori] Aset ' + item.asset_tag + ' didaftar keluar kepada anda',
     htmlBody: body
   });
+}
+
+// Sent to the same person on return, so the handover is closed off in
+// writing on both ends — the recipient gets proof they returned it.
+function _mailCheckIn_(item, custodian, loan, returned, txnId, loc, cat) {
+  if (!custodian || !custodian.email) return;
+  const out = loan && loan.transaction_date ? _fmtDateTime_(loan.transaction_date) : '—';
+  const days = loan && loan.transaction_date ? _daysBetween_(loan.transaction_date, returned) : null;
+  const late = loan && loan.expected_return_date
+    ? _daysBetween_(loan.expected_return_date, returned) : null;
+  const status = (late === null) ? 'Selesai'
+    : (late > 0 ? 'Lewat ' + late + ' hari' : 'Dipulangkan tepat pada masa');
+
+  const body = _emailLayout_('Aset Telah Dipulangkan',
+    '<p>Salam <b>' + _esc_(custodian.name) + '</b>,</p>' +
+    '<p>Terima kasih. Pemulangan aset berikut telah <b>direkodkan</b> dan anda tidak lagi bertanggungjawab ke atasnya:</p>' +
+    _kvRows_([
+      ['Rujukan', 'TRX_' + ('00000' + txnId).slice(-6)],
+      ['Tag Aset', item.asset_tag],
+      ['Nama Aset', item.name],
+      ['Kategori', cat || '—'],
+      ['Nombor Siri', item.serial_number || '—'],
+      ['Tarikh & Masa Didaftar Keluar', out],
+      ['Tarikh & Masa Dipulangkan', _fmtDateTime_(returned)],
+      ['Tempoh Dipinjam', (days === null ? '—' : days + ' hari')],
+      ['Status Pemulangan', status],
+      ['Dikembalikan Ke', loc || '—'],
+      ['Direkod Oleh', 'Admin i-Nventori']
+    ]) +
+    '<p style="color:' + (late > 0 ? '#b45309' : '#047857') + ';margin-top:14px;">' +
+    (late > 0
+      ? 'Aset dipulangkan <b>' + late + ' hari selepas</b> tarikh jangka pulang.'
+      : 'Aset dipulangkan dalam tempoh yang ditetapkan. Terima kasih.') + '</p>' +
+    '<p style="font-size:12px;color:#64748b;">Simpan emel ini sebagai bukti pemulangan anda.</p>'
+  );
+  MailApp.sendEmail({
+    to: custodian.email, cc: ADMIN_EMAIL,
+    subject: '[i-Nventori] Aset ' + item.asset_tag + ' telah dipulangkan',
+    htmlBody: body
+  });
+}
+
+// Resolves the person an asset is being handed to. Either an existing
+// custodian is picked, or a name + email is typed straight into the
+// check-out form. In the latter case the person is created (or matched by
+// email) so the ledger keeps a real foreign key and the same person is
+// reusable next time — rather than the name living as loose text.
+function _resolveRecipient_(v) {
+  if (v.custodian_id) {
+    const found = _findById_(_readTable_('Custodians'), v.custodian_id);
+    if (!found) throw new Error('Penerima tidak wujud.');
+    return found;
+  }
+  if (!v.recipient_name || !v.recipient_email) {
+    throw new Error('Sila pilih penerima, atau masukkan nama dan emel penerima.');
+  }
+  const email = String(v.recipient_email).trim().toLowerCase();
+  const rows  = _readTable_('Custodians');
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].email || '').toLowerCase() === email) return rows[i];
+  }
+  const now = new Date();
+  const id  = _nextId_('Custodians');
+  const rec = {
+    id: id,
+    employee_id: 'ADH-' + ('000' + id).slice(-3),   // ad-hoc, still unique
+    name: String(v.recipient_name).trim(),
+    email: email,
+    department: v.recipient_department || '',
+    created_at: now, updated_at: now
+  };
+  _insert_('Custodians', rec);
+  return rec;
 }
 
 // ============================================================

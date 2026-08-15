@@ -860,7 +860,11 @@ function pill(status) {
   return '<span class="pill ' + m.cls + '"><i></i>' + esc(m.label) + '</span>';
 }
 
-var TYPE_LABEL = { fixed_asset: 'Aset Tetap', consumable: 'Bahan Guna Habis' };
+// The owner's vocabulary, and it is not interchangeable:
+//   Aset      = kerusi, meja, komputer, alat besar — tracked individually
+//   Inventori = alat tulis, kertas, kartrij — tracked by quantity
+// The DB enum stays fixed_asset/consumable; only the labels change.
+var TYPE_LABEL = { fixed_asset: 'Aset', consumable: 'Inventori' };
 var ACTION_LABEL = {
   stock_add: 'Tambah Stok', stock_remove: 'Keluar Stok', check_out: 'Daftar Keluar',
   check_in: 'Daftar Masuk', decommission: 'Pelupusan', audit_adjust: 'Pelarasan Audit'
@@ -1294,8 +1298,8 @@ function viewDashboard() {
     '</div>';
 
   // ══════════════ SECTION 1 — ASET TETAP ══════════════
-  h += sectionHead('Aset Tetap',
-    'Peralatan tahan lama — komputer, monitor, perabot. Dinilai selepas susut nilai.',
+  h += sectionHead('Aset',
+    'Kerusi, meja, komputer dan alat besar — dijejak seunit, dinilai selepas susut nilai.',
     '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'items\')">Lihat semua ' + icon('i-out', 13) + '</button>');
 
   h += '<div class="dash-top">';
@@ -1369,7 +1373,7 @@ function viewDashboard() {
   h += '</div>';
 
   // ══════════════ SECTION 2 — INVENTORI GUNA HABIS ══════════════
-  h += sectionHead('Inventori Guna Habis',
+  h += sectionHead('Inventori',
     'Alat tulis, kertas, kartrij — dikira mengikut baki stok, bukan susut nilai.',
     '<button class="btn btn-sm" onclick="go(\'stock\')">Urus stok ' + icon('i-out', 13) + '</button>');
 
@@ -1381,16 +1385,16 @@ function viewDashboard() {
   }).slice(0, 3);
 
   h += '<div class="hero">' +
-    '<div class="lbl">Nilai Stok Semasa ' + hintDot('Kos seunit didarab baki stok. Bahan guna habis tidak disusut nilai — ia hanya berkurang apabila dikeluarkan.') + '</div>' +
+    '<div class="lbl">Nilai Stok Semasa ' + hintDot('Kos seunit didarab baki stok. Item inventori tidak disusut nilai — ia hanya berkurang apabila dikeluarkan.') + '</div>' +
     '<div class="big mono">' + money(stockValue) + '</div>' +
     '<div class="trend ' + (low ? 'down' : 'up') + '">' +
       (low ? '↓ ' + low + ' jenis stok rendah' : '✓ paras selamat') +
       ' <span>· ' + stockUnits + ' unit di tangan</span></div>' +
     '<div class="hero-actions">' +
-      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Bahan Baharu</button>' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>' +
       '<button class="btn" onclick="go(\'stock\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
     '</div>' +
-    '<div class="substrip"><div class="cap">Nilai stok tertinggi <b>· ' + cons.length + ' jenis bahan</b></div>' +
+    '<div class="substrip"><div class="cap">Nilai stok tertinggi <b>· ' + cons.length + ' jenis item</b></div>' +
     '<div class="chips">' +
       (topCons.length ? topCons.map(function (i, n) {
         return '<div class="chip"><div class="t">' +
@@ -1403,7 +1407,7 @@ function viewDashboard() {
     '</div></div></div>';
 
   h += '<div class="tiles">' +
-    tile('i-layers', 'Jenis Bahan', cons.length, 'Dalam inventori', 'stock', true,
+    tile('i-layers', 'Jenis Item', cons.length, 'Dalam inventori', 'stock', true,
          '<div class="trend"><span>' + stockUnits + ' unit di tangan</span></div>') +
     tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'stock', false,
          low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
@@ -1454,7 +1458,7 @@ function viewDashboard() {
   }), 'Semua stok berada pada paras selamat.');
 
   h += '<div class="card"><div class="card-head">' +
-    '<span style="color:var(--muted)">' + icon('i-chart', 16) + '</span><h3>Bahan Paling Kerap Dikeluarkan</h3>' +
+    '<span style="color:var(--muted)">' + icon('i-chart', 16) + '</span><h3>Item Paling Kerap Dikeluarkan</h3>' +
     '<div class="spacer"></div><span class="pill pill-mute">30 hari</span></div><div class="card-body">';
   if (!issued30.items.length) {
     h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">Tiada pengeluaran dalam 30 hari.</p>';
@@ -1623,7 +1627,7 @@ function viewItems() {
 
   h += '<div class="card"><div class="filters">' +
     '<div class="tabs">' +
-      tabBtn('all', 'Semua') + tabBtn('fixed_asset', 'Aset Tetap') + tabBtn('consumable', 'Habis Pakai') +
+      tabBtn('all', 'Semua') + tabBtn('fixed_asset', 'Aset') + tabBtn('consumable', 'Inventori') +
     '</div>' +
     '<input id="fq" placeholder="Cari nama, tag, siri…" value="' + esc(FILTER.q) + '" oninput="FILTER.q=this.value;renderTableOnly()">' +
     selectFilter('fstatus', 'status', 'Semua Status', (D.meta.item_status || []).map(function (s) {
@@ -1811,12 +1815,12 @@ function viewStock() {
   var value = cons.reduce(function (s, i) { return s + Number(i.unit_cost || 0) * Number(i.quantity_available || 0); }, 0);
 
   var h = '<div class="page-head"><div><h2>Stok</h2>' +
-    '<p>' + cons.length + ' bahan guna habis · ' + low.length + ' pada paras rendah</p></div>' +
+    '<p>' + cons.length + ' item inventori · ' + low.length + ' pada paras rendah</p></div>' +
     '<div class="spacer"></div>' +
-    '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Bahan Baharu</button></div>';
+    '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button></div>';
 
   h += '<div class="grid g-3" style="margin-bottom:16px">' +
-    kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Bahan', cons.length, 'Dalam inventori', 'stock') +
+    kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Item', cons.length, 'Dalam inventori', 'stock') +
     kpi('i-warn', 'var(--warn)', 'var(--warn-bg)', 'Perlu Diisi Semula', low.length, 'Pada atau bawah paras minimum', 'stock') +
     kpi('i-money', 'var(--ok)', 'var(--ok-bg)', 'Nilai Stok', moneyShort(value), 'Kos × baki semasa', 'stock') +
     '</div>';
@@ -1826,7 +1830,7 @@ function viewStock() {
   }
 
   h += '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-    '<th>Tag</th><th>Bahan</th><th>Lokasi</th><th class="t-num">Baki</th><th class="t-num">Minimum</th>' +
+    '<th>Tag</th><th>Item</th><th>Lokasi</th><th class="t-num">Baki</th><th class="t-num">Minimum</th>' +
     '<th style="width:130px">Paras</th><th class="t-num">Nilai</th><th style="width:170px"></th></tr></thead><tbody>';
 
   h += cons.map(function (i) {
@@ -2190,6 +2194,12 @@ function openItemDrawer(id, presetType) {
     '</div>' +
     field('Jangka Hayat (tahun)', input('fLife', 'number', it ? it.useful_life_years : '', 'min="0" step="1" oninput="previewDepr()"'),
       'Kosongkan jika aset tidak disusut nilai') +
+    '<div id="portableRow" class="field"><label>Aset Mudah Alih</label>' +
+      select('fPortable', [
+        { v: 'TRUE',  t: 'Ya — boleh didaftar keluar kepada individu' },
+        { v: 'FALSE', t: 'Tidak — kekal di lokasi (cth. meja, kerusi)' }
+      ], (it && String(it.is_portable) === 'FALSE') ? 'FALSE' : 'TRUE', '') +
+      '<div class="hint">Hanya aset mudah alih boleh dipinjamkan</div></div>' +
     '<div id="deprPreview"></div>' +
     '</fieldset>';
 
@@ -2225,6 +2235,9 @@ function openItemDrawer(id, presetType) {
 
 function toggleItemType() {
   var t = val('fType');
+  // "Mudah alih" is an asset concept; stock quantity is an inventory one.
+  var pr = $('portableRow');
+  if (pr) pr.style.display = (t === 'fixed_asset') ? '' : 'none';
   var row = $('qtyRow');
   if (!row) return;
   // A fixed asset is one physical thing; the quantity fields only make
@@ -2264,6 +2277,7 @@ function saveItem(btn, id) {
     date_next_inspection: val('fInspect'),
     date_last_maintained: val('fMaint'),
     date_last_audited: val('fAudit'),
+    is_portable: (type === 'fixed_asset') ? val('fPortable') : 'TRUE',
     photo_url: UPLOADS.photo_url,
     receipt_url: UPLOADS.receipt_url,
     notes: val('fNotes')
@@ -2273,36 +2287,69 @@ function saveItem(btn, id) {
 
 // ── Check-out ─────────────────────────────────────────────────────────
 function openCheckOut(id) {
+  // Only movable ASSETS are loanable. Fixed furniture is marked
+  // is_portable FALSE, and inventory (pens, paper) leaves through "Keluar
+  // Stok" instead — it is issued, not borrowed, and never comes back.
+  // The server enforces both rules; this keeps them out of the list so the
+  // admin is never offered a choice that will be rejected.
   var avail = (D.items || []).filter(function (i) {
-    return !i.open_loan && i.status !== 'decommissioned' && i.status !== 'disposed' && Number(i.quantity_available) > 0;
+    return i.item_type === 'fixed_asset' &&
+           String(i.is_portable) !== 'FALSE' &&
+           !i.open_loan &&
+           i.status !== 'decommissioned' && i.status !== 'disposed' &&
+           Number(i.quantity_available) > 0;
   });
   if (!avail.length) {
-    openDrawer('Daftar Keluar', '', '<div class="err-box">Tiada item tersedia untuk dipinjam.</div>');
+    openDrawer('Daftar Keluar', 'Tiada aset mudah alih tersedia',
+      '<div class="info-box" style="margin-bottom:0">Tiada aset mudah alih yang tersedia untuk dipinjam sekarang.<br><br>' +
+      'Sebab lazim: semua sudah dipinjam, atau aset ditanda <b>bukan mudah alih</b> (meja, kerusi).<br><br>' +
+      'Untuk alat tulis dan kertas, gunakan <b>Keluar Stok</b> di bahagian Inventori — ia dikeluarkan, bukan dipinjam.</div>',
+      '<button class="btn" onclick="closeDrawer()">Tutup</button>' +
+      '<button class="btn btn-primary" onclick="closeDrawer();go(\'stock\')">Buka Stok</button>');
     return;
   }
-  if (!(D.custodians || []).length) {
-    openDrawer('Daftar Keluar', '',
-      '<div class="err-box">Sila daftarkan sekurang-kurangnya satu penjaga aset di Tetapan terlebih dahulu.</div>',
-      '<button class="btn" onclick="closeDrawer()">Batal</button>' +
-      '<button class="btn btn-primary" onclick="closeDrawer();go(\'settings\')">Buka Tetapan</button>');
-    return;
-  }
-
   var due = new Date(); due.setDate(due.getDate() + 14);
-  var b = field('Item', select('cItem', avail.map(function (i) {
+  var hasPeople = (D.custodians || []).length > 0;
+
+  var b = field('Aset', select('cItem', avail.map(function (i) {
       return { v: i.id, t: i.asset_tag + ' — ' + i.name + ' (baki ' + i.quantity_available + ')' };
-    }), id || '', 'onchange="coQtyToggle()"'), null, true) +
-    field('Penjaga', select('cCust', (D.custodians || []).map(function (c) {
-      return { v: c.id, t: c.name + ' — ' + c.employee_id + (c.department ? ' · ' + c.department : '') };
-    }), '', ''), 'Penjaga akan menerima emel pemberitahuan', true) +
-    '<div id="coQty"></div>' +
+    }), id || '', 'onchange="coQtyToggle()"'), null, true);
+
+  // Two ways to name the recipient. Typing a name + email is the default
+  // when nobody is registered yet, so a handover never blocks on setting up
+  // reference data first — the person is created behind the scenes.
+  b += '<fieldset class="fs"><legend>Penerima</legend>' +
+    '<div class="tabs" style="margin-bottom:12px">' +
+      '<button type="button" id="coTabNew" class="' + (hasPeople ? '' : 'active') + '" onclick="coMode(\'new\')">Nama &amp; emel baharu</button>' +
+      '<button type="button" id="coTabPick" class="' + (hasPeople ? 'active' : '') + '" onclick="coMode(\'pick\')">Pilih sedia ada</button>' +
+    '</div>' +
+    '<div id="coPick" class="' + (hasPeople ? '' : 'hide') + '">' +
+      (hasPeople
+        ? field('Penerima', select('cCust', (D.custodians || []).map(function (c) {
+            return { v: c.id, t: c.name + ' — ' + c.email + (c.department ? ' · ' + c.department : '') };
+          }), '', ''))
+        : '<p style="font-size:12.5px;color:var(--muted-2);margin:0">Belum ada penerima berdaftar.</p>') +
+    '</div>' +
+    '<div id="coNew" class="' + (hasPeople ? 'hide' : '') + '">' +
+      field('Nama Penuh', input('cName', 'text', '', 'placeholder="cth. Zulkifli bin Omar"'), null, true) +
+      field('Emel', input('cEmail', 'email', '', 'placeholder="nama@ukm.edu.my"'),
+        'Emel pemberitahuan akan dihantar ke alamat ini', true) +
+      field('Jabatan', input('cDept', 'text', '', 'placeholder="cth. Pentadbiran"')) +
+    '</div>' +
+    '</fieldset>';
+
+  b += '<div id="coQty"></div>' +
     field('Tarikh Jangka Pulang', input('cDue', 'date', inputDate(due), 'min="' + inputDate(new Date()) + '"'),
       'Pinjaman lewat akan disenaraikan sebagai amaran', true) +
-    field('Catatan', '<textarea id="cNote" placeholder="Tujuan peminjaman…"></textarea>');
+    field('Catatan', '<textarea id="cNote" placeholder="Tujuan peminjaman…"></textarea>') +
+    '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
+      ' Penerima akan menerima emel pengesahan serta-merta — lengkap dengan tag aset, ' +
+      'tarikh &amp; masa, dan tarikh jangka pulang.</div>';
 
-  openDrawer('Daftar Keluar Aset', 'Serahkan aset kepada penjaga', b,
+  openDrawer('Daftar Keluar Aset', 'Serahkan aset kepada individu', b,
     '<button class="btn" onclick="closeDrawer()">Batal</button>' +
     '<button class="btn btn-primary" onclick="doCheckOut(this)">' + icon('i-out', 15) + ' Daftar Keluar</button>');
+  CO_MODE = hasPeople ? 'pick' : 'new';
   coQtyToggle();
 }
 function coQtyToggle() {
@@ -2314,13 +2361,42 @@ function coQtyToggle() {
         'Baki tersedia: ' + it.quantity_available)
     : '';
 }
+// Which recipient mode the check-out form is currently in.
+var CO_MODE = 'new';
+function coMode(m) {
+  CO_MODE = m;
+  $('coPick').classList.toggle('hide', m !== 'pick');
+  $('coNew').classList.toggle('hide', m !== 'new');
+  $('coTabPick').classList.toggle('active', m === 'pick');
+  $('coTabNew').classList.toggle('active', m === 'new');
+}
+
 function doCheckOut(btn) {
-  submitAction(btn, 'CheckOut', {
-    id: num('cItem'), custodian_id: num('cCust'),
+  var p = {
+    id: num('cItem'),
     expected_return_date: val('cDue'),
     quantity: $('cQty') ? num('cQty') : 1,
     reason_notes: val('cNote')
-  }, 'Aset didaftar keluar. Emel dihantar kepada penjaga.');
+  };
+  if (CO_MODE === 'pick' && $('cCust') && val('cCust')) {
+    p.custodian_id = num('cCust');
+  } else {
+    p.recipient_name = val('cName');
+    p.recipient_email = val('cEmail');
+    p.recipient_department = val('cDept');
+  }
+  // The server reports whether the notification actually left, so the toast
+  // never claims an email was sent when the mail quota rejected it.
+  busy(btn);
+  api('CheckOut', p, function (res) {
+    refresh(function () {
+      unbusy(btn); closeDrawer();
+      toast(res && res.mailed === false
+        ? 'Aset didaftar keluar — tetapi emel gagal dihantar.'
+        : 'Aset didaftar keluar. Emel dihantar kepada ' + ((res && res.custodian_email) || 'penerima') + '.',
+        res && res.mailed === false ? 'err' : 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
 }
 
 // ── Check-in ──────────────────────────────────────────────────────────
@@ -2337,16 +2413,27 @@ function openCheckIn(id) {
     (late ? 'Lewat ' + Math.abs(d) + ' hari (sepatutnya ' + fmtDate(l.expected_return_date) + ')'
           : 'Jangka pulang ' + fmtDate(l.expected_return_date)) + '</div>' +
     field('Tarikh Pulang Sebenar', input('kDate', 'date', inputDate(new Date()))) +
-    field('Catatan / Keadaan Aset', '<textarea id="kNote" placeholder="cth. keadaan baik, tiada kerosakan"></textarea>');
+    field('Catatan / Keadaan Aset', '<textarea id="kNote" placeholder="cth. keadaan baik, tiada kerosakan"></textarea>') +
+    '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
+      ' ' + esc(custName(l.custodian_id)) + ' akan menerima emel pengesahan pemulangan, ' +
+      'lengkap dengan tarikh &amp; masa dan tempoh pinjaman.</div>';
 
   openDrawer('Daftar Masuk Aset', 'Terima pemulangan dan bebaskan aset', b,
     '<button class="btn" onclick="closeDrawer()">Batal</button>' +
     '<button class="btn btn-primary" onclick="doCheckIn(this,' + id + ')">' + icon('i-in', 15) + ' Daftar Masuk</button>');
 }
 function doCheckIn(btn, id) {
-  submitAction(btn, 'CheckIn', {
-    id: id, actual_return_date: val('kDate'), reason_notes: val('kNote')
-  }, 'Aset dipulangkan dan kini tersedia.');
+  busy(btn);
+  api('CheckIn', { id: id, actual_return_date: val('kDate'), reason_notes: val('kNote') },
+    function (res) {
+      refresh(function () {
+        unbusy(btn); closeDrawer();
+        toast(res && res.mailed === false
+          ? 'Pemulangan direkod — tetapi emel gagal dihantar.'
+          : 'Pemulangan direkod. Emel pengesahan dihantar kepada ' + ((res && res.custodian_name) || 'penerima') + '.',
+          res && res.mailed === false ? 'err' : 'ok');
+      });
+    }, function (e) { unbusy(btn); drawerErr(e); });
 }
 
 // ── Stock add / remove ────────────────────────────────────────────────
