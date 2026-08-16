@@ -25,7 +25,7 @@
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
   var API_URL = 'https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec';
-  var API_FNS = ['getInitialData', 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload'];
+  var API_FNS = ['getInitialData', 'getPublicCatalog', 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload'];
   function makeRunner() {
     var onOk = function () {};
     var onErr = function (e) { console.error('[API]', e); };
@@ -77,6 +77,9 @@ window.__earlyPending = false;
   try {
     var pass = localStorage.getItem('inv_pass') || '';
     window.__earlyPass = pass;
+    // Without a stored password this visitor is a requester, not an admin,
+    // so there is no point prefetching the admin payload they cannot see.
+    if (!pass) return;
     window.__earlyPending = true;
     google.script.run
       .withSuccessHandler(function (d) {
@@ -576,6 +579,39 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
   padding:2px 9px; font-size:10px; font-weight:600;
 }
 
+/* ═══ PUBLIC PAGE (PEMOHON) ══════════════════════════════════════════ */
+#public{max-width:1180px; margin:0 auto; padding:18px 20px 50px}
+.pub-head{
+  display:flex; align-items:center; gap:14px; padding:16px 20px; background:var(--surface);
+  border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); margin-bottom:18px;
+}
+.pub-hero{margin:26px 4px 20px}
+.pub-hero h1{font-size:30px; letter-spacing:-.035em; font-weight:600}
+.pub-hero p{margin:7px 0 0; color:var(--muted); font-size:14px; max-width:620px}
+.pub-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px}
+.pub-stat{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:15px 17px; box-shadow:var(--shadow-card);
+}
+.pub-stat .v{font-size:25px; font-weight:700; letter-spacing:-.04em; line-height:1}
+.pub-stat .l{font-size:12px; color:var(--muted); margin-top:5px}
+.pub-filters{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px}
+.pub-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:14px}
+.pub-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:15px; box-shadow:var(--shadow-card); display:flex; flex-direction:column;
+  transition:box-shadow .15s, transform .15s;
+}
+.pub-card:hover{box-shadow:var(--shadow-card-hover); transform:translateY(-1px)}
+.pub-card-top{display:flex; align-items:flex-start; gap:10px; margin-bottom:11px}
+.pub-name{font-weight:600; font-size:14px; line-height:1.3}
+.pub-meta{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; margin-top:5px}
+.pub-note{
+  font-size:11.5px; color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn-bd);
+  border-radius:9px; padding:7px 9px; margin-top:9px; display:flex; align-items:center; gap:6px;
+}
+.pub-foot{text-align:center; color:var(--muted-2); font-size:11.5px; margin-top:34px}
+
 /* ═══ RESPONSIVE ═════════════════════════════════════════════════════ */
 @media (max-width:1180px){
   .dash-top{grid-template-columns:1fr 1fr}
@@ -588,6 +624,10 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
   .userchip{padding:4px}
 }
 @media (max-width:820px){
+  .pub-stats{grid-template-columns:1fr}
+  .pub-grid{grid-template-columns:1fr}
+  #public{padding:10px 12px 40px}
+  .pub-hero h1{font-size:23px}
   #app{padding:8px 8px 14px}
   .shell{border-radius:20px; min-height:calc(100vh - 22px)}
   .dash-top,.tiles,.g-4,.g-3,.g-2,.row-2,.chips{grid-template-columns:1fr}
@@ -649,6 +689,40 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 <g id="i-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></g>
 </defs></svg>
 
+<!-- ═══ PUBLIC PAGE — PEMOHON ════════════════════════════════════════
+     The default landing view. No password: staff browse availability and
+     submit a request, which an admin then approves. ═══════════════════ -->
+<div id="public" class="hide">
+  <div class="pub-head">
+    <div class="logo" style="border:0;padding:0">
+      <div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
+      <div><b>i-Nventori</b><span>OFFICE</span></div>
+    </div>
+    <div style="flex:1"></div>
+    <button class="icon-btn" id="pubTheme" onclick="setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')" title="Tukar tema">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun"/></svg>
+    </button>
+    <button class="btn btn-sm" onclick="loadCatalog();toast('Senarai disegarkan','ok')">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg>
+      Segar
+    </button>
+    <button class="btn btn-sm btn-primary" onclick="showGate()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-lock"/></svg>
+      Log Masuk Admin
+    </button>
+  </div>
+
+  <div class="pub-hero">
+    <h1>Mohon Aset &amp; Inventori</h1>
+    <p>Semak apa yang tersedia dan di mana ia berada, kemudian hantar permohonan.
+       Admin akan meluluskan dan anda dimaklumkan melalui emel.</p>
+  </div>
+
+  <div id="pubBody"><div id="loading">Memuatkan senarai…</div></div>
+
+  <div class="pub-foot">i-Nventori OFFICE · IMEN, UKM</div>
+</div>
+
 <!-- ═══ LOGIN GATE ═══════════════════════════════════════════════════ -->
 <div id="gate" class="hide">
   <div class="gate-card">
@@ -665,7 +739,8 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       Log Masuk
     </button>
     <p style="margin-top:18px;font-size:11.5px;color:var(--muted-2);text-align:center">
-      Akses terhad kepada admin inventori IMEN.
+      Akses terhad kepada admin inventori IMEN.<br>
+      <a href="#" onclick="showPublic();return false" style="font-weight:600">&larr; Kembali ke halaman pemohon</a>
     </p>
   </div>
 </div>
@@ -685,6 +760,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       <button data-view="items" onclick="go('items')">Inventori</button>
       <button data-view="loans" onclick="go('loans')">Pinjaman<span class="badge hide" id="bLoans">0</span></button>
       <button data-view="stock" onclick="go('stock')">Stok<span class="badge hide" id="bStock">0</span></button>
+      <button data-view="requests" onclick="go('requests')">Permohonan<span class="badge hide" id="bReq">0</span></button>
       <button data-view="ledger" onclick="go('ledger')">Log Audit</button>
       <button data-view="reports" onclick="go('reports')">Laporan</button>
     </nav>
@@ -726,6 +802,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       <button class="rail-btn" data-view="items" onclick="go('items')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
       <button class="rail-btn" data-view="loans" onclick="go('loans')" title="Daftar Keluar/Masuk"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-swap"/></svg></button>
       <button class="rail-btn" data-view="stock" onclick="go('stock')" title="Stok"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
+      <button class="rail-btn" data-view="requests" onclick="go('requests')" title="Permohonan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></button>
       <button class="rail-btn" data-view="ledger" onclick="go('ledger')" title="Log Audit"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg></button>
       <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
       <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
@@ -965,10 +1042,17 @@ function showGateErr(m) {
   el.textContent = m;
   el.classList.remove('hide');
 }
+function showGate() {
+  $('public').classList.add('hide');
+  $('app').classList.add('hide');
+  $('gate').classList.remove('hide');
+  setTimeout(function () { var g = $('gatePass'); if (g) g.focus(); }, 60);
+}
+
 function doLogout() {
   PASS = '';
   try { localStorage.removeItem('inv_pass'); localStorage.removeItem(CACHE_KEY); } catch (e) {}
-  location.reload();
+  location.reload();   // lands on the public page, since no password remains
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1030,7 +1114,11 @@ window.addEventListener('DOMContentLoaded', function () {
     $('app').classList.remove('hide');
     boot();
   } else {
-    $('gate').classList.remove('hide');
+    // Everyone else is a requester. The gate is one click away.
+    var cachedPub = null;
+    try { cachedPub = JSON.parse(localStorage.getItem('inv_pub_v1') || 'null'); } catch (e) {}
+    if (cachedPub) PUB = cachedPub;    // instant paint, same as the admin side
+    showPublic();
   }
   var th = 'light';
   try { th = localStorage.getItem('inv_theme') || 'light'; } catch (e) {}
@@ -1090,6 +1178,7 @@ function render() {
   else if (VIEW === 'items')     el.innerHTML = viewItems();
   else if (VIEW === 'loans')     el.innerHTML = viewLoans();
   else if (VIEW === 'stock')     el.innerHTML = viewStock();
+  else if (VIEW === 'requests')  el.innerHTML = viewRequests();
   else if (VIEW === 'ledger')    el.innerHTML = viewLedger();
   else if (VIEW === 'reports')   el.innerHTML = viewReports();
   else if (VIEW === 'settings')  el.innerHTML = viewSettings();
@@ -1099,10 +1188,12 @@ function renderBadges() {
   var a = D.alerts || {};
   var overdue = (a.overdue || []).length;
   var low = (a.low_stock || []).length;
-  var totalAlerts = overdue + low + (a.inspection || []).length;
+  var pendingReq = (D.requests || []).filter(function (r) { return r.status === 'pending'; }).length;
+  var totalAlerts = overdue + low + pendingReq + (a.inspection || []).length;
 
   setBadge('bLoans', overdue);
   setBadge('bStock', low);
+  setBadge('bReq', (D.requests || []).filter(function (r) { return r.status === 'pending'; }).length);
   var dot = $('bellDot');
   if (totalAlerts) { dot.textContent = totalAlerts > 99 ? '99+' : totalAlerts; dot.classList.remove('hide'); }
   else dot.classList.add('hide');
@@ -2823,6 +2914,329 @@ function palKey(e) {
 function palPick(id) {
   closePalette();
   openHistory(id);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  PUBLIC PAGE — PEMOHON
+//
+//  What a member of staff sees when they open the link. No password, and
+//  deliberately no access to the admin payload: it calls getPublicCatalog,
+//  which carries availability and location but never the name of whoever
+//  is holding something.
+// ══════════════════════════════════════════════════════════════════════
+var PUB = null;                       // the catalog
+var PUB_FILTER = { q: '', type: 'all' };
+
+function showPublic() {
+  $('gate').classList.add('hide');
+  $('app').classList.add('hide');
+  $('public').classList.remove('hide');
+  loadCatalog();
+}
+
+function loadCatalog() {
+  var host = $('pubBody');
+  if (!PUB) host.innerHTML = '<div id="loading">Memuatkan senarai…</div>';
+  google.script.run
+    .withSuccessHandler(function (d) {
+      PUB = d || { items: [] };
+      try { localStorage.setItem('inv_pub_v1', JSON.stringify(PUB)); } catch (e) {}
+      renderCatalog();
+    })
+    .withFailureHandler(function (e) {
+      if (PUB) return;               // a warm cache is better than an error
+      host.innerHTML = '<div class="empty">' + icon('i-warn', 30) +
+        '<p>Tidak dapat memuatkan senarai. Sila muat semula.</p></div>';
+    })
+    .getPublicCatalog();
+}
+
+function renderCatalog() {
+  var host = $('pubBody');
+  if (!host || !PUB) return;
+  var q = PUB_FILTER.q.toLowerCase().trim();
+  var rows = (PUB.items || []).filter(function (i) {
+    if (PUB_FILTER.type !== 'all' && i.item_type !== PUB_FILTER.type) return false;
+    if (!q) return true;
+    return [i.name, i.asset_tag, i.category, i.location].join(' ').toLowerCase().indexOf(q) !== -1;
+  });
+
+  var assets = (PUB.items || []).filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var avail  = assets.filter(function (i) { return i.available; }).length;
+
+  var h = '<div class="pub-stats">' +
+    pubStat(avail, 'Aset tersedia') +
+    pubStat(assets.length - avail, 'Sedang dipinjam') +
+    pubStat((PUB.items || []).filter(function (i) { return i.item_type === 'consumable' && i.available; }).length,
+            'Item inventori ada stok') +
+    '</div>';
+
+  h += '<div class="pub-filters">' +
+    '<div class="tabs">' +
+      pubTab('all', 'Semua') + pubTab('fixed_asset', 'Aset') + pubTab('consumable', 'Inventori') +
+    '</div>' +
+    '<div class="searchbox" style="flex:1;max-width:320px">' +
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>' +
+      '<input id="pubQ" placeholder="Cari nama, kategori, lokasi…" value="' + esc(PUB_FILTER.q) + '" oninput="PUB_FILTER.q=this.value;renderCatalog()">' +
+    '</div></div>';
+
+  if (!rows.length) {
+    h += '<div class="empty">' + icon('i-box', 30) + '<p>Tiada item sepadan.</p></div>';
+    host.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="pub-grid">' + rows.map(function (i) {
+    var isAsset = i.item_type === 'fixed_asset';
+    var badge = i.available
+      ? '<span class="pill pill-ok"><i></i>Tersedia</span>'
+      : (isAsset
+          ? '<span class="pill pill-warn"><i></i>Sedang dipinjam</span>'
+          : '<span class="pill pill-err"><i></i>Kehabisan stok</span>');
+
+    // An unavailable asset shows WHEN it comes back — never WHO has it.
+    var note = '';
+    if (!i.available && isAsset) {
+      note = i.expected_return_date
+        ? '<div class="pub-note">' + icon('i-clock', 13) + ' Dijangka pulang ' + fmtDate(i.expected_return_date) +
+          (i.is_overdue ? ' <b style="color:var(--err)">(sudah lewat)</b>' : '') + '</div>'
+        : '<div class="pub-note">' + icon('i-clock', 13) + ' Tarikh pulang belum ditetapkan</div>';
+    }
+
+    return '<div class="pub-card">' +
+      '<div class="pub-card-top">' +
+        '<span class="rowicon" style="background:' + (isAsset ? 'var(--accent-soft)' : 'var(--surface-3)') +
+          ';color:' + (isAsset ? 'var(--accent)' : 'var(--ink-2)') + '">' +
+          icon(isAsset ? 'i-box' : 'i-layers', 14) + '</span>' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="pub-name">' + esc(i.name) + '</div>' +
+          '<div class="t-sub">' + esc(i.category || TYPE_LABEL[i.item_type]) +
+            (i.asset_tag ? ' · <span class="mono">' + esc(i.asset_tag) + '</span>' : '') + '</div>' +
+        '</div>' + badge +
+      '</div>' +
+      '<div class="pub-meta">' + icon('i-pin', 13) + ' ' + esc(i.location || '—') + '</div>' +
+      (!isAsset ? '<div class="pub-meta">' + icon('i-layers', 13) + ' Baki <b class="mono">' + i.quantity_available + '</b> unit</div>' : '') +
+      note +
+      '<button class="btn ' + (i.available ? 'btn-accent' : '') + ' btn-block" style="margin-top:12px"' +
+        (i.available ? ' onclick="openRequest(' + i.id + ')"' : ' disabled') + '>' +
+        (i.available
+          ? icon('i-check', 14) + ' Mohon'
+          : (isAsset ? 'Tunggu dipulangkan' : 'Tiada stok')) + '</button>' +
+      '</div>';
+  }).join('') + '</div>';
+
+  host.innerHTML = h;
+}
+
+function pubStat(n, label) {
+  return '<div class="pub-stat"><div class="v mono">' + n + '</div><div class="l">' + esc(label) + '</div></div>';
+}
+function pubTab(v, label) {
+  return '<button class="' + (PUB_FILTER.type === v ? 'active' : '') + '" onclick="PUB_FILTER.type=\'' + v + '\';renderCatalog()">' + label + '</button>';
+}
+
+// ── Request form ──────────────────────────────────────────────────────
+function openRequest(id) {
+  var i = (PUB.items || []).filter(function (x) { return Number(x.id) === Number(id); })[0];
+  if (!i) return;
+  var isAsset = i.item_type === 'fixed_asset';
+
+  // Remember the requester so they do not retype it every time.
+  var me = {};
+  try { me = JSON.parse(localStorage.getItem('inv_me') || '{}'); } catch (e) {}
+
+  var need = new Date(); need.setDate(need.getDate() + 3);
+
+  var b = '<div class="info-box"><b>' + esc(i.name) + '</b>' +
+    (i.asset_tag ? ' · <span class="mono">' + esc(i.asset_tag) + '</span>' : '') +
+    '<br>' + esc(i.category || '') + ' · ' + esc(i.location || '') +
+    (isAsset ? '' : '<br>Baki tersedia: <b class="mono">' + i.quantity_available + '</b> unit') + '</div>';
+
+  b += '<fieldset class="fs"><legend>Maklumat Pemohon</legend>' +
+    field('Nama Penuh', input('qName', 'text', me.name || '', 'placeholder="cth. Farah binti Ali"'), null, true) +
+    field('Emel', input('qEmail', 'email', me.email || '', 'placeholder="nama@ukm.edu.my"'),
+      'Kemas kini permohonan akan dihantar ke sini', true) +
+    field('Jabatan', input('qDept', 'text', me.dept || '', 'placeholder="cth. Akademik"')) +
+    '</fieldset>';
+
+  b += '<fieldset class="fs"><legend>Butiran Permohonan</legend>' +
+    (isAsset ? '' : field('Kuantiti', input('qQty', 'number', 1, 'min="1" max="' + i.quantity_available + '" step="1"'),
+      'Maksimum ' + i.quantity_available + ' unit', true)) +
+    field('Tujuan', '<textarea id="qPurpose" placeholder="cth. Bengkel pelajar pada 20 Ogos"></textarea>',
+      'Bantu admin membuat keputusan', true) +
+    field('Tarikh Diperlukan', input('qNeed', 'date', inputDate(need), 'min="' + inputDate(new Date()) + '"')) +
+    '</fieldset>';
+
+  b += '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
+    ' Permohonan anda akan dihantar kepada admin untuk kelulusan. Anda akan menerima emel ' +
+    'pengesahan sekarang, dan satu lagi apabila keputusan dibuat.</div>';
+
+  openDrawer('Mohon ' + (isAsset ? 'Aset' : 'Item'), i.name, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-accent" onclick="submitRequest(this,' + id + ')">' +
+      icon('i-check', 15) + ' Hantar Permohonan</button>');
+}
+
+function submitRequest(btn, id) {
+  var p = {
+    item_id: id,
+    requester_name: val('qName'),
+    requester_email: val('qEmail'),
+    requester_department: val('qDept'),
+    quantity: $('qQty') ? num('qQty') : 1,
+    purpose: val('qPurpose'),
+    needed_date: val('qNeed')
+  };
+  busy(btn, 'Menghantar…');
+  // No password: SubmitRequest is a public action.
+  google.script.run
+    .withSuccessHandler(function (res) {
+      unbusy(btn);
+      if (!res || !res.success) { drawerErr((res && res.error) || 'Ralat tidak diketahui'); return; }
+      try {
+        localStorage.setItem('inv_me', JSON.stringify({
+          name: p.requester_name, email: p.requester_email, dept: p.requester_department
+        }));
+      } catch (e) {}
+      closeDrawer();
+      loadCatalog();
+      requestSent(res.result);
+    })
+    .withFailureHandler(function (e) { unbusy(btn); drawerErr((e && e.message) || String(e)); })
+    .handleAction('SubmitRequest', p);
+}
+
+function requestSent(r) {
+  openDrawer('Permohonan Dihantar', 'Rujukan REQ_' + ('00000' + (r && r.id)).slice(-6),
+    '<div style="text-align:center;padding:26px 10px">' +
+      '<div style="width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok);' +
+        'display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' + icon('i-check', 26) + '</div>' +
+      '<h3 style="font-size:17px;margin-bottom:6px">Terima kasih!</h3>' +
+      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Permohonan anda sedang menunggu kelulusan admin.</p>' +
+      (r && r.mailed === false
+        ? '<div class="err-box">Permohonan direkod, tetapi emel pengesahan gagal dihantar.</div>'
+        : '<div class="info-box">Emel pengesahan telah dihantar. Anda akan dimaklumkan apabila keputusan dibuat.</div>') +
+    '</div>',
+    '<button class="btn btn-primary" onclick="closeDrawer()">Selesai</button>');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  ADMIN — PERMOHONAN QUEUE
+// ══════════════════════════════════════════════════════════════════════
+var REQ_FILTER = 'pending';
+
+var REQ_STATUS_META = {
+  pending:  { cls: 'pill-warn', label: 'Menunggu' },
+  approved: { cls: 'pill-ok',   label: 'Diluluskan' },
+  rejected: { cls: 'pill-err',  label: 'Ditolak' },
+  cancelled:{ cls: 'pill-mute', label: 'Dibatalkan' }
+};
+
+function viewRequests() {
+  var all = D.requests || [];
+  var rows = all.filter(function (r) { return REQ_FILTER === 'all' || r.status === REQ_FILTER; });
+  var pending = all.filter(function (r) { return r.status === 'pending'; }).length;
+
+  var h = '<div class="page-head"><div><h2>Permohonan</h2>' +
+    '<p>' + pending + ' menunggu kelulusan · ' + all.length + ' keseluruhan</p></div></div>';
+
+  // Built once so each return path below emits its own complete, balanced
+  // card element rather than relying on the other branch to close it.
+  var filterBar = '<div class="filters">' +
+    '<div class="tabs">' +
+      reqTab('pending', 'Menunggu', pending) +
+      reqTab('approved', 'Diluluskan', all.filter(function (r) { return r.status === 'approved'; }).length) +
+      reqTab('rejected', 'Ditolak', all.filter(function (r) { return r.status === 'rejected'; }).length) +
+      reqTab('all', 'Semua', all.length) +
+    '</div></div>';
+
+  if (!rows.length) {
+    return h + '<div class="card">' + filterBar + '<div class="empty">' + icon('i-check', 30) +
+      '<p>' + (REQ_FILTER === 'pending' ? 'Tiada permohonan menunggu. Semuanya selesai.' : 'Tiada rekod.') + '</p></div></div>';
+  }
+
+  h += '<div class="card">' + filterBar +
+    '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    '<th>Rujukan</th><th>Pemohon</th><th>Item</th><th class="t-num">Kuantiti</th>' +
+    '<th>Tujuan</th><th>Diperlukan</th><th>Status</th><th style="width:180px"></th>' +
+    '</tr></thead><tbody>';
+
+  h += rows.map(function (r) {
+    var it = itemById(r.item_id);
+    var m = REQ_STATUS_META[r.status] || REQ_STATUS_META.cancelled;
+    return '<tr>' +
+      '<td class="mono" style="font-size:12px;color:var(--muted)">REQ_' + ('00000' + r.id).slice(-6) + '</td>' +
+      '<td><div class="t-name" style="font-size:13px">' + esc(r.requester_name) + '</div>' +
+        '<div class="t-sub">' + esc(r.requester_email) + (r.requester_department ? ' · ' + esc(r.requester_department) : '') + '</div></td>' +
+      '<td><div class="t-name" style="font-size:13px">' + esc(it ? it.name : 'Item #' + r.item_id) + '</div>' +
+        '<div class="t-sub">' + esc(r.request_type === 'asset' ? 'Aset' : 'Inventori') + '</div></td>' +
+      '<td class="t-num mono">' + (r.quantity || 1) + '</td>' +
+      '<td style="font-size:12.5px;color:var(--muted);max-width:220px">' + esc(r.purpose || '—') + '</td>' +
+      '<td class="mono" style="font-size:12.5px">' + fmtDate(r.needed_date) + '</td>' +
+      '<td><span class="pill ' + m.cls + '"><i></i>' + m.label + '</span>' +
+        (r.actioned_at ? '<div class="t-sub" style="margin-top:3px">' + fmtDate(r.actioned_at) + '</div>' : '') + '</td>' +
+      '<td>' + (r.status === 'pending'
+        ? '<button class="btn btn-sm btn-accent" onclick="openDecide(' + r.id + ',true)">' + icon('i-check', 13) + ' Lulus</button> ' +
+          '<button class="btn btn-sm" onclick="openDecide(' + r.id + ',false)">' + icon('i-x', 13) + ' Tolak</button>'
+        : (r.admin_notes ? '<span class="t-sub">' + esc(r.admin_notes) + '</span>' : '')) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  return h + '</tbody></table></div></div>';
+}
+
+function reqTab(v, label, n) {
+  return '<button class="' + (REQ_FILTER === v ? 'active' : '') + '" onclick="REQ_FILTER=\'' + v + '\';render()">' +
+    label + (n ? ' (' + n + ')' : '') + '</button>';
+}
+
+function openDecide(id, approve) {
+  var r = find(D.requests, id);
+  if (!r) return;
+  var it = itemById(r.item_id);
+  var isAsset = r.request_type === 'asset';
+  var due = new Date(); due.setDate(due.getDate() + 14);
+
+  var b = '<div class="info-box">' +
+    '<b>' + esc(r.requester_name) + '</b> · ' + esc(r.requester_email) +
+    (r.requester_department ? ' · ' + esc(r.requester_department) : '') +
+    '<br>Memohon <b>' + esc(it ? it.name : 'Item #' + r.item_id) + '</b>' +
+    (isAsset ? '' : ' × ' + (r.quantity || 1) + ' unit') +
+    '<br>Tujuan: ' + esc(r.purpose || '—') +
+    (r.needed_date ? '<br>Diperlukan menjelang ' + fmtDate(r.needed_date) : '') + '</div>';
+
+  if (approve && isAsset) {
+    b += field('Tarikh Jangka Pulang', input('dcDue', 'date', inputDate(due), 'min="' + inputDate(new Date()) + '"'),
+      'Aset akan terus didaftar keluar kepada pemohon', true);
+  }
+  if (approve && !isAsset) {
+    b += '<div class="info-box">Meluluskan akan mengeluarkan <b>' + (r.quantity || 1) +
+      ' unit</b> daripada stok dan merekodkannya atas nama pemohon.</div>';
+  }
+  b += field('Catatan Admin', '<textarea id="dcNote" placeholder="' +
+    (approve ? 'cth. sila ambil di pejabat' : 'cth. stok perlu disimpan untuk keperluan lain') + '"></textarea>',
+    'Disertakan dalam emel kepada pemohon');
+
+  openDrawer(approve ? 'Luluskan Permohonan' : 'Tolak Permohonan',
+    'REQ_' + ('00000' + r.id).slice(-6), b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn ' + (approve ? 'btn-accent' : 'btn-danger') + '" onclick="doDecide(this,' + id + ',' + approve + ')">' +
+      icon(approve ? 'i-check' : 'i-x', 15) + ' ' + (approve ? 'Luluskan' : 'Tolak') + '</button>');
+}
+
+function doDecide(btn, id, approve) {
+  var p = { id: id, admin_notes: val('dcNote') };
+  if ($('dcDue')) p.expected_return_date = val('dcDue');
+  busy(btn);
+  api(approve ? 'ApproveRequest' : 'RejectRequest', p, function (res) {
+    refresh(function () {
+      unbusy(btn); closeDrawer();
+      toast(res && res.mailed === false
+        ? 'Keputusan direkod — tetapi emel gagal dihantar.'
+        : (approve ? 'Permohonan diluluskan dan pemohon dimaklumkan.' : 'Permohonan ditolak dan pemohon dimaklumkan.'),
+        res && res.mailed === false ? 'err' : 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
 }
 
 // ══════════════════════════════════════════════════════════════════════

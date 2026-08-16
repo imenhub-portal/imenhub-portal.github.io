@@ -141,9 +141,14 @@ Either order is safe mid-rollout as long as the JSON contract does not change
 **`doGet(e)`** — `?format=json` returns the raw payload; otherwise fetches and serves
 `index.html` from GitHub.
 
-**`doPost(e)`** — the JSON API. Five entry points, explicitly allowlisted; anything else
-is rejected: `getInitialData`, `handleAction`, `adminLogin`, `getItemHistory`,
-`startResumableUpload`.
+**`doPost(e)`** — the JSON API. Six entry points, explicitly allowlisted; anything else
+is rejected: `getInitialData`, `getPublicCatalog`, `handleAction`, `adminLogin`,
+`getItemHistory`, `startResumableUpload`.
+
+**Two audiences, one file.** Opening the link with no stored password lands on the
+**public Pemohon page** (`#public`), which browses `getPublicCatalog` and can submit a
+request. "Log Masuk Admin" reveals the gate; a stored password boots straight into the
+admin shell. There is no second HTML file to keep in sync.
 
 **`handleAction(actionType, payload)`** — the single dispatch point. Authorization is
 enforced *before* the switch, so no individual handler can forget it. Every write is
@@ -222,6 +227,20 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   `useful_life_years: 0`, so `_bookValue_` correctly returns cost unchanged).
   Averaging them produced a headline number that meant nothing for either,
   which is what prompted the split.
+- **`getPublicCatalog` is a deliberately separate, narrower payload — do not "simplify"
+  it by reusing `getInitialData`.** It is reachable without any password, so it carries
+  availability and location but **never** the name or email of whoever holds an asset,
+  never the ledger, and never the custodian directory. An unavailable asset reports its
+  expected return date and nothing more. Tests assert the serialised payload contains no
+  "@" and no custodian reference.
+- **Approving a request runs the real handover path.** `svcDecideRequest` calls
+  `svcCheckOut` (assets) or `svcStockChange` (inventory) rather than reimplementing
+  them, so the ledger row, the recipient resolution and the emails are identical to an
+  admin-initiated handover. There is no second implementation to drift out of step.
+- **`SubmitRequest` is the only public write action.** It is in `ACTIONS_PUBLIC`, so it
+  needs no password — but it only ever creates a *pending* row. Nothing moves until an
+  admin approves. Availability is re-checked server-side at submit AND again at approve,
+  because the browser's copy of the catalog can be minutes stale.
 - **There is no money in this app, by decision.** No unit cost, no depreciation, no
   book value, no warranty. It tracks *where things are* and *how many are left*. Do not
   reintroduce a "total value" figure — it was removed because it answered a question

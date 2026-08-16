@@ -64,6 +64,16 @@ const SCHEMA = {
     'created_at', 'updated_at', 'deleted_at'
   ],
 
+  // Requests raised by staff from the public page. Unlike Transactions
+  // this IS mutable — a request moves through pending -> approved/rejected
+  // — but the resulting handover still lands in the immutable ledger.
+  Requests: [
+    'id', 'item_id', 'request_type', 'requester_name', 'requester_email',
+    'requester_department', 'quantity', 'purpose', 'needed_date',
+    'status', 'admin_notes', 'custodian_id',
+    'created_at', 'actioned_at'
+  ],
+
   // IMMUTABLE LEDGER. Nothing in this file ever calls setValue/deleteRow on
   // this tab — only appendRow (enforced by the guard in _update_). A
   // check-in appends a NEW row; it does not edit the original check_out row.
@@ -78,6 +88,7 @@ const SCHEMA = {
 // except these, which are spelled out.
 const DATE_COLS = {
   transaction_date: 1, expected_return_date: 1, actual_return_date: 1,
+  needed_date: 1, actioned_at: 1,
   created_at: 1, updated_at: 1, deleted_at: 1
 };
 const NUM_COLS = {
@@ -91,6 +102,8 @@ const ACTION_TYPES = ['stock_add', 'stock_remove', 'check_out', 'check_in', 'dec
 
 // Removal reasons offered by the decommission drawer (spec 5.2).
 const REMOVAL_REASONS = ['Rosak', 'E-waste', 'Hilang', 'Dijual', 'Dipindah'];
+
+const REQUEST_STATUS = ['pending', 'approved', 'rejected', 'cancelled'];
 
 // ============================================================
 //  MIGRATIONS — ensureSheets_()
@@ -430,6 +443,7 @@ function getInitialData(adminPass) {
   if (!isAdmin) {
     payload.custodians   = [];
     payload.transactions = [];
+    payload.requests     = [];
     payload.alerts       = { overdue: [], inspection: [], audit: [], low_stock: [] };
   }
   payload.is_admin  = isAdmin;
@@ -444,6 +458,7 @@ function _buildPayload_() {
   const locs   = _readTable_('Locations');
   const custs  = _readTable_('Custodians');
   const txns   = _readTable_('Transactions');
+  const reqs   = _readTable_('Requests');
   const loans  = _openLoans_(txns);
 
   // Attach the open loan to its item so the grid can show who holds what
@@ -467,6 +482,7 @@ function _buildPayload_() {
     locations:    locs,
     custodians:   custs,
     transactions: txns,
+    requests: reqs.slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); }),
     alerts: {
       inspection: items.filter(function (i) { return SCOPES.inspectionDue(i, today); }).map(_alertRef_),
       audit:      items.filter(function (i) { return SCOPES.auditDue(i, today); }).map(_alertRef_),
@@ -518,6 +534,205 @@ function getItemHistory(itemId, adminPass) {
 }
 
 // ============================================================
+//  PUBLIC CATALOG  (no password — this is what staff browse)
+//
+//  Deliberately a separate, narrower payload than getInitialData: it
+//  carries only what a requester needs to decide whether to ask for
+//  something. No ledger, no custodian directory, and critically NO name
+//  of whoever currently holds an asset — an unavailable item reports its
+//  expected return date and nothing more. Staff names are personal data
+//  and this endpoint is reachable by anyone with the URL.
+// ============================================================
+function getPublicCatalog() {
+  ensureSheets_();
+  const today = _today_();
+  const items = _readTable_('Items');
+  const cats  = _readTable_('Categories');
+  const locs  = _readTable_('Locations');
+  const loans = _openLoans_(_readTable_('Transactions'));
+
+  const loanByItem = {};
+  loans.forEach(function (l) { loanByItem[l.item_id] = l; });
+
+  const catName = {};
+  cats.forEach(function (c) { catName[c.id] = c.name; });
+  const locName = {};
+  locs.forEach(function (l) {
+    locName[l.id] = [l.building, l.floor, l.room_number].filter(String).join(' · ');
+  });
+
+  const out = [];
+  items.forEach(function (i) {
+    if (i.status === 'decommissioned' || i.status === 'disposed') return;
+    var loan = loanByItem[i.id];
+    var isAsset = i.item_type === 'fixed_asset';
+    // Fixed furniture is not loanable, so it is not offered at all.
+    if (isAsset && String(i.is_portable) === 'FALSE') return;
+
+    out.push({
+      id: i.id,
+      asset_tag: i.asset_tag || '',
+      name: i.name,
+      item_type: i.item_type,
+      category: catName[i.category_id] || '',
+      location: locName[i.location_id] || '',
+      quantity_available: Number(i.quantity_available || 0),
+      available: isAsset ? (!loan && Number(i.quantity_available || 0) > 0)
+                         : Number(i.quantity_available || 0) > 0,
+      // Date only — never the holder's name.
+      expected_return_date: loan ? loan.expected_return_date : null,
+      is_overdue: loan ? SCOPES.overdue(loan, today) : false
+    });
+  });
+
+  out.sort(function (a, b) {
+    if (a.item_type !== b.item_type) return a.item_type === 'fixed_asset' ? -1 : 1;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return { items: out, server_ts: new Date().toISOString() };
+}
+
+// Public. Rate-limited only by Apps Script itself; creates nothing but a
+// pending row, so the worst case is an admin rejecting some noise.
+function svcSubmitRequest(p) {
+  const v = _validate_({
+    item_id:              { required: true, type: 'number', label: 'Item' },
+    requester_name:       { required: true, max: 120, label: 'Nama' },
+    requester_email:      { required: true, type: 'email', max: 120, label: 'Emel' },
+    requester_department: { max: 80, label: 'Jabatan' },
+    quantity:             { type: 'number', min: 1, def: 1, label: 'Kuantiti' },
+    purpose:              { required: true, max: 500, label: 'Tujuan' },
+    needed_date:          { type: 'date', label: 'Tarikh diperlukan' }
+  }, p);
+
+  const item = _findById_(_readTable_('Items'), v.item_id);
+  if (!item) throw new Error('Item tidak dijumpai.');
+  if (item.status === 'decommissioned' || item.status === 'disposed') {
+    throw new Error('Item ini telah dilupuskan.');
+  }
+  const isAsset = item.item_type === 'fixed_asset';
+  if (isAsset && String(item.is_portable) === 'FALSE') {
+    throw new Error('Aset ini bukan mudah alih dan tidak boleh dipohon.');
+  }
+
+  // Availability is re-checked here, not trusted from the browser.
+  if (isAsset) {
+    var open = _openLoans_(_readTable_('Transactions')).filter(function (l) {
+      return Number(l.item_id) === Number(item.id);
+    });
+    if (open.length) {
+      throw new Error('Aset ini sedang dipinjam. Sila cuba semula selepas ia dipulangkan.');
+    }
+  } else if (Number(item.quantity_available || 0) < v.quantity) {
+    throw new Error('Baki tidak mencukupi. Baki semasa: ' + item.quantity_available + '.');
+  }
+
+  // One pending request per person per item — stops double-tapping the
+  // button from filling the admin queue with duplicates.
+  const dup = _readTable_('Requests').filter(function (r) {
+    return r.status === 'pending' &&
+           Number(r.item_id) === Number(item.id) &&
+           String(r.requester_email).toLowerCase() === v.requester_email.toLowerCase();
+  });
+  if (dup.length) throw new Error('Anda sudah menghantar permohonan untuk item ini dan ia masih menunggu kelulusan.');
+
+  const now = new Date();
+  const id  = _nextId_('Requests');
+  _insert_('Requests', {
+    id: id,
+    item_id: item.id,
+    request_type: isAsset ? 'asset' : 'inventory',
+    requester_name: v.requester_name,
+    requester_email: String(v.requester_email).toLowerCase(),
+    requester_department: v.requester_department || '',
+    quantity: isAsset ? 1 : v.quantity,
+    purpose: v.purpose,
+    needed_date: v.needed_date,
+    status: 'pending',
+    admin_notes: '',
+    custodian_id: null,
+    created_at: now,
+    actioned_at: null
+  });
+
+  var mailed = true;
+  try { _mailRequestReceived_(item, v, id); } catch (e) { mailed = false; }
+  return { id: id, status: 'pending', mailed: mailed };
+}
+
+// Admin decision. Approving an ASSET hands it over for real: the same
+// svcCheckOut path runs, so the ledger and the notification emails are
+// identical to a handover the admin started themselves. Approving an
+// INVENTORY request issues the stock the same way Keluar Stok does.
+function svcDecideRequest(p, decision) {
+  const v = _validate_({
+    id:                   { required: true, type: 'number', label: 'Permohonan' },
+    admin_notes:          { max: 500, label: 'Catatan' },
+    expected_return_date: { type: 'date', label: 'Tarikh jangka pulang' }
+  }, p);
+
+  const rows = _readTable_('Requests');
+  const req  = _findById_(rows, v.id);
+  if (!req) throw new Error('Permohonan tidak dijumpai.');
+  if (req.status !== 'pending') {
+    throw new Error('Permohonan ini telah pun diuruskan (' + req.status + ').');
+  }
+
+  const item = _findById_(_readTable_('Items'), req.item_id);
+  if (!item) throw new Error('Item tidak lagi wujud.');
+
+  const now = new Date();
+
+  if (decision === 'rejected') {
+    _update_('Requests', req._row, {
+      status: 'rejected', admin_notes: v.admin_notes || '', actioned_at: now
+    });
+    var rMailed = true;
+    try { _mailRequestDecided_(item, req, 'rejected', v.admin_notes); } catch (e) { rMailed = false; }
+    return { id: req.id, status: 'rejected', mailed: rMailed };
+  }
+
+  // ── Approved ──
+  if (req.request_type === 'asset') {
+    if (!v.expected_return_date) throw new Error('Sila tetapkan tarikh jangka pulang.');
+    // Reuses the real handover path — same validation, same ledger row,
+    // same emails. There is no second implementation to drift.
+    var out = svcCheckOut({
+      id: item.id,
+      recipient_name: req.requester_name,
+      recipient_email: req.requester_email,
+      recipient_department: req.requester_department,
+      expected_return_date: v.expected_return_date,
+      reason_notes: 'Permohonan #' + req.id + ': ' + (req.purpose || '')
+    });
+    _update_('Requests', req._row, {
+      status: 'approved', admin_notes: v.admin_notes || '',
+      custodian_id: out.custodian_id, actioned_at: now
+    });
+    return { id: req.id, status: 'approved', mailed: out.mailed, custodian_id: out.custodian_id };
+  }
+
+  // Inventory: issue the stock to the requester, creating them if needed.
+  var recipient = _resolveRecipient_({
+    recipient_name: req.requester_name,
+    recipient_email: req.requester_email,
+    recipient_department: req.requester_department
+  });
+  svcStockChange({
+    id: item.id, quantity: req.quantity, custodian_id: recipient.id,
+    reason_notes: 'Permohonan #' + req.id + ': ' + (req.purpose || '')
+  }, 'stock_remove');
+
+  _update_('Requests', req._row, {
+    status: 'approved', admin_notes: v.admin_notes || '',
+    custodian_id: recipient.id, actioned_at: now
+  });
+  var iMailed = true;
+  try { _mailRequestDecided_(item, req, 'approved', v.admin_notes); } catch (e) { iMailed = false; }
+  return { id: req.id, status: 'approved', mailed: iMailed };
+}
+
+// ============================================================
 //  AUTH  ("auth middleware")
 //
 //  One shared admin password, held in Script Properties. The check is
@@ -549,7 +764,7 @@ function adminLogin(pass) {
 
 // Every action name the frontend may invoke, and whether it needs admin.
 // Anything not listed here is rejected by handleAction().
-const ACTIONS_PUBLIC = ['Ping'];
+const ACTIONS_PUBLIC = ['Ping', 'SubmitRequest'];
 const ACTIONS_ADMIN  = [
   'AddItem', 'UpdateItem', 'DeleteItem',
   'StockAdd', 'StockRemove',
@@ -558,7 +773,8 @@ const ACTIONS_ADMIN  = [
   'SaveCategory', 'DeleteCategory',
   'SaveLocation', 'DeleteLocation',
   'SaveCustodian', 'DeleteCustodian',
-  'RunDateCheck', 'SeedReference'
+  'RunDateCheck', 'SeedReference',
+  'ApproveRequest', 'RejectRequest'
 ];
 
 // ============================================================
@@ -579,6 +795,9 @@ function handleAction(actionType, payload) {
 
   switch (actionType) {
     case 'Ping':            return { success: true, result: 'pong' };
+    case 'SubmitRequest':   return _txn_(function () { return svcSubmitRequest(p); });
+    case 'ApproveRequest':  return _txn_(function () { return svcDecideRequest(p, 'approved'); });
+    case 'RejectRequest':   return _txn_(function () { return svcDecideRequest(p, 'rejected'); });
     case 'AddItem':         return _txn_(function () { return svcAddItem(p); });
     case 'UpdateItem':      return _txn_(function () { return svcUpdateItem(p); });
     case 'DeleteItem':      return _txn_(function () { return svcDeleteItem(p); });
@@ -1268,6 +1487,60 @@ function _resolveRecipient_(v) {
   return rec;
 }
 
+// Acknowledgement to the requester, and a heads-up to the admin.
+function _mailRequestReceived_(item, v, reqId) {
+  const now = new Date();
+  const rows = [
+    ['Rujukan', 'REQ_' + ('00000' + reqId).slice(-6)],
+    ['Item', item.name],
+    ['Jenis', item.item_type === 'fixed_asset' ? 'Aset' : 'Inventori'],
+    ['Kuantiti', String(v.quantity || 1)],
+    ['Tujuan', v.purpose],
+    ['Tarikh Diperlukan', v.needed_date ? _fmtDate_(v.needed_date) : '—'],
+    ['Dihantar Pada', _fmtDateTime_(now)]
+  ];
+  MailApp.sendEmail({
+    to: v.requester_email,
+    subject: '[i-Nventori] Permohonan diterima — ' + item.name,
+    htmlBody: _emailLayout_('Permohonan Diterima',
+      '<p>Salam <b>' + _esc_(v.requester_name) + '</b>,</p>' +
+      '<p>Permohonan anda telah diterima dan sedang <b>menunggu kelulusan admin</b>.</p>' +
+      _kvRows_(rows) +
+      '<p style="font-size:12px;color:#64748b;">Anda akan menerima emel sebaik permohonan ini diluluskan atau ditolak.</p>')
+  });
+  MailApp.sendEmail({
+    to: ADMIN_EMAIL,
+    subject: '[i-Nventori] Permohonan baharu — ' + item.name,
+    htmlBody: _emailLayout_('Permohonan Baharu Menunggu',
+      '<p>Permohonan baharu daripada <b>' + _esc_(v.requester_name) + '</b> (' + _esc_(v.requester_email) + '):</p>' +
+      _kvRows_(rows) +
+      '<p>Buka i-Nventori &rarr; Permohonan untuk meluluskan atau menolak.</p>')
+  });
+}
+
+function _mailRequestDecided_(item, req, decision, notes) {
+  const approved = decision === 'approved';
+  MailApp.sendEmail({
+    to: req.requester_email,
+    cc: ADMIN_EMAIL,
+    subject: '[i-Nventori] Permohonan ' + (approved ? 'DILULUSKAN' : 'DITOLAK') + ' — ' + item.name,
+    htmlBody: _emailLayout_(approved ? 'Permohonan Diluluskan' : 'Permohonan Ditolak',
+      '<p>Salam <b>' + _esc_(req.requester_name) + '</b>,</p>' +
+      '<p>Permohonan anda telah <b>' + (approved ? 'diluluskan' : 'ditolak') + '</b>.</p>' +
+      _kvRows_([
+        ['Rujukan', 'REQ_' + ('00000' + req.id).slice(-6)],
+        ['Item', item.name],
+        ['Kuantiti', String(req.quantity || 1)],
+        ['Keputusan', approved ? 'Diluluskan' : 'Ditolak'],
+        ['Catatan Admin', notes || '—'],
+        ['Tarikh & Masa Keputusan', _fmtDateTime_(new Date())]
+      ]) +
+      (approved
+        ? '<p style="color:#047857;">Sila hubungi pejabat untuk mengambil item. Emel berasingan mengandungi butiran penuh serahan.</p>'
+        : '<p style="color:#b45309;">Sila hubungi admin jika anda memerlukan penjelasan lanjut.</p>'))
+  });
+}
+
 // ============================================================
 //  DATE AUTOMATION ENGINE  ("inventory:check-dates", spec 5.4)
 //
@@ -1468,6 +1741,7 @@ function doPost(e) {
     var result;
     switch (req.fn) {
       case 'getInitialData':       result = getInitialData(args[0]); break;
+      case 'getPublicCatalog':     result = getPublicCatalog(); break;
       case 'handleAction':         result = handleAction(args[0], args[1]); break;
       case 'adminLogin':           result = adminLogin(args[0]); break;
       case 'getItemHistory':       result = getItemHistory(args[0], args[1]); break;

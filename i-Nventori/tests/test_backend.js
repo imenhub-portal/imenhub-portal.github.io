@@ -498,8 +498,8 @@ section('9. Migrations (ensureSheets_) and header auto-heal');
 {
   const S = loadBackend();
   S.ensureSheets_();
-  eq('all five tabs are created', Object.keys(S.__test.ss._sheets).sort(),
-    ['Categories', 'Custodians', 'Items', 'Locations', 'Transactions']);
+  eq('all six tabs are created', Object.keys(S.__test.ss._sheets).sort(),
+    ['Categories', 'Custodians', 'Items', 'Locations', 'Requests', 'Transactions']);
   eq('Items header matches the schema', S.__test.rows('Items')[0], S.SCHEMA.Items);
 
   // Simulate a sheet created before a column was added — is_portable is a
@@ -762,6 +762,155 @@ section('13. A notification failure must never lose the record');
   eq('reporting the same', backc.result.mailed, false);
   eq('with the return in the ledger',
     S._readTable_('Transactions').filter((t) => t.action_type === 'check_in').length, 1);
+}
+
+section('14. Public catalog leaks nothing personal');
+{
+  const S = fresh();
+  const projId = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', category_id: 1, location_id: 3, item_type: 'fixed_asset',
+    date_acquired: '2026-01-10'
+  })).result.id;
+  S._txn_(() => S.svcAddItem({
+    name: 'Meja Berat', category_id: 1, location_id: 1, item_type: 'fixed_asset',
+    date_acquired: '2026-01-10', is_portable: 'FALSE'
+  }));
+  S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', category_id: 5, location_id: 2, item_type: 'consumable',
+    quantity_total: 40, min_stock_alert: 10, date_acquired: '2026-01-10'
+  }));
+
+  const cat = S.getPublicCatalog();
+  const names = cat.items.map((i) => i.name).sort();
+  eq('non-movable assets are not offered at all', names, ['Pen Biru', 'Projektor']);
+
+  const proj = cat.items.filter((i) => i.name === 'Projektor')[0];
+  eq('an available asset says so', proj.available, true);
+  ok('and reports its location', proj.location.length > 0, proj.location);
+
+  // Hand it out, then re-read the public view.
+  S._txn_(() => S.svcCheckOut({
+    id: projId, custodian_id: 1, expected_return_date: iso(daysFromNow(9))
+  }));
+  const cat2 = S.getPublicCatalog();
+  const proj2 = cat2.items.filter((i) => i.name === 'Projektor')[0];
+  eq('once loaned it reads unavailable', proj2.available, false);
+  ok('and gives the expected return date', isDate(proj2.expected_return_date));
+
+  // The privacy boundary: the holder's identity must never appear.
+  const blob = JSON.stringify(cat2);
+  ok('the catalog never names who holds it', blob.indexOf('Aminah') === -1);
+  ok('nor leaks any email address', blob.indexOf('@') === -1, blob.slice(0, 200));
+  ok('nor carries a custodian id', blob.indexOf('custodian') === -1);
+  ok('nor the ledger', blob.indexOf('transaction_date') === -1);
+}
+
+section('15. Request lifecycle');
+{
+  const S = fresh();
+  const projId = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', category_id: 1, location_id: 3, item_type: 'fixed_asset',
+    date_acquired: '2026-01-10'
+  })).result.id;
+  const penId = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', category_id: 5, location_id: 2, item_type: 'consumable',
+    quantity_total: 40, min_stock_alert: 10, date_acquired: '2026-01-10'
+  })).result.id;
+
+  // ── Submitting needs no password ──
+  S.__test.sentMail.length = 0;
+  const sub = S.handleAction('SubmitRequest', {
+    item_id: projId, requester_name: 'Farah binti Ali', requester_email: 'farah@ukm.edu.my',
+    requester_department: 'Akademik', purpose: 'Bengkel pelajar', needed_date: iso(daysFromNow(4))
+  });
+  ok('a request can be submitted with no admin password', sub.success, sub.error);
+  eq('and lands as pending', sub.result.status, 'pending');
+  eq('acknowledgement + admin heads-up are sent', S.__test.sentMail.length, 2);
+  eq('one goes to the requester', S.__test.sentMail[0].to, 'farah@ukm.edu.my');
+
+  // ── Duplicates are refused ──
+  const dup = S.handleAction('SubmitRequest', {
+    item_id: projId, requester_name: 'Farah binti Ali', requester_email: 'FARAH@ukm.edu.my',
+    purpose: 'Sekali lagi'
+  });
+  eq('the same person cannot queue the same item twice', dup.success, false);
+  ok('and is told why', /masih menunggu/i.test(dup.error), dup.error);
+
+  // ── Deciding is admin-only ──
+  const sneaky = S.handleAction('ApproveRequest', { id: 1, expected_return_date: iso(daysFromNow(9)) });
+  eq('approving without the admin password is denied', sneaky.success, false);
+
+  // ── Approve: the real handover runs ──
+  S.__test.sentMail.length = 0;
+  const appr = S.handleAction('ApproveRequest', {
+    __pass: 'rahsia', id: 1, expected_return_date: iso(daysFromNow(9)), admin_notes: 'Diluluskan'
+  });
+  ok('an admin can approve', appr.success, appr.error);
+  eq('status becomes approved', appr.result.status, 'approved');
+
+  const item = S._findById_(S._readTable_('Items'), projId);
+  eq('the asset is genuinely checked out', item.status, 'assigned');
+  eq('to the requester', S._findById_(S._readTable_('Custodians'), item.custodian_id).email, 'farah@ukm.edu.my');
+  eq('and the ledger records it',
+    S._readTable_('Transactions').filter((t) => t.action_type === 'check_out').length, 1);
+  const led = S._readTable_('Transactions').filter((t) => t.action_type === 'check_out')[0];
+  ok('referencing the request', /Permohonan #1/.test(led.reason_notes), led.reason_notes);
+  ok('the requester is emailed the handover', S.__test.sentMail.some((m) => m.to === 'farah@ukm.edu.my'));
+
+  // ── Approving twice is refused ──
+  const again = S.handleAction('ApproveRequest', {
+    __pass: 'rahsia', id: 1, expected_return_date: iso(daysFromNow(9))
+  });
+  eq('a decided request cannot be decided again', again.success, false);
+
+  // ── An asset already out cannot be requested ──
+  const busy = S.handleAction('SubmitRequest', {
+    item_id: projId, requester_name: 'Lain', requester_email: 'lain@ukm.edu.my', purpose: 'Cuba'
+  });
+  eq('a loaned asset cannot be requested', busy.success, false);
+  ok('and says to wait for its return', /sedang dipinjam/i.test(busy.error), busy.error);
+
+  // ── Inventory request: approving issues the stock ──
+  const invReq = S.handleAction('SubmitRequest', {
+    item_id: penId, requester_name: 'Farah binti Ali', requester_email: 'farah@ukm.edu.my',
+    quantity: 6, purpose: 'Mesyuarat'
+  });
+  ok('inventory can be requested', invReq.success, invReq.error);
+  const invApprove = S.handleAction('ApproveRequest', { __pass: 'rahsia', id: invReq.result.id });
+  ok('and approved without a return date', invApprove.success, invApprove.error);
+  const pen = S._findById_(S._readTable_('Items'), penId);
+  eq('stock is deducted', pen.quantity_available, 34);
+  const issue = S._readTable_('Transactions').filter((t) => t.action_type === 'stock_remove')[0];
+  ok('and attributed to the requester', Number(issue.custodian_id) > 0);
+
+  // ── Over-requesting is refused up front ──
+  const greedy = S.handleAction('SubmitRequest', {
+    item_id: penId, requester_name: 'Zed', requester_email: 'zed@ukm.edu.my',
+    quantity: 999, purpose: 'Banyak'
+  });
+  eq('more than the balance is refused', greedy.success, false);
+
+  // ── Reject path ──
+  const rReq = S.handleAction('SubmitRequest', {
+    item_id: penId, requester_name: 'Zed', requester_email: 'zed@ukm.edu.my',
+    quantity: 2, purpose: 'Ujian'
+  });
+  S.__test.sentMail.length = 0;
+  const rej = S.handleAction('RejectRequest', {
+    __pass: 'rahsia', id: rReq.result.id, admin_notes: 'Stok perlu disimpan'
+  });
+  ok('a request can be rejected', rej.success, rej.error);
+  eq('status becomes rejected', rej.result.status, 'rejected');
+  const penAfter = S._findById_(S._readTable_('Items'), penId);
+  eq('and no stock moves on a rejection', penAfter.quantity_available, 34);
+  ok('the requester is told', S.__test.sentMail.some((m) => m.to === 'zed@ukm.edu.my'));
+  ok('with the reason', /Stok perlu disimpan/.test(S.__test.sentMail[0].htmlBody));
+
+  // ── Anonymous callers still see no request queue ──
+  const anon = S.getInitialData('salah-password');
+  eq('the request queue is admin-only', anon.requests.length, 0);
+  const admin = S.getInitialData('rahsia');
+  ok('but an admin sees it', admin.requests.length >= 3, String(admin.requests.length));
 }
 
 // ══════════════════════════════════════════════════════════════════════
