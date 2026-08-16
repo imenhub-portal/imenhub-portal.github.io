@@ -784,16 +784,6 @@ function esc(s) {
 }
 function $(id) { return document.getElementById(id); }
 
-function money(n) {
-  var v = Number(n || 0);
-  return 'RM ' + v.toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function moneyShort(n) {
-  var v = Number(n || 0);
-  if (v >= 1000000) return 'RM ' + (v / 1000000).toFixed(2) + 'j';
-  if (v >= 10000)   return 'RM ' + (v / 1000).toFixed(1) + 'k';
-  return money(v);
-}
 function toDate(v) {
   if (!v) return null;
   var d = (v instanceof Date) ? v : new Date(v);
@@ -820,22 +810,6 @@ function daysBetween(a, b) {
   if (!x || !y) return null;
   x.setHours(0, 0, 0, 0); y.setHours(0, 0, 0, 0);
   return Math.round((y - x) / 86400000);
-}
-
-// Mirror of _bookValue_ in Code.gs, so the drawer can preview a value
-// before saving. Keep the two in step — if you change one, change both.
-function bookValue(item, asOf) {
-  var cost = Number(item.unit_cost || 0);
-  var life = Number(item.useful_life_years || 0);
-  var salv = Number(item.salvage_value || 0);
-  if (!cost) return 0;
-  if (!life || life <= 0) return cost;
-  if (!item.date_acquired) return cost;
-  var days = daysBetween(item.date_acquired, asOf || today());
-  if (days === null) return cost;
-  var ageYears = Math.max(0, days / 365.25);
-  var value = cost - (((cost - salv) / life) * ageYears);
-  return Math.max(salv, Math.round(value * 100) / 100);
 }
 
 function icon(name, size) {
@@ -1125,7 +1099,7 @@ function renderBadges() {
   var a = D.alerts || {};
   var overdue = (a.overdue || []).length;
   var low = (a.low_stock || []).length;
-  var totalAlerts = overdue + low + (a.warranty || []).length + (a.inspection || []).length;
+  var totalAlerts = overdue + low + (a.inspection || []).length;
 
   setBadge('bLoans', overdue);
   setBadge('bStock', low);
@@ -1149,10 +1123,9 @@ function greeting() {
   return 'Selamat malam';
 }
 
-// Value flowing in and out of the inventory per month, derived from the
-// ledger joined against each item's unit cost. This is the closest true
-// analogue of a profit/loss chart for an asset register: what was
-// acquired versus what was consumed, disposed of, or written down.
+// Units flowing in and out per month, straight from the ledger. For a
+// tracking app the meaningful question is "how much moved", not what it
+// was worth — so this counts units, never money.
 function monthlyFlow(months) {
   var n = months || 8;
   var buckets = [];
@@ -1171,10 +1144,8 @@ function monthlyFlow(months) {
       if (buckets[i].y === d.getFullYear() && buckets[i].m === d.getMonth()) { b = buckets[i]; break; }
     }
     if (!b) return;
-    var it = itemById(t.item_id);
-    var cost = it ? Number(it.unit_cost || 0) : 0;
     var q = Number(t.quantity || 0);
-    if (q >= 0) b.inV += q * cost; else b.outV += Math.abs(q) * cost;
+    if (q >= 0) b.inV += q; else b.outV += Math.abs(q);
   });
   return buckets;
 }
@@ -1204,8 +1175,8 @@ function flowChart() {
     var ho = Math.max(2, (b.outV / top) * 100);
     return '<div class="bargroup">' +
       '<div class="bars">' +
-        '<div class="bar b-in" style="height:' + hi + '%" title="Masuk ' + money(b.inV) + '"></div>' +
-        '<div class="bar b-out" style="height:' + ho + '%" title="Keluar ' + money(b.outV) + '"></div>' +
+        '<div class="bar b-in" style="height:' + hi + '%" title="Masuk ' + b.inV + ' unit"></div>' +
+        '<div class="bar b-out" style="height:' + ho + '%" title="Keluar ' + b.outV + ' unit"></div>' +
       '</div>' +
       '<div class="mlabel">' + MONTH_BM[b.m] + '</div></div>';
   }).join('');
@@ -1214,7 +1185,6 @@ function flowChart() {
          '<div class="plot">' + lines + bars + '</div></div>';
 }
 function moneyAxis(v) {
-  if (v >= 1000000) return (v / 1000000).toFixed(1).replace('.0', '') + 'j';
   if (v >= 1000) return Math.round(v / 1000) + 'k';
   return Math.round(v);
 }
@@ -1234,27 +1204,23 @@ function sectionHead(title, sub, right) {
 // because a stock issue now records custodian_id.
 function issueStats(sinceDays) {
   var cutoff = sinceDays ? new Date(Date.now() - sinceDays * 86400000) : null;
-  var byStaff = {}, byItem = {}, totalUnits = 0, totalValue = 0;
+  var byStaff = {}, byItem = {}, totalUnits = 0;
   (D.transactions || []).forEach(function (t) {
     if (t.action_type !== 'stock_remove') return;
     var d = toDate(t.transaction_date);
     if (cutoff && d && d < cutoff) return;
     var qty = Math.abs(Number(t.quantity || 0));
     var it = itemById(t.item_id);
-    var value = it ? qty * Number(it.unit_cost || 0) : 0;
     totalUnits += qty;
-    totalValue += value;
     if (t.custodian_id) {
       var k = String(t.custodian_id);
-      if (!byStaff[k]) byStaff[k] = { id: t.custodian_id, units: 0, value: 0, items: {} };
+      if (!byStaff[k]) byStaff[k] = { id: t.custodian_id, units: 0, items: {} };
       byStaff[k].units += qty;
-      byStaff[k].value += value;
       if (it) byStaff[k].items[it.name] = (byStaff[k].items[it.name] || 0) + qty;
     }
     if (it) {
-      if (!byItem[it.id]) byItem[it.id] = { item: it, units: 0, value: 0 };
+      if (!byItem[it.id]) byItem[it.id] = { item: it, units: 0 };
       byItem[it.id].units += qty;
-      byItem[it.id].value += value;
     }
   });
   return {
@@ -1262,12 +1228,11 @@ function issueStats(sinceDays) {
              .sort(function (a, b) { return b.units - a.units; }),
     items: Object.keys(byItem).map(function (k) { return byItem[k]; })
              .sort(function (a, b) { return b.units - a.units; }),
-    totalUnits: totalUnits, totalValue: totalValue
+    totalUnits: totalUnits
   };
 }
 
 function viewDashboard() {
-  var p = D.portfolio || {};
   var a = D.alerts || {};
   var items = D.items || [];
   var active = items.filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
@@ -1276,134 +1241,129 @@ function viewDashboard() {
   var onLoan = items.filter(function (i) { return i.open_loan; });
   var overdue = (a.overdue || []).length;
   var low = (a.low_stock || []).length;
-
-  // Asset figures exclude consumables, so "book value" means what it says.
-  var assetCost = assets.reduce(function (s, i) { return s + Number(i.unit_cost || 0); }, 0);
-  var assetBook = assets.reduce(function (s, i) { return s + (i.book_value != null ? i.book_value : bookValue(i)); }, 0);
-  var deprPct = assetCost ? ((assetCost - assetBook) / assetCost) * 100 : 0;
-
-  // Consumable figures are simply cost x quantity on hand — no depreciation.
-  var stockValue = cons.reduce(function (s, i) {
-    return s + Number(i.unit_cost || 0) * Number(i.quantity_available || 0); }, 0);
   var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
-
   var issued30 = issueStats(30);
 
   var h = '<div class="page-head"><div>' +
     '<h2>' + greeting() + ', admin</h2>' +
-    '<p>Pantau aset, stok dan pinjaman IMEN dalam satu tempat.</p></div>' +
+    '<p>Pantau kedudukan aset dan baki stok inventori IMEN.</p></div>' +
     '<div class="spacer"></div>' +
     '<button class="btn" onclick="runDateCheck(this)">' + icon('i-clock', 15) + ' Semak Tarikh</button>' +
     '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport</button>' +
     '</div>';
 
-  // ══════════════ SECTION 1 — ASET TETAP ══════════════
+  // ══════════════ ASET ══════════════
   h += sectionHead('Aset',
-    'Kerusi, meja, komputer dan alat besar — dijejak seunit, dinilai selepas susut nilai.',
+    'Kerusi, meja, komputer dan alat besar — dijejak seunit mengikut lokasi.',
     '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'items\')">Lihat semua ' + icon('i-out', 13) + '</button>');
+
+  // Where the assets physically are — the core question this app answers.
+  var byLoc = {};
+  assets.forEach(function (i) {
+    var k = i.open_loan ? '__loan' : locName(i.location_id);
+    if (!byLoc[k]) byLoc[k] = [];
+    byLoc[k].push(i);
+  });
+  var locKeys = Object.keys(byLoc).filter(function (k) { return k !== '__loan'; })
+                  .sort(function (x, y) { return byLoc[y].length - byLoc[x].length; });
 
   h += '<div class="dash-top">';
 
-  var byCat = {};
-  assets.forEach(function (i) {
-    var k = catName(i.category_id);
-    if (!byCat[k]) byCat[k] = { n: 0, v: 0 };
-    byCat[k].n++;
-    byCat[k].v += (i.book_value != null ? i.book_value : bookValue(i));
-  });
-  var topCats = Object.keys(byCat).sort(function (x, y) { return byCat[y].v - byCat[x].v; }).slice(0, 3);
-
   h += '<div class="hero">' +
-    '<div class="lbl">Nilai Buku Aset ' + hintDot('Kos belian asal tolak susut nilai terkumpul. Ini nilai aset anda hari ini untuk tujuan audit — bukan harga belian dahulu.') + '</div>' +
-    '<div class="big mono">' + money(assetBook) + '</div>' +
-    '<div class="trend ' + (deprPct > 0 ? 'down' : 'flat') + '">' +
-      (deprPct > 0 ? '↓ ' + deprPct.toFixed(1) + '%' : '—') +
-      ' <span>susut nilai dari kos ' + money(assetCost) + '</span></div>' +
+    '<div class="lbl">Jumlah Aset</div>' +
+    '<div class="big mono">' + assets.length + '</div>' +
+    '<div class="trend ' + (overdue ? 'down' : 'up') + '">' +
+      (onLoan.length ? onLoan.length + ' sedang dipinjam' : 'Semua berada di lokasi') +
+      ' <span>' + (overdue ? '· ' + overdue + ' lewat dipulangkan' : '') + '</span></div>' +
     '<div class="hero-actions">' +
       '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset</button>' +
       '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
     '</div>' +
-    '<div class="substrip"><div class="cap">Kategori aset teratas <b>· ' + Object.keys(byCat).length + ' kategori</b></div>' +
+    '<div class="substrip"><div class="cap">Kedudukan aset <b>· ' + locKeys.length + ' lokasi</b></div>' +
     '<div class="chips">' +
-      (topCats.length ? topCats.map(function (k, n) {
-        var c = byCat[k];
+      (locKeys.length ? locKeys.slice(0, 3).map(function (k, n) {
         return '<div class="chip"><div class="t">' +
           '<span style="width:7px;height:7px;border-radius:2px;background:' +
             (n === 0 ? 'var(--accent)' : n === 1 ? 'var(--ink)' : 'var(--muted-2)') + ';display:block"></span>' +
-          esc(k.length > 11 ? k.slice(0, 10) + '…' : k) + '</div>' +
-          '<div class="v mono">' + moneyShort(c.v) + '</div>' +
-          '<div class="s">' + c.n + ' aset</div></div>';
+          esc(k.length > 12 ? k.slice(0, 11) + '…' : k) + '</div>' +
+          '<div class="v mono">' + byLoc[k].length + '</div>' +
+          '<div class="s">aset di sini</div></div>';
       }).join('') : '<div class="chip"><div class="s">Belum ada aset</div></div>') +
     '</div></div></div>';
 
   h += '<div class="tiles">' +
-    tile('i-box', 'Jumlah Aset', assets.length, 'Belum dilupuskan', 'items', true,
-         '<div class="trend">' + (items.length - active.length) + ' <span>telah dilupuskan</span></div>') +
+    tile('i-box', 'Tersedia', assets.filter(function (i) { return !i.open_loan; }).length,
+         'Berada di lokasi', 'items', true,
+         '<div class="trend"><span>sedia untuk dipinjam</span></div>') +
     tile('i-out', 'Sedang Dipinjam', onLoan.length,
          overdue ? overdue + ' lewat' : 'Mengikut jadual', 'loans', false,
          overdue ? '<div class="trend down">↑ ' + overdue + ' <span>lewat dipulangkan</span></div>'
                  : '<div class="trend up">✓ <span>tiada lewat</span></div>') +
-    tile('i-shield', 'Waranti Akan Tamat', (a.warranty || []).length, 'Dalam 30 hari', 'items', false,
-         '<div class="trend flat"><span>dalam 30 hari</span></div>') +
+    tile('i-pin', 'Lokasi', locKeys.length, 'Tempat penyimpanan', 'settings', false,
+         '<div class="trend flat"><span>' + (D.locations || []).length + ' lokasi berdaftar</span></div>') +
     tile('i-clock', 'Pemeriksaan', (a.inspection || []).length, 'Tertunggak', 'items', false,
          '<div class="trend flat"><span>' + (a.audit || []).length + ' audit tertunggak</span></div>') +
     '</div>';
 
-  h += '<div class="card">' +
-    '<div class="card-head"><div style="flex:1"><h3>Aliran Nilai Inventori</h3>' +
-      '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Nilai masuk berbanding keluar, 8 bulan terakhir</p></div>' +
-      '<div class="chart-legend"><span><i style="background:var(--ink)"></i>Masuk</span>' +
-      '<span><i style="background:var(--accent)"></i>Keluar</span></div></div>' +
-    '<div class="card-body">' + flowChart() + '</div></div>';
+  // Assets currently out, with who holds them.
+  h += '<div class="card"><div class="card-head"><div style="flex:1">' +
+    '<h3>Aset Di Luar Lokasi</h3>' +
+    '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Siapa memegangnya sekarang</p></div>' +
+    '<button class="btn btn-sm btn-ghost" onclick="go(\'loans\')">Semua</button></div><div class="card-body">';
+  if (!onLoan.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:20px 0;margin:0">' +
+         'Semua aset berada di lokasi masing-masing.</p>';
+  } else {
+    h += onLoan.slice(0, 6).map(function (i) {
+      var l = i.open_loan;
+      var d = daysBetween(today(), l.expected_return_date);
+      return '<div class="alert-row" style="cursor:pointer" onclick="openCheckIn(' + i.id + ')">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(i.name) + '</div>' +
+        '<div class="t-sub mono">' + esc(i.asset_tag) + ' · ' + esc(custName(l.custodian_id)) + '</div></div>' +
+        '<div class="spacer"></div>' +
+        (l.is_overdue
+          ? '<span class="pill pill-err"><i></i>' + Math.abs(d) + ' hari lewat</span>'
+          : '<span class="pill pill-info"><i></i>' + d + ' hari lagi</span>') + '</div>';
+    }).join('');
+  }
+  h += '</div></div>';
 
   h += '</div>';   // /dash-top
 
-  // Asset-specific alerts
-  h += '<div class="grid g-2" style="margin-top:14px">';
-  h += alertCard('Pinjaman Lewat', 'i-warn', 'var(--err)', (a.overdue || []).map(function (o) {
-    return { tag: o.asset_tag, name: o.name, right: '<span class="pill pill-err"><i></i>' + o.days_overdue + ' hari</span>',
-             sub: custName(o.custodian_id) + ' · sepatutnya ' + fmtDate(o.expected_return_date), id: o.id };
-  }), 'Tiada pinjaman lewat. Semua aset dipulangkan mengikut jadual.');
-  h += alertCard('Waranti Akan Tamat', 'i-shield', 'var(--info)', (a.warranty || []).map(function (o) {
-    var d = daysBetween(today(), o.date_warranty_expiry);
-    return { tag: o.asset_tag, name: o.name,
-             right: '<span class="pill ' + (d <= 7 ? 'pill-err' : 'pill-warn') + '"><i></i>' + d + ' hari</span>',
-             sub: 'Tamat ' + fmtDate(o.date_warranty_expiry), id: o.id };
-  }), 'Tiada waranti akan tamat dalam 30 hari.');
-  h += '</div>';
-
-  // ══════════════ SECTION 2 — INVENTORI GUNA HABIS ══════════════
+  // ══════════════ INVENTORI ══════════════
   h += sectionHead('Inventori',
-    'Alat tulis, kertas, kartrij — dikira mengikut baki stok, bukan susut nilai.',
+    'Alat tulis, kertas, kartrij — dijejak mengikut baki stok.',
     '<button class="btn btn-sm" onclick="go(\'stock\')">Urus stok ' + icon('i-out', 13) + '</button>');
 
   h += '<div class="dash-top">';
 
-  var topCons = cons.slice().sort(function (x, y) {
-    return (Number(y.unit_cost || 0) * Number(y.quantity_available || 0)) -
-           (Number(x.unit_cost || 0) * Number(x.quantity_available || 0));
+  var lowest = cons.slice().sort(function (x, y) {
+    var rx = Number(x.min_stock_alert || 1) ? Number(x.quantity_available || 0) / Number(x.min_stock_alert || 1) : 99;
+    var ry = Number(y.min_stock_alert || 1) ? Number(y.quantity_available || 0) / Number(y.min_stock_alert || 1) : 99;
+    return rx - ry;
   }).slice(0, 3);
 
   h += '<div class="hero">' +
-    '<div class="lbl">Nilai Stok Semasa ' + hintDot('Kos seunit didarab baki stok. Item inventori tidak disusut nilai — ia hanya berkurang apabila dikeluarkan.') + '</div>' +
-    '<div class="big mono">' + money(stockValue) + '</div>' +
+    '<div class="lbl">Unit Dalam Simpanan</div>' +
+    '<div class="big mono">' + stockUnits + '</div>' +
     '<div class="trend ' + (low ? 'down' : 'up') + '">' +
-      (low ? '↓ ' + low + ' jenis stok rendah' : '✓ paras selamat') +
-      ' <span>· ' + stockUnits + ' unit di tangan</span></div>' +
+      (low ? '↓ ' + low + ' jenis stok rendah' : '✓ semua paras selamat') +
+      ' <span>· ' + cons.length + ' jenis item</span></div>' +
     '<div class="hero-actions">' +
       '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>' +
       '<button class="btn" onclick="go(\'stock\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
     '</div>' +
-    '<div class="substrip"><div class="cap">Nilai stok tertinggi <b>· ' + cons.length + ' jenis item</b></div>' +
+    '<div class="substrip"><div class="cap">Paling hampir habis <b>· ' + cons.length + ' jenis item</b></div>' +
     '<div class="chips">' +
-      (topCons.length ? topCons.map(function (i, n) {
+      (lowest.length ? lowest.map(function (i, n) {
+        var isLow = Number(i.quantity_available || 0) <= Number(i.min_stock_alert || 0);
         return '<div class="chip"><div class="t">' +
           '<span style="width:7px;height:7px;border-radius:2px;background:' +
-            (n === 0 ? 'var(--accent)' : n === 1 ? 'var(--ink)' : 'var(--muted-2)') + ';display:block"></span>' +
-          esc(i.name.length > 11 ? i.name.slice(0, 10) + '…' : i.name) + '</div>' +
-          '<div class="v mono">' + moneyShort(Number(i.unit_cost || 0) * Number(i.quantity_available || 0)) + '</div>' +
-          '<div class="s">' + i.quantity_available + ' unit</div></div>';
-      }).join('') : '<div class="chip"><div class="s">Belum ada bahan</div></div>') +
+            (isLow ? 'var(--accent)' : 'var(--ok)') + ';display:block"></span>' +
+          esc(i.name.length > 12 ? i.name.slice(0, 11) + '…' : i.name) + '</div>' +
+          '<div class="v mono">' + i.quantity_available + '</div>' +
+          '<div class="s">min ' + (i.min_stock_alert || 0) + '</div></div>';
+      }).join('') : '<div class="chip"><div class="s">Belum ada item</div></div>') +
     '</div></div></div>';
 
   h += '<div class="tiles">' +
@@ -1413,13 +1373,12 @@ function viewDashboard() {
          low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
              : '<div class="trend up">✓ <span>paras selamat</span></div>') +
     tile('i-out', 'Dikeluarkan (30 hari)', issued30.totalUnits, 'unit', 'ledger', false,
-         '<div class="trend flat"><span>bernilai ' + moneyShort(issued30.totalValue) + '</span></div>') +
+         '<div class="trend flat"><span>kepada ' + issued30.staff.length + ' staf</span></div>') +
     tile('i-users', 'Penerima', issued30.staff.length, 'staf dalam 30 hari', 'ledger', false,
          '<div class="trend flat"><span>' + (issued30.staff.length ? 'tertinggi: ' +
             esc(custName(issued30.staff[0].id).split(' ')[0]) : 'belum ada rekod') + '</span></div>') +
     '</div>';
 
-  // Who took what — the reporting this whole change exists for.
   h += '<div class="card"><div class="card-head"><div style="flex:1">' +
     '<h3>Pengeluaran Mengikut Staf</h3>' +
     '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">30 hari terakhir</p></div>' +
@@ -1438,7 +1397,6 @@ function viewDashboard() {
         '<div class="spacer"></div>' +
         '<div class="mini-bar"><span style="width:' + ((r.units / maxU) * 100).toFixed(0) + '%;background:var(--accent)"></span></div>' +
         '<span class="mono" style="font-weight:700;min-width:64px;text-align:right">' + r.units + ' unit</span>' +
-        '<span class="mono" style="color:var(--muted);min-width:74px;text-align:right;font-size:12px">' + money(r.value) + '</span>' +
         '</div>';
     }).join('');
   }
@@ -1446,15 +1404,24 @@ function viewDashboard() {
 
   h += '</div>';   // /dash-top
 
-  // Consumable alerts
+  // Monthly movement, in units. Answers "berapa banyak keluar sebulan",
+  // which is what drives reorder timing.
+  h += '<div class="card" style="margin-top:14px">' +
+    '<div class="card-head"><div style="flex:1"><h3>Pergerakan Stok Bulanan</h3>' +
+      '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Unit masuk berbanding keluar, 8 bulan terakhir</p></div>' +
+      '<div class="chart-legend"><span><i style="background:var(--ink)"></i>Masuk</span>' +
+      '<span><i style="background:var(--accent)"></i>Keluar</span></div></div>' +
+    '<div class="card-body">' + flowChart() + '</div></div>';
+
+  // Alerts
   h += '<div class="grid g-2" style="margin-top:14px">';
   h += alertCard('Stok Rendah', 'i-layers', 'var(--warn)', (a.low_stock || []).map(function (o) {
     var pct = o.min_stock_alert ? Math.min(100, (o.quantity_available / o.min_stock_alert) * 100) : 0;
-    return { tag: o.asset_tag, name: o.name,
+    return { tag: o.name, name: o.name,
              right: '<div class="mini-bar"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
                     '<span class="mono" style="font-size:12px;font-weight:700;min-width:50px;text-align:right">' +
                     o.quantity_available + '/' + o.min_stock_alert + '</span>',
-             sub: 'Baki di bawah paras minimum', id: o.id };
+             sub: 'baki di bawah paras minimum', id: o.id };
   }), 'Semua stok berada pada paras selamat.');
 
   h += '<div class="card"><div class="card-head">' +
@@ -1467,7 +1434,7 @@ function viewDashboard() {
     h += issued30.items.slice(0, 6).map(function (r) {
       return '<div class="alert-row" style="cursor:pointer" onclick="openHistory(' + r.item.id + ')">' +
         '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(r.item.name) + '</div>' +
-        '<div class="t-sub mono">' + esc(r.item.asset_tag) + ' · baki ' + r.item.quantity_available + '</div></div>' +
+        '<div class="t-sub">baki ' + r.item.quantity_available + ' unit</div></div>' +
         '<div class="spacer"></div>' +
         '<div class="mini-bar"><span style="width:' + ((r.units / maxI) * 100).toFixed(0) + '%;background:var(--ink)"></span></div>' +
         '<span class="mono" style="font-weight:700;min-width:60px;text-align:right">' + r.units + ' unit</span></div>';
@@ -1475,7 +1442,7 @@ function viewDashboard() {
   }
   h += '</div></div></div>';
 
-  // ══════════════ SECTION 3 — AKTIVITI ══════════════
+  // ══════════════ AKTIVITI ══════════════
   h += sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
     '<button class="btn btn-sm" onclick="go(\'ledger\')">Log penuh ' + icon('i-out', 13) + '</button>');
 
@@ -1485,12 +1452,11 @@ function viewDashboard() {
     h += '<div class="empty">' + icon('i-history', 28) + '<p>Belum ada transaksi direkodkan.</p></div>';
   } else {
     h += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      '<th style="width:38px"></th><th>ID</th><th>Aktiviti</th><th>Penerima / Penjaga</th>' +
-      '<th class="t-num">Nilai</th><th>Status</th><th>Tarikh</th><th style="width:38px"></th></tr></thead><tbody>';
+      '<th style="width:38px"></th><th>ID</th><th>Item</th><th>Penerima / Penjaga</th>' +
+      '<th class="t-num">Kuantiti</th><th>Tindakan</th><th>Tarikh</th><th style="width:38px"></th></tr></thead><tbody>';
     h += recent.map(function (t) {
       var it = itemById(t.item_id);
       var q = Number(t.quantity || 0);
-      var value = it ? Math.abs(q) * Number(it.unit_cost || 0) : 0;
       var st = ledgerStatus(t);
       return '<tr>' +
         '<td><span class="ck" onclick="this.classList.toggle(\'on\');this.closest(\'tr\').classList.toggle(\'sel\')">' +
@@ -1500,11 +1466,12 @@ function viewDashboard() {
           '<span class="rowicon" style="background:' + st.bg + ';color:' + st.fg + '">' + icon(st.icon, 13) + '</span>' +
           '<div style="min-width:0"><div class="t-name" style="font-size:13px">' +
             esc(it ? it.name : 'Item #' + t.item_id) + '</div>' +
-            '<div class="t-sub mono">' + esc(it ? it.asset_tag : '—') + '</div></div></div></td>' +
+            '<div class="t-sub mono">' + esc(it && it.asset_tag ? it.asset_tag : (it ? TYPE_LABEL[it.item_type] : '—')) + '</div></div></div></td>' +
         '<td style="font-size:12.5px">' + (t.custodian_id
             ? esc(custName(t.custodian_id))
             : '<span style="color:var(--muted-3)">—</span>') + '</td>' +
-        '<td class="t-num mono" style="font-weight:600">' + (value ? money(value) : '—') + '</td>' +
+        '<td class="t-num mono" style="font-weight:600;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
+          (q > 0 ? '+' : '') + q + '</td>' +
         '<td><span class="dotstat"><i style="background:' + st.fg + '"></i>' + esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span></td>' +
         '<td class="mono" style="font-size:12px;color:var(--muted)">' + fmtDateTime(t.transaction_date) + '</td>' +
         '<td>' + (it ? '<button class="btn btn-sm btn-ghost" onclick="openHistory(' + it.id + ')">' + icon('i-dots', 15) + '</button>' : '') + '</td>' +
@@ -1515,14 +1482,6 @@ function viewDashboard() {
   h += '</div>';
 
   return h;
-}
-
-// Small "?" affordance carrying a plain-language definition, so an
-// accounting term never sits on the dashboard unexplained.
-function hintDot(text) {
-  return '<span title="' + esc(text) + '" style="display:inline-flex;align-items:center;justify-content:center;' +
-    'width:14px;height:14px;border-radius:50%;border:1px solid var(--muted-3);color:var(--muted-2);' +
-    'font-size:9.5px;font-weight:700;cursor:help;margin-left:4px;vertical-align:1px">?</span>';
 }
 
 // Colour + glyph per ledger action, shared by the activity table.
@@ -1580,8 +1539,8 @@ function runDateCheck(btn) {
   api('RunDateCheck', {}, function (s) {
     btn.disabled = false;
     btn.innerHTML = icon('i-clock', 15) + ' Semak Tarikh';
-    var total = s.warranty + s.inspection + s.audit + s.low_stock + s.overdue;
-    toast(total ? total + ' amaran dikesan (waranti ' + s.warranty + ', lewat ' + s.overdue +
+    var total = s.inspection + s.audit + s.low_stock + s.overdue;
+    toast(total ? total + ' amaran dikesan (lewat ' + s.overdue +
                   ', stok ' + s.low_stock + ', pemeriksaan ' + s.inspection + ', audit ' + s.audit + ')'
                 : 'Tiada amaran. Semua rekod terkini.', total ? '' : 'ok');
   }, function (e) {
@@ -1678,21 +1637,17 @@ function itemsTable(rows) {
   var h = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
     th('asset_tag', 'Tag Aset') + th('name', 'Nama Item') + th('category_id', 'Kategori') +
     th('location_id', 'Lokasi') + th('status', 'Status') +
-    th('quantity_available', 'Baki', 't-num') + th('unit_cost', 'Kos', 't-num') +
-    '<th class="t-num">Nilai Buku</th>' + th('date_warranty_expiry', 'Waranti') +
+    th('quantity_available', 'Baki', 't-num') + th('date_acquired', 'Diperoleh') +
     '<th style="width:40px"></th></tr></thead><tbody>';
 
   h += rows.map(function (i) {
     var loan = i.open_loan;
-    var wDays = i.date_warranty_expiry ? daysBetween(today(), i.date_warranty_expiry) : null;
-    var wCell = i.date_warranty_expiry
-      ? '<span class="mono" style="font-size:12px;' + (wDays < 0 ? 'color:var(--err)' : wDays <= 30 ? 'color:var(--warn)' : '') + '">' +
-        fmtDate(i.date_warranty_expiry) + '</span>'
-      : '<span style="color:var(--muted-3)">—</span>';
     var lowFlag = (i.item_type === 'consumable' && Number(i.quantity_available) <= Number(i.min_stock_alert || 0));
 
     return '<tr class="' + (loan && loan.is_overdue ? 'overdue-row' : '') + '">' +
-      '<td><span class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</span></td>' +
+      '<td>' + (i.asset_tag
+        ? '<span class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</span>'
+        : '<span class="pill pill-mute">Inventori</span>') + '</td>' +
       '<td><div class="t-name">' + esc(i.name) + '</div>' +
         '<div class="t-sub">' + esc(TYPE_LABEL[i.item_type] || i.item_type) +
         (i.serial_number ? ' · <span class="mono">' + esc(i.serial_number) + '</span>' : '') + '</div></td>' +
@@ -1705,9 +1660,7 @@ function itemsTable(rows) {
       '<td class="t-num mono" style="' + (lowFlag ? 'color:var(--warn);font-weight:700' : '') + '">' +
         (i.quantity_available == null ? '—' : i.quantity_available) +
         (i.item_type === 'consumable' ? '<span style="color:var(--muted-3)">/' + (i.quantity_total || 0) + '</span>' : '') + '</td>' +
-      '<td class="t-num mono" style="font-size:12.5px">' + money(i.unit_cost) + '</td>' +
-      '<td class="t-num mono" style="font-size:12.5px;color:var(--muted)">' + money(i.book_value != null ? i.book_value : bookValue(i)) + '</td>' +
-      '<td>' + wCell + '</td>' +
+      '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + fmtDate(i.date_acquired) + '</td>' +
       '<td>' + rowMenuBtn(i.id) + '</td></tr>';
   }).join('');
 
@@ -1812,7 +1765,7 @@ function viewStock() {
   });
 
   var low = cons.filter(function (i) { return Number(i.quantity_available) <= Number(i.min_stock_alert || 0); });
-  var value = cons.reduce(function (s, i) { return s + Number(i.unit_cost || 0) * Number(i.quantity_available || 0); }, 0);
+  var units = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
 
   var h = '<div class="page-head"><div><h2>Stok</h2>' +
     '<p>' + cons.length + ' item inventori · ' + low.length + ' pada paras rendah</p></div>' +
@@ -1822,7 +1775,7 @@ function viewStock() {
   h += '<div class="grid g-3" style="margin-bottom:16px">' +
     kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Item', cons.length, 'Dalam inventori', 'stock') +
     kpi('i-warn', 'var(--warn)', 'var(--warn-bg)', 'Perlu Diisi Semula', low.length, 'Pada atau bawah paras minimum', 'stock') +
-    kpi('i-money', 'var(--ok)', 'var(--ok-bg)', 'Nilai Stok', moneyShort(value), 'Kos × baki semasa', 'stock') +
+    kpi('i-box', 'var(--ok)', 'var(--ok-bg)', 'Unit Di Tangan', units, 'Jumlah baki semua item', 'stock') +
     '</div>';
 
   if (!cons.length) {
@@ -1831,7 +1784,7 @@ function viewStock() {
 
   h += '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
     '<th>Tag</th><th>Item</th><th>Lokasi</th><th class="t-num">Baki</th><th class="t-num">Minimum</th>' +
-    '<th style="width:130px">Paras</th><th class="t-num">Nilai</th><th style="width:170px"></th></tr></thead><tbody>';
+    '<th style="width:130px">Paras</th><th style="width:170px"></th></tr></thead><tbody>';
 
   h += cons.map(function (i) {
     var min = Number(i.min_stock_alert || 0);
@@ -1841,14 +1794,14 @@ function viewStock() {
     // roughly half-full rather than pinned at 100%.
     var pct = Math.max(3, Math.min(100, (av / Math.max(min * 2, 1)) * 100));
     return '<tr>' +
-      '<td class="mono" style="font-size:12.5px;font-weight:600">' + esc(i.asset_tag) + '</td>' +
+      '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + esc(i.asset_tag || '—') + '</td>' +
       '<td><div class="t-name">' + esc(i.name) + '</div><div class="t-sub">' + esc(catName(i.category_id)) + '</div></td>' +
       '<td style="font-size:12.5px">' + esc(locName(i.location_id)) + '</td>' +
       '<td class="t-num mono" style="font-weight:700;' + (isLow ? 'color:var(--warn)' : '') + '">' + av + '</td>' +
       '<td class="t-num mono" style="color:var(--muted)">' + min + '</td>' +
       '<td><div class="mini-bar" style="width:100%"><span style="width:' + pct + '%;background:' +
         (isLow ? 'var(--warn)' : 'var(--ok)') + '"></span></div></td>' +
-      '<td class="t-num mono" style="font-size:12.5px">' + money(av * Number(i.unit_cost || 0)) + '</td>' +
+
       '<td><button class="btn btn-sm" onclick="openStock(' + i.id + ',\'StockAdd\')">' + icon('i-plus', 13) + ' Tambah</button> ' +
           '<button class="btn btn-sm" onclick="openStock(' + i.id + ',\'StockRemove\')">' + icon('i-layers', 13) + ' Kurang</button></td>' +
       '</tr>';
@@ -1931,60 +1884,56 @@ function viewLedger() {
 // ══════════════════════════════════════════════════════════════════════
 function viewReports() {
   var items = (D.items || []).filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
-  var p = D.portfolio || {};
+  var assets = items.filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var cons   = items.filter(function (i) { return i.item_type === 'consumable'; });
+  var onLoan = items.filter(function (i) { return i.open_loan; });
+  var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
+  var issued = issueStats(90);
 
-  // By category
-  var byCat = {};
-  items.forEach(function (i) {
-    var k = catName(i.category_id);
-    if (!byCat[k]) byCat[k] = { n: 0, cost: 0, book: 0 };
-    var qty = i.item_type === 'consumable' ? Number(i.quantity_available || 0) : 1;
-    byCat[k].n++;
-    byCat[k].cost += Number(i.unit_cost || 0) * qty;
-    byCat[k].book += (i.book_value != null ? i.book_value : bookValue(i)) * qty;
-  });
-
-  var byStatus = {};
-  (D.items || []).forEach(function (i) { byStatus[i.status] = (byStatus[i.status] || 0) + 1; });
-
-  var maxCost = Math.max.apply(null, Object.keys(byCat).map(function (k) { return byCat[k].cost; }).concat([1]));
-
-  var h = '<div class="page-head"><div><h2>Laporan</h2><p>Ringkasan kewangan dan taburan aset</p></div>' +
+  var h = '<div class="page-head"><div><h2>Laporan</h2>' +
+    '<p>Taburan aset mengikut lokasi dan penggunaan inventori</p></div>' +
     '<div class="spacer"></div>' +
     '<button class="btn" onclick="window.print()">' + icon('i-chart', 15) + ' Cetak</button>' +
     '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button></div>';
 
   h += '<div class="grid g-4" style="margin-bottom:16px">' +
-    kpi('i-money', 'var(--accent)', 'var(--accent-soft)', 'Kos Perolehan', moneyShort(p.acquisition_cost), 'Nilai belian asal', 'reports') +
-    kpi('i-chart', 'var(--ok)', 'var(--ok-bg)', 'Nilai Buku', moneyShort(p.book_value), 'Selepas susut nilai', 'reports') +
-    kpi('i-down', 'var(--warn)', 'var(--warn-bg)', 'Susut Nilai', moneyShort(p.depreciation), 'Terkumpul sehingga kini', 'reports') +
-    kpi('i-box', 'var(--muted)', 'var(--paper-3)', 'Aset Aktif', p.asset_count || 0, 'Belum dilupuskan', 'items') +
+    kpi('i-box', 'var(--accent)', 'var(--accent-soft)', 'Jumlah Aset', assets.length, 'Belum dilupuskan', 'items') +
+    kpi('i-out', 'var(--info)', 'var(--info-bg)', 'Sedang Dipinjam', onLoan.length, 'Di luar lokasi', 'loans') +
+    kpi('i-layers', 'var(--ok)', 'var(--ok-bg)', 'Unit Inventori', stockUnits, cons.length + ' jenis item', 'stock') +
+    kpi('i-users', 'var(--muted)', 'var(--surface-3)', 'Pengeluaran 90 hari', issued.totalUnits, 'unit kepada staf', 'ledger') +
     '</div>';
 
   h += '<div class="grid g-2">';
 
-  // Category breakdown
-  h += '<div class="card"><div class="card-head"><h3>Taburan Mengikut Kategori</h3></div><div class="card-body">';
-  var catKeys = Object.keys(byCat).sort(function (a, b) { return byCat[b].cost - byCat[a].cost; });
-  if (!catKeys.length) h += '<p style="color:var(--muted-2);text-align:center;margin:0">Tiada data.</p>';
-  else h += catKeys.map(function (k) {
-    var c = byCat[k];
+  // Assets by location — the register's main question.
+  var byLoc = {};
+  assets.forEach(function (i) {
+    var k = i.open_loan ? 'Sedang dipinjam' : locName(i.location_id);
+    byLoc[k] = (byLoc[k] || 0) + 1;
+  });
+  var locKeys = Object.keys(byLoc).sort(function (a, b) { return byLoc[b] - byLoc[a]; });
+  var maxLoc = locKeys.length ? byLoc[locKeys[0]] : 1;
+
+  h += '<div class="card"><div class="card-head"><h3>Aset Mengikut Lokasi</h3></div><div class="card-body">';
+  if (!locKeys.length) h += '<p style="color:var(--muted-2);text-align:center;margin:0">Tiada aset.</p>';
+  else h += locKeys.map(function (k) {
     return '<div style="margin-bottom:13px">' +
       '<div style="display:flex;gap:10px;font-size:13px;margin-bottom:5px">' +
         '<span style="font-weight:600">' + esc(k) + '</span>' +
-        '<span style="color:var(--muted-2)">' + c.n + ' item</span>' +
-        '<span style="margin-left:auto" class="mono">' + money(c.cost) + '</span></div>' +
-      '<div class="mini-bar" style="width:100%"><span style="width:' + ((c.cost / maxCost) * 100).toFixed(1) + '%;background:var(--accent)"></span></div>' +
-      '</div>';
+        '<span style="margin-left:auto" class="mono">' + byLoc[k] + ' aset</span></div>' +
+      '<div class="mini-bar" style="width:100%"><span style="width:' + ((byLoc[k] / maxLoc) * 100).toFixed(1) +
+        '%;background:' + (k === 'Sedang dipinjam' ? 'var(--accent)' : 'var(--ink)') + '"></span></div></div>';
   }).join('');
   h += '</div></div>';
 
-  // Status breakdown
-  h += '<div class="card"><div class="card-head"><h3>Status Aset</h3></div><div class="card-body">';
+  // Status spread.
+  var byStatus = {};
+  (D.items || []).forEach(function (i) { byStatus[i.status] = (byStatus[i.status] || 0) + 1; });
   var total = (D.items || []).length || 1;
-  h += Object.keys(STATUS_META).map(function (s) {
-    var n = byStatus[s] || 0;
-    return '<div class="alert-row">' + pill(s) + '<div class="spacer"></div>' +
+  h += '<div class="card"><div class="card-head"><h3>Status Item</h3></div><div class="card-body">';
+  h += Object.keys(STATUS_META).map(function (st) {
+    var n = byStatus[st] || 0;
+    return '<div class="alert-row">' + pill(st) + '<div class="spacer"></div>' +
       '<div class="mini-bar"><span style="width:' + ((n / total) * 100).toFixed(1) + '%;background:var(--ink-3)"></span></div>' +
       '<span class="mono" style="font-weight:600;min-width:34px;text-align:right">' + n + '</span></div>';
   }).join('');
@@ -1992,38 +1941,50 @@ function viewReports() {
 
   h += '</div>';
 
-  // Depreciation table — the assets carrying the most value loss.
-  var depr = items.filter(function (i) { return i.useful_life_years > 0; })
-    .map(function (i) {
-      var bv = i.book_value != null ? i.book_value : bookValue(i);
-      return { i: i, bv: bv, loss: Number(i.unit_cost || 0) - bv };
-    })
-    .sort(function (a, b) { return b.loss - a.loss; }).slice(0, 15);
+  // Consumption per staff, 90 days.
+  h += '<div class="card" style="margin-top:16px"><div class="card-head"><div style="flex:1">' +
+    '<h3>Pengeluaran Inventori Mengikut Staf</h3>' +
+    '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">90 hari terakhir</p></div></div>';
+  if (!issued.staff.length) {
+    h += '<div class="empty" style="padding:30px">' + icon('i-users', 26) +
+      '<p style="margin:0;font-size:12.5px">Tiada pengeluaran direkodkan kepada staf.</p></div>';
+  } else {
+    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Staf</th><th>Jabatan</th>' +
+      '<th>Item Diambil</th><th class="t-num">Jumlah Unit</th></tr></thead><tbody>';
+    h += issued.staff.map(function (r) {
+      var c = find(D.custodians, r.id);
+      var detail = Object.keys(r.items).sort(function (x, y) { return r.items[y] - r.items[x]; })
+        .map(function (n) { return n + ' ×' + r.items[n]; }).join(', ');
+      return '<tr><td class="t-name">' + esc(custName(r.id)) + '</td>' +
+        '<td style="font-size:12.5px;color:var(--muted)">' + esc(c ? (c.department || '—') : '—') + '</td>' +
+        '<td style="font-size:12.5px">' + esc(detail) + '</td>' +
+        '<td class="t-num mono" style="font-weight:700">' + r.units + '</td></tr>';
+    }).join('');
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
 
-  if (depr.length) {
-    h += '<div class="card" style="margin-top:16px"><div class="card-head"><h3>Susut Nilai Tertinggi</h3>' +
-      '<div class="spacer"></div><span class="t-sub">Kaedah garis lurus</span></div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Tag</th><th>Aset</th><th>Diperoleh</th>' +
-      '<th class="t-num">Kos</th><th class="t-num">Nilai Buku</th><th class="t-num">Susut Nilai</th><th class="t-num">Hayat</th></tr></thead><tbody>';
-    h += depr.map(function (r) {
-      var pctLoss = r.i.unit_cost ? (r.loss / r.i.unit_cost) * 100 : 0;
-      return '<tr><td class="mono" style="font-size:12.5px">' + esc(r.i.asset_tag) + '</td>' +
-        '<td class="t-name">' + esc(r.i.name) + '</td>' +
-        '<td class="mono" style="font-size:12.5px">' + fmtDate(r.i.date_acquired) + '</td>' +
-        '<td class="t-num mono">' + money(r.i.unit_cost) + '</td>' +
-        '<td class="t-num mono">' + money(r.bv) + '</td>' +
-        '<td class="t-num mono" style="color:var(--err)">−' + money(r.loss).replace('RM ', 'RM ') +
-          ' <span style="color:var(--muted-2);font-size:11px">(' + pctLoss.toFixed(0) + '%)</span></td>' +
-        '<td class="t-num mono">' + r.i.useful_life_years + ' thn</td></tr>';
+  // Most-consumed items.
+  if (issued.items.length) {
+    h += '<div class="card" style="margin-top:16px"><div class="card-head">' +
+      '<h3>Item Paling Banyak Digunakan</h3><div class="spacer"></div>' +
+      '<span class="t-sub">90 hari</span></div>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Kategori</th>' +
+      '<th class="t-num">Dikeluarkan</th><th class="t-num">Baki Kini</th><th class="t-num">Minimum</th></tr></thead><tbody>';
+    h += issued.items.slice(0, 20).map(function (r) {
+      var low = Number(r.item.quantity_available || 0) <= Number(r.item.min_stock_alert || 0);
+      return '<tr><td class="t-name">' + esc(r.item.name) + '</td>' +
+        '<td style="font-size:12.5px;color:var(--muted)">' + esc(catName(r.item.category_id)) + '</td>' +
+        '<td class="t-num mono" style="font-weight:700">' + r.units + '</td>' +
+        '<td class="t-num mono" style="' + (low ? 'color:var(--warn);font-weight:700' : '') + '">' +
+          r.item.quantity_available + '</td>' +
+        '<td class="t-num mono" style="color:var(--muted)">' + (r.item.min_stock_alert || 0) + '</td></tr>';
     }).join('');
     h += '</tbody></table></div></div>';
   }
   return h;
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  VIEW — TETAPAN (reference data)
-// ══════════════════════════════════════════════════════════════════════
 function viewSettings() {
   var h = '<div class="page-head"><div><h2>Tetapan</h2><p>Data rujukan: kategori, lokasi dan penjaga aset</p></div></div>';
   h += '<div class="grid g-3">';
@@ -2177,38 +2138,28 @@ function openItemDrawer(id, presetType) {
       field('Kategori', select('fCat', catOpts, it ? it.category_id : ''), null, true) +
       field('Lokasi', select('fLoc', locOpts, it ? it.location_id : ''), null, true) +
     '</div>';
-  if (it) b += '<div class="info-box">Tag aset <b class="mono">' + esc(it.asset_tag) + '</b> — dijana automatik dan kekal.</div>';
-  else b += '<div class="info-box">Tag aset (<span class="mono">AST-TAHUN-NNNN</span>) dijana automatik semasa disimpan.</div>';
+  if (it && it.asset_tag) b += '<div class="info-box">Tag aset <b class="mono">' + esc(it.asset_tag) + '</b> — dijana automatik dan kekal.</div>';
+  else if (!it) b += '<div class="info-box">Aset menerima tag (<span class="mono">AST-TAHUN-NNNN</span>) secara automatik. Item inventori tidak bertag — ia dikenali melalui nama.</div>';
   b += '</fieldset>';
 
-  b += '<fieldset class="fs"><legend>Kuantiti &amp; Kewangan</legend>' +
+  b += '<fieldset class="fs"><legend>Kuantiti &amp; Pergerakan</legend>' +
     '<div class="row-2" id="qtyRow">' +
       field('Kuantiti' + (it ? ' (dikunci)' : ''),
         input('fQty', 'number', it ? it.quantity_total : 1, 'min="0" step="1"' + (it ? ' disabled' : '')),
-        it ? 'Ubah kuantiti melalui Tambah/Kurang Stok supaya lejar kekal tepat.' : null) +
+        it ? 'Ubah kuantiti melalui Tambah/Keluar Stok supaya lejar kekal tepat.' : null) +
       field('Amaran Stok Minimum', input('fMin', 'number', it ? it.min_stock_alert : 5, 'min="0" step="1"'), 'Amaran dicetuskan pada paras ini') +
     '</div>' +
-    '<div class="row-2">' +
-      field('Kos Seunit (RM)', input('fCost', 'number', it ? it.unit_cost : '', 'min="0" step="0.01" oninput="previewDepr()"')) +
-      field('Nilai Baki (RM)', input('fSalvage', 'number', it ? it.salvage_value : 0, 'min="0" step="0.01" oninput="previewDepr()"'), 'Nilai selepas hayat penuh') +
-    '</div>' +
-    field('Jangka Hayat (tahun)', input('fLife', 'number', it ? it.useful_life_years : '', 'min="0" step="1" oninput="previewDepr()"'),
-      'Kosongkan jika aset tidak disusut nilai') +
     '<div id="portableRow" class="field"><label>Aset Mudah Alih</label>' +
       select('fPortable', [
         { v: 'TRUE',  t: 'Ya — boleh didaftar keluar kepada individu' },
         { v: 'FALSE', t: 'Tidak — kekal di lokasi (cth. meja, kerusi)' }
       ], (it && String(it.is_portable) === 'FALSE') ? 'FALSE' : 'TRUE', '') +
       '<div class="hint">Hanya aset mudah alih boleh dipinjamkan</div></div>' +
-    '<div id="deprPreview"></div>' +
     '</fieldset>';
 
   b += '<fieldset class="fs"><legend>Tarikh Kitaran Hayat</legend>' +
     '<div class="row-2">' +
-      field('Tarikh Perolehan', input('fAcq', 'date', it ? inputDate(it.date_acquired) : inputDate(new Date()), 'oninput="previewDepr()"'), null, true) +
-      field('Tamat Waranti', input('fWarranty', 'date', it ? inputDate(it.date_warranty_expiry) : '')) +
-    '</div>' +
-    '<div class="row-2">' +
+      field('Tarikh Perolehan', input('fAcq', 'date', it ? inputDate(it.date_acquired) : inputDate(new Date())), null, true) +
       field('Pemeriksaan Seterusnya', input('fInspect', 'date', it ? inputDate(it.date_next_inspection) : '')) +
       field('Penyelenggaraan Terakhir', input('fMaint', 'date', it ? inputDate(it.date_last_maintained) : '')) +
     '</div>' +
@@ -2227,10 +2178,9 @@ function openItemDrawer(id, presetType) {
     '<button class="btn btn-primary" onclick="saveItem(this,' + (id || 'null') + ')">' + icon('i-check', 15) + ' Simpan</button>';
 
   openDrawer(it ? 'Sunting Item' : 'Tambah Item Baharu',
-             it ? it.asset_tag + ' · ' + it.name : 'Daftar aset atau bahan guna habis',
+             it ? ((it.asset_tag ? it.asset_tag + ' · ' : '') + it.name) : 'Daftar aset atau item inventori',
              b, foot);
   toggleItemType();
-  previewDepr();
 }
 
 function toggleItemType() {
@@ -2245,19 +2195,6 @@ function toggleItemType() {
   row.style.display = (t === 'consumable') ? '' : 'none';
 }
 
-function previewDepr() {
-  var host = $('deprPreview');
-  if (!host) return;
-  var cost = Number(num('fCost') || 0), life = Number(num('fLife') || 0), salv = Number(num('fSalvage') || 0);
-  if (!cost || !life) { host.innerHTML = ''; return; }
-  var item = { unit_cost: cost, useful_life_years: life, salvage_value: salv, date_acquired: val('fAcq') };
-  var bv = bookValue(item);
-  var annual = (cost - salv) / life;
-  host.innerHTML = '<div class="info-box" style="margin-bottom:0">' +
-    'Susut nilai garis lurus: <b class="mono">' + money(annual) + '</b>/tahun · ' +
-    'Nilai buku hari ini: <b class="mono">' + money(bv) + '</b></div>';
-}
-
 function saveItem(btn, id) {
   var type = val('fType');
   var p = {
@@ -2269,11 +2206,7 @@ function saveItem(btn, id) {
     location_id: num('fLoc'),
     quantity_total: type === 'consumable' ? num('fQty') : 1,
     min_stock_alert: num('fMin') || 0,
-    unit_cost: num('fCost') || 0,
-    salvage_value: num('fSalvage') || 0,
-    useful_life_years: num('fLife') || 0,
     date_acquired: val('fAcq'),
-    date_warranty_expiry: val('fWarranty'),
     date_next_inspection: val('fInspect'),
     date_last_maintained: val('fMaint'),
     date_last_audited: val('fAudit'),
@@ -2477,12 +2410,11 @@ function doStock(btn, id, action) {
 function openDecommission(id) {
   var it = itemById(id);
   if (!it) return;
-  var bv = it.book_value != null ? it.book_value : bookValue(it);
-
   var b = '<div class="err-box">Tindakan ini menandakan aset sebagai dilupuskan dan tidak boleh dipinjam lagi. ' +
     'Rekod dan sejarahnya kekal dalam lejar audit.</div>' +
-    '<div class="info-box"><b class="mono">' + esc(it.asset_tag) + '</b> — ' + esc(it.name) +
-    '<br>Kos asal ' + money(it.unit_cost) + ' · nilai buku semasa <b>' + money(bv) + '</b></div>' +
+    '<div class="info-box"><b class="mono">' + esc(it.asset_tag || it.name) + '</b>' +
+    (it.asset_tag ? ' — ' + esc(it.name) : '') +
+    '<br>' + esc(catName(it.category_id)) + ' · ' + esc(locName(it.location_id)) + '</div>' +
     field('Sebab Pelupusan', select('dReason', (D.meta.removal_reasons || []).map(function (r) {
       return { v: r, t: r };
     }), '', ''), null, true) +
@@ -2492,18 +2424,16 @@ function openDecommission(id) {
         { v: 'decommissioned', t: 'Dilupuskan' }, { v: 'disposed', t: 'Dibuang' }
       ], 'decommissioned', '')) +
     '</div>' +
-    field('Nilai Hapus Kira / Harga Jualan (RM)', input('dValue', 'number', 0, 'min="0" step="0.01"'),
-      'Masukkan harga jualan jika dijual, atau 0 jika dihapus kira') +
     field('Catatan', '<textarea id="dNote" placeholder="Butiran tambahan…"></textarea>');
 
-  openDrawer('Lupuskan Aset', it.asset_tag + ' · ' + it.name, b,
+  openDrawer('Lupuskan Item', (it.asset_tag ? it.asset_tag + ' · ' : '') + it.name, b,
     '<button class="btn" onclick="closeDrawer()">Batal</button>' +
     '<button class="btn btn-danger" onclick="doDecom(this,' + id + ')">' + icon('i-trash', 15) + ' Sahkan Pelupusan</button>');
 }
 function doDecom(btn, id) {
   submitAction(btn, 'Decommission', {
     id: id, reason: val('dReason'), date_decommissioned: val('dDate'),
-    status: val('dStatus'), writeoff_value: num('dValue') || 0, reason_notes: val('dNote')
+    status: val('dStatus'), reason_notes: val('dNote')
   }, 'Aset telah dilupuskan.');
 }
 
@@ -2594,8 +2524,6 @@ function openHistory(id) {
 function renderHistory(it, txns) {
   var host = $('histBody');
   if (!host) return;
-  var bv = it.book_value != null ? it.book_value : bookValue(it);
-
   var h = '<fieldset class="fs"><legend>Ringkasan</legend>' +
     kvRow('Status', pill(it.status)) +
     kvRow('Jenis', esc(TYPE_LABEL[it.item_type] || it.item_type)) +
@@ -2603,13 +2531,13 @@ function renderHistory(it, txns) {
     kvRow('Lokasi', esc(locName(it.location_id))) +
     (it.serial_number ? kvRow('Nombor Siri', '<span class="mono">' + esc(it.serial_number) + '</span>') : '') +
     kvRow('Baki / Jumlah', '<span class="mono">' + it.quantity_available + ' / ' + it.quantity_total + '</span>') +
-    kvRow('Kos Seunit', '<span class="mono">' + money(it.unit_cost) + '</span>') +
-    kvRow('Nilai Buku', '<span class="mono">' + money(bv) + '</span>') +
+    (it.item_type === 'fixed_asset'
+      ? kvRow('Mudah Alih', String(it.is_portable) === 'FALSE' ? 'Tidak — kekal di lokasi' : 'Ya — boleh dipinjam')
+      : '') +
     '</fieldset>';
 
   h += '<fieldset class="fs"><legend>Tarikh Kitaran Hayat</legend>' +
     kvRow('Diperoleh', fmtDate(it.date_acquired)) +
-    kvRow('Tamat Waranti', fmtDate(it.date_warranty_expiry)) +
     kvRow('Pemeriksaan Seterusnya', fmtDate(it.date_next_inspection)) +
     kvRow('Penyelenggaraan Terakhir', fmtDate(it.date_last_maintained)) +
     kvRow('Audit Terakhir', fmtDate(it.date_last_audited)) +
@@ -2923,19 +2851,17 @@ function downloadCSV(filename, rows) {
 function exportCSV() {
   var rows = [[
     'Tag Aset', 'Nama', 'Jenis', 'Kategori', 'Lokasi', 'Nombor Siri', 'Status',
-    'Baki', 'Jumlah', 'Min Stok', 'Kos Seunit', 'Nilai Buku', 'Nilai Baki', 'Hayat (thn)',
-    'Diperoleh', 'Tamat Waranti', 'Penyelenggaraan Terakhir', 'Pemeriksaan Seterusnya',
+    'Mudah Alih', 'Baki', 'Jumlah', 'Min Stok',
+    'Diperoleh', 'Penyelenggaraan Terakhir', 'Pemeriksaan Seterusnya',
     'Audit Terakhir', 'Dilupuskan', 'Penjaga Semasa', 'Catatan'
   ]];
   filteredItems().forEach(function (i) {
     rows.push([
       i.asset_tag, i.name, TYPE_LABEL[i.item_type] || i.item_type, catName(i.category_id), locName(i.location_id),
       i.serial_number, (STATUS_META[i.status] || {}).label || i.status,
+      i.item_type === 'fixed_asset' ? (String(i.is_portable) === 'FALSE' ? 'Tidak' : 'Ya') : '',
       i.quantity_available, i.quantity_total, i.min_stock_alert,
-      Number(i.unit_cost || 0).toFixed(2),
-      Number(i.book_value != null ? i.book_value : bookValue(i)).toFixed(2),
-      Number(i.salvage_value || 0).toFixed(2), i.useful_life_years,
-      fmtDate(i.date_acquired), fmtDate(i.date_warranty_expiry), fmtDate(i.date_last_maintained),
+      fmtDate(i.date_acquired), fmtDate(i.date_last_maintained),
       fmtDate(i.date_next_inspection), fmtDate(i.date_last_audited), fmtDate(i.date_decommissioned),
       i.open_loan ? custName(i.open_loan.custodian_id) : '', i.notes
     ]);

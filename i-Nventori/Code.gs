@@ -56,10 +56,10 @@ const SCHEMA = {
   Items: [
     'id', 'asset_tag', 'name', 'category_id', 'location_id', 'serial_number',
     'item_type', 'quantity_total', 'quantity_available', 'min_stock_alert',
-    'unit_cost', 'status',
-    'date_acquired', 'date_warranty_expiry', 'date_last_maintained',
+    'status',
+    'date_acquired', 'date_last_maintained',
     'date_next_inspection', 'date_last_audited', 'date_decommissioned',
-    'salvage_value', 'useful_life_years', 'is_portable',
+    'is_portable',
     'custodian_id', 'photo_url', 'receipt_url', 'notes',
     'created_at', 'updated_at', 'deleted_at'
   ],
@@ -82,8 +82,7 @@ const DATE_COLS = {
 };
 const NUM_COLS = {
   id: 1, category_id: 1, location_id: 1, custodian_id: 1, item_id: 1,
-  quantity_total: 1, quantity_available: 1, min_stock_alert: 1,
-  unit_cost: 1, salvage_value: 1, useful_life_years: 1, quantity: 1
+  quantity_total: 1, quantity_available: 1, min_stock_alert: 1, quantity: 1
 };
 
 const ITEM_TYPES   = ['fixed_asset', 'consumable'];
@@ -333,27 +332,12 @@ function _today_() { return _startOfDay_(new Date()); }
 //  second copy of this logic is how the bell and the email end up
 //  disagreeing about what is overdue.
 // ============================================================
-const WARRANTY_WINDOW_DAYS = 30;
-const AUDIT_STALE_DAYS     = 365;
+const AUDIT_STALE_DAYS = 365;
 
 const SCOPES = {
   // Active = not soft-deleted, not decommissioned/disposed.
   active: function (item) {
     return !item.deleted_at && item.status !== 'decommissioned' && item.status !== 'disposed';
-  },
-
-  // Warranty expiring within 30 days, inclusive, and not already expired.
-  expiringWarranty: function (item, today) {
-    if (!SCOPES.active(item) || !item.date_warranty_expiry) return false;
-    var d = _daysBetween_(today || _today_(), item.date_warranty_expiry);
-    return d !== null && d >= 0 && d <= WARRANTY_WINDOW_DAYS;
-  },
-
-  // Already past warranty.
-  expiredWarranty: function (item, today) {
-    if (!SCOPES.active(item) || !item.date_warranty_expiry) return false;
-    var d = _daysBetween_(today || _today_(), item.date_warranty_expiry);
-    return d !== null && d < 0;
   },
 
   // Inspection due today or earlier.
@@ -404,55 +388,6 @@ function _openLoans_(transactions) {
 }
 
 // ============================================================
-//  DEPRECIATION  (spec 5.5)
-//
-//    Current Value = Unit Cost - ((Unit Cost - Salvage) / Life) * Age
-//
-//  Clamped at both ends: age is never negative (an asset acquired in the
-//  future is worth its full cost, not more), and the result never falls
-//  below salvage value however old the asset gets. With no useful life
-//  recorded, the asset does not depreciate — guessing a life would put
-//  invented numbers on a financial summary card.
-//  MIRRORED in index.html (_bookValue) for the live preview; change both.
-// ============================================================
-function _bookValue_(item, asOf) {
-  const cost = Number(item.unit_cost || 0);
-  const life = Number(item.useful_life_years || 0);
-  const salv = Number(item.salvage_value || 0);
-  if (!cost) return 0;
-  if (!life || life <= 0) return cost;
-
-  const acquired = item.date_acquired;
-  if (!acquired) return cost;
-
-  const days = _daysBetween_(acquired, asOf || _today_());
-  if (days === null) return cost;
-  const ageYears = Math.max(0, days / 365.25);
-
-  const annual = (cost - salv) / life;
-  const value  = cost - (annual * ageYears);
-  return Math.max(salv, Math.round(value * 100) / 100);
-}
-
-// Whole-portfolio financial summary for the dashboard card.
-function _portfolio_(items, asOf) {
-  var acquisition = 0, book = 0, count = 0;
-  (items || []).forEach(function (it) {
-    if (!SCOPES.active(it)) return;
-    var qty = (it.item_type === 'consumable') ? Number(it.quantity_available || 0) : 1;
-    acquisition += Number(it.unit_cost || 0) * qty;
-    book        += _bookValue_(it, asOf) * qty;
-    count       += 1;
-  });
-  return {
-    acquisition_cost: Math.round(acquisition * 100) / 100,
-    book_value:       Math.round(book * 100) / 100,
-    depreciation:     Math.round((acquisition - book) * 100) / 100,
-    asset_count:      count
-  };
-}
-
-// ============================================================
 //  SERVER CACHE
 //
 //  getInitialData() re-reads five tabs on every call. The finished
@@ -495,7 +430,7 @@ function getInitialData(adminPass) {
   if (!isAdmin) {
     payload.custodians   = [];
     payload.transactions = [];
-    payload.alerts       = { warranty: [], overdue: [], inspection: [], audit: [], low_stock: [] };
+    payload.alerts       = { overdue: [], inspection: [], audit: [], low_stock: [] };
   }
   payload.is_admin  = isAdmin;
   payload.server_ts = new Date().toISOString();
@@ -524,7 +459,6 @@ function _buildPayload_() {
       transaction_date:     l.transaction_date,
       is_overdue:           SCOPES.overdue(l, today)
     } : null;
-    it.book_value = _bookValue_(it, today);
   });
 
   return {
@@ -534,7 +468,6 @@ function _buildPayload_() {
     custodians:   custs,
     transactions: txns,
     alerts: {
-      warranty:   items.filter(function (i) { return SCOPES.expiringWarranty(i, today); }).map(_alertRef_),
       inspection: items.filter(function (i) { return SCOPES.inspectionDue(i, today); }).map(_alertRef_),
       audit:      items.filter(function (i) { return SCOPES.auditDue(i, today); }).map(_alertRef_),
       low_stock:  items.filter(function (i) { return SCOPES.lowStock(i); }).map(_alertRef_),
@@ -550,7 +483,6 @@ function _buildPayload_() {
         };
       })
     },
-    portfolio: _portfolio_(items, today),
     meta: {
       item_types:      ITEM_TYPES,
       item_status:     ITEM_STATUS,
@@ -563,7 +495,6 @@ function _buildPayload_() {
 function _alertRef_(i) {
   return {
     id: i.id, asset_tag: i.asset_tag, name: i.name, status: i.status,
-    date_warranty_expiry: i.date_warranty_expiry,
     date_next_inspection: i.date_next_inspection,
     date_last_audited:    i.date_last_audited,
     quantity_available:   i.quantity_available,
@@ -725,11 +656,7 @@ const ITEM_SCHEMA = {
   serial_number:        { max: 80,  label: 'Nombor siri' },
   quantity_total:       { type: 'number', min: 0, def: 1, label: 'Kuantiti' },
   min_stock_alert:      { type: 'number', min: 0, def: 0, label: 'Amaran stok minimum' },
-  unit_cost:            { type: 'number', min: 0, def: 0, label: 'Kos seunit' },
-  salvage_value:        { type: 'number', min: 0, def: 0, label: 'Nilai baki' },
-  useful_life_years:    { type: 'number', min: 0, def: 0, label: 'Jangka hayat (tahun)' },
   date_acquired:        { required: true, type: 'date', label: 'Tarikh perolehan' },
-  date_warranty_expiry: { type: 'date', label: 'Tarikh tamat waranti' },
   date_next_inspection: { type: 'date', label: 'Tarikh pemeriksaan seterusnya' },
   date_last_maintained: { type: 'date', label: 'Tarikh penyelenggaraan terakhir' },
   date_last_audited:    { type: 'date', label: 'Tarikh audit terakhir' },
@@ -750,7 +677,10 @@ function svcAddItem(p) {
   const qty = (v.item_type === 'fixed_asset') ? 1 : Math.max(0, Number(v.quantity_total || 0));
   const now = new Date();
   const id  = _nextId_('Items');
-  const tag = _nextAssetTag_(v.date_acquired.getFullYear());
+  // Only movable assets carry a tag — an asset tag identifies ONE physical
+  // thing you can point at and label. Inventory is a quantity of
+  // interchangeable units, so it is identified by name instead.
+  const tag = (v.item_type === 'fixed_asset') ? _nextAssetTag_(v.date_acquired.getFullYear()) : '';
 
   const item = {
     id: id,
@@ -763,16 +693,12 @@ function svcAddItem(p) {
     quantity_total: qty,
     quantity_available: qty,
     min_stock_alert: v.min_stock_alert || 0,
-    unit_cost: v.unit_cost || 0,
     status: qty > 0 ? 'available' : 'maintenance',
     date_acquired: v.date_acquired,
-    date_warranty_expiry: v.date_warranty_expiry,
     date_last_maintained: v.date_last_maintained,
     date_next_inspection: v.date_next_inspection,
     date_last_audited: v.date_last_audited,
     date_decommissioned: null,
-    salvage_value: v.salvage_value || 0,
-    useful_life_years: v.useful_life_years || 0,
     is_portable: (v.is_portable === 'FALSE') ? 'FALSE' : 'TRUE',
     custodian_id: null,
     photo_url: v.photo_url || '',
@@ -812,12 +738,8 @@ function svcUpdateItem(p) {
     serial_number: v.serial_number || '',
     item_type: v.item_type,
     min_stock_alert: v.min_stock_alert || 0,
-    unit_cost: v.unit_cost || 0,
-    salvage_value: v.salvage_value || 0,
-    useful_life_years: v.useful_life_years || 0,
     is_portable: (v.is_portable === 'FALSE') ? 'FALSE' : 'TRUE',
     date_acquired: v.date_acquired,
-    date_warranty_expiry: v.date_warranty_expiry,
     date_last_maintained: v.date_last_maintained,
     date_next_inspection: v.date_next_inspection,
     date_last_audited: v.date_last_audited,
@@ -1034,7 +956,6 @@ function svcDecommission(p) {
     id:                  { required: true, type: 'number', label: 'Item' },
     reason:              { required: true, in: REMOVAL_REASONS, label: 'Sebab pelupusan' },
     date_decommissioned: { required: true, type: 'date', label: 'Tarikh pelupusan' },
-    writeoff_value:      { type: 'number', min: 0, def: 0, label: 'Nilai hapus kira / jualan' },
     status:              { in: ['decommissioned', 'disposed'], def: 'decommissioned', label: 'Status' },
     reason_notes:        { max: 500, label: 'Catatan' }
   }, p);
@@ -1063,8 +984,7 @@ function svcDecommission(p) {
   _ledger_({
     item_id: item.id, action_type: 'decommission', quantity: -qty,
     transaction_date: v.date_decommissioned,
-    reason_notes: v.reason + ' | Nilai: RM' + (v.writeoff_value || 0).toFixed(2) +
-                  (v.reason_notes ? ' | ' + v.reason_notes : '')
+    reason_notes: v.reason + (v.reason_notes ? ' | ' + v.reason_notes : '')
   });
 
   return { id: item.id, status: v.status };
@@ -1366,7 +1286,6 @@ function checkDates(skipMail) {
   const custs = _readTable_('Custodians');
   const loans = _openLoans_(txns);
 
-  const warranty   = items.filter(function (i) { return SCOPES.expiringWarranty(i, today); });
   const inspection = items.filter(function (i) { return SCOPES.inspectionDue(i, today); });
   const audit      = items.filter(function (i) { return SCOPES.auditDue(i, today); });
   const lowStock   = items.filter(function (i) { return SCOPES.lowStock(i); });
@@ -1374,24 +1293,17 @@ function checkDates(skipMail) {
 
   const summary = {
     checked_at: new Date().toISOString(),
-    warranty:   warranty.length,
     inspection: inspection.length,
     audit:      audit.length,
     low_stock:  lowStock.length,
     overdue:    overdue.length
   };
 
-  const total = warranty.length + inspection.length + audit.length + lowStock.length + overdue.length;
+  const total = inspection.length + audit.length + lowStock.length + overdue.length;
   if (skipMail || total === 0) return summary;
 
   var html = '<p>Ringkasan amaran inventori bagi ' + _fmtDate_(today) + ':</p>';
 
-  if (warranty.length) {
-    html += '<h3 style="font-size:14px;color:#b45309;margin:16px 0 4px;">Waranti akan tamat (' + warranty.length + ')</h3>' +
-      _kvRows_(warranty.map(function (i) {
-        return [i.asset_tag + ' — ' + i.name, _fmtDate_(i.date_warranty_expiry)];
-      }));
-  }
   if (overdue.length) {
     html += '<h3 style="font-size:14px;color:#be123c;margin:16px 0 4px;">Pinjaman lewat (' + overdue.length + ')</h3>' +
       _kvRows_(overdue.map(function (l) {

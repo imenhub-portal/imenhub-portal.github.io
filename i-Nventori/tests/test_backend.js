@@ -215,58 +215,11 @@ function fresh() {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-section('1. Depreciation (_bookValue_)');
-{
-  const S = loadBackend();
-  const base = { unit_cost: 10000, salvage_value: 1000, useful_life_years: 5 };
-
-  eq('brand new asset is worth full cost',
-    S._bookValue_({ ...base, date_acquired: daysFromNow(0) }), 10000);
-
-  // 1 year in: 10000 - ((10000-1000)/5 * 1) = 8200
-  const oneYear = S._bookValue_({ ...base, date_acquired: daysFromNow(-365) });
-  ok('one year of straight-line depreciation', Math.abs(oneYear - 8200) < 5, 'got ' + oneYear);
-
-  // Half life: 10000 - (1800 * 2.5) = 5500
-  const half = S._bookValue_({ ...base, date_acquired: daysFromNow(-Math.round(365.25 * 2.5)) });
-  ok('mid-life value', Math.abs(half - 5500) < 10, 'got ' + half);
-
-  eq('fully depreciated (exactly 5 years) clamps to salvage value',
-    S._bookValue_({ ...base, date_acquired: daysFromNow(-Math.ceil(365.25 * 5)) }), 1000);
-  ok('one day short of full life is still slightly above salvage',
-    S._bookValue_({ ...base, date_acquired: daysFromNow(-(Math.ceil(365.25 * 5) - 2)) }) > 1000);
-
-  // The clamp is the important one: without it this goes negative.
-  eq('long past useful life never goes below salvage',
-    S._bookValue_({ ...base, date_acquired: daysFromNow(-365 * 40) }), 1000);
-  ok('never negative even with zero salvage',
-    S._bookValue_({ unit_cost: 500, salvage_value: 0, useful_life_years: 2, date_acquired: daysFromNow(-365 * 30) }) === 0);
-
-  eq('future acquisition date does not inflate value above cost',
-    S._bookValue_({ ...base, date_acquired: daysFromNow(400) }), 10000);
-
-  eq('no useful life recorded means no depreciation',
-    S._bookValue_({ unit_cost: 750, date_acquired: daysFromNow(-3650) }), 750);
-
-  eq('zero cost is zero', S._bookValue_({ unit_cost: 0, useful_life_years: 5, date_acquired: daysFromNow(-365) }), 0);
-}
-
-// ══════════════════════════════════════════════════════════════════════
-section('2. SCOPES boundaries');
+section('1. Query scopes (SCOPES)');
 {
   const S = loadBackend();
   const today = S._today_();
   const item = (o) => ({ status: 'available', item_type: 'fixed_asset', ...o });
-
-  // Warranty: inclusive 0..30, exclusive beyond.
-  eq('warranty 29 days out is expiring', S.SCOPES.expiringWarranty(item({ date_warranty_expiry: daysFromNow(29) }), today), true);
-  eq('warranty exactly 30 days out is expiring', S.SCOPES.expiringWarranty(item({ date_warranty_expiry: daysFromNow(30) }), today), true);
-  eq('warranty 31 days out is NOT expiring', S.SCOPES.expiringWarranty(item({ date_warranty_expiry: daysFromNow(31) }), today), false);
-  eq('warranty expiring today is expiring', S.SCOPES.expiringWarranty(item({ date_warranty_expiry: daysFromNow(0) }), today), true);
-  eq('already-expired warranty is not "expiring"', S.SCOPES.expiringWarranty(item({ date_warranty_expiry: daysFromNow(-1) }), today), false);
-  eq('already-expired warranty IS expired', S.SCOPES.expiredWarranty(item({ date_warranty_expiry: daysFromNow(-1) }), today), true);
-  eq('decommissioned items are excluded from warranty alerts',
-    S.SCOPES.expiringWarranty(item({ status: 'decommissioned', date_warranty_expiry: daysFromNow(5) }), today), false);
 
   // Inspection: due today counts.
   eq('inspection due today', S.SCOPES.inspectionDue(item({ date_next_inspection: daysFromNow(0) }), today), true);
@@ -522,7 +475,6 @@ section('8. Validation and referential integrity');
   throws('a bad date is rejected', () => S.svcAddItem({ ...base, date_acquired: 'semalam' }), /bukan tarikh/);
   throws('a nonexistent category is rejected', () => S.svcAddItem({ ...base, category_id: 999 }), /Kategori tidak wujud/);
   throws('a nonexistent location is rejected', () => S.svcAddItem({ ...base, location_id: 999 }), /Lokasi tidak wujud/);
-  throws('a negative cost is rejected', () => S.svcAddItem({ ...base, unit_cost: -5 }), /Kos seunit/);
 
   throws('a duplicate employee_id is rejected', () => S.svcSaveRef('Custodians', {
     employee_id: 'E001', name: 'Lain', email: 'lain@ukm.edu.my'
@@ -550,24 +502,42 @@ section('9. Migrations (ensureSheets_) and header auto-heal');
     ['Categories', 'Custodians', 'Items', 'Locations', 'Transactions']);
   eq('Items header matches the schema', S.__test.rows('Items')[0], S.SCHEMA.Items);
 
-  // Simulate an older sheet missing a late-added column.
+  // Simulate a sheet created before a column was added — is_portable is a
+  // real example, added after the app was already deployed with live rows.
   const items = S.__test.ss.getSheetByName('Items');
-  items._data[0] = S.SCHEMA.Items.filter((c) => c !== 'salvage_value' && c !== 'useful_life_years');
-  items._data.push(['1', 'AST-2026-0001', 'Lama', '1', '1', '', 'fixed_asset', '1', '1', '0', '100', 'available',
-    '2026-01-01', '', '', '', '', '', '', '', '', '', new Date(), new Date(), '']);
+  const older = S.SCHEMA.Items.filter((c) => c !== 'is_portable');
+  items._data[0] = older;
+  const row = older.map((c) => {
+    if (c === 'id') return '1';
+    if (c === 'asset_tag') return 'AST-2026-0001';
+    if (c === 'name') return 'Lama';
+    if (c === 'category_id' || c === 'location_id') return '1';
+    if (c === 'item_type') return 'fixed_asset';
+    if (c === 'quantity_total' || c === 'quantity_available') return '1';
+    if (c === 'status') return 'available';
+    if (c === 'date_acquired') return '2026-01-01';
+    if (c === 'created_at' || c === 'updated_at') return new Date();
+    return '';
+  });
+  items._data.push(row);
   const before = items._data[1].length;
 
   S.ensureSheets_();
   const header = items._data[0];
-  ok('the missing columns are appended, not thrown on',
-    header.includes('salvage_value') && header.includes('useful_life_years'));
+  ok('the missing column is appended, not thrown on', header.includes('is_portable'));
   eq('running it again is idempotent', (S.ensureSheets_(), items._data[0].length), header.length);
   ok('the pre-existing row survives untouched', items._data[1].length === before);
 
   const read = S._readTable_('Items');
   eq('the healed row still reads', read.length, 1);
-  eq('and the new column reads as empty rather than breaking', read[0].salvage_value, null);
-  eq('so depreciation treats it as no-salvage', S._bookValue_(read[0]), 100);
+  eq('and the new column reads as empty rather than breaking', read[0].is_portable, null);
+
+  // Blank must behave as "movable", so rows predating the column stay loanable.
+  const outc = S._txn_(() => S.svcCheckOut({
+    id: 1, recipient_name: 'A', recipient_email: 'a@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(3))
+  }));
+  ok('so a pre-existing asset can still be checked out', outc.success, outc.error);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -596,7 +566,6 @@ section('10. Locking, cache and the date engine');
     date_acquired: '2026-01-01', unit_cost: 100, ...over
   })).result.id;
 
-  mk({ date_warranty_expiry: iso(daysFromNow(10)) });                        // warranty
   mk({ date_next_inspection: iso(daysFromNow(-2)) });                        // inspection
   mk({ date_last_audited: iso(daysFromNow(-400)) });                         // audit
   const loanId = mk({});
@@ -613,7 +582,6 @@ section('10. Locking, cache and the date engine');
   }));
 
   const sum = S2.checkDates(true);
-  eq('warranty alerts', sum.warranty, 1);
   eq('inspection alerts', sum.inspection, 1);
   eq('low stock alerts', sum.low_stock, 1);
   eq('overdue alerts', sum.overdue, 1);
@@ -622,7 +590,6 @@ section('10. Locking, cache and the date engine');
 
   // The digest and the dashboard must agree — same SCOPES, same numbers.
   const payload = S2.getInitialData('rahsia');
-  eq('the dashboard warranty badge matches the digest', payload.alerts.warranty.length, sum.warranty);
   eq('the dashboard overdue badge matches the digest', payload.alerts.overdue.length, sum.overdue);
   eq('the dashboard low-stock badge matches the digest', payload.alerts.low_stock.length, sum.low_stock);
   eq('the dashboard audit badge matches the digest', payload.alerts.audit.length, sum.audit);
@@ -631,39 +598,16 @@ section('10. Locking, cache and the date engine');
 }
 
 // ══════════════════════════════════════════════════════════════════════
-section('11. Portfolio summary and notification');
+section('11. Notifications');
 {
   const S = fresh();
-  S._txn_(() => S.svcAddItem({
-    name: 'A', category_id: 1, location_id: 1, item_type: 'fixed_asset',
-    date_acquired: iso(daysFromNow(-365)), unit_cost: 10000, salvage_value: 1000, useful_life_years: 5
-  }));
-  S._txn_(() => S.svcAddItem({
-    name: 'B', category_id: 5, location_id: 1, item_type: 'consumable',
-    date_acquired: iso(daysFromNow(0)), unit_cost: 20, quantity_total: 10
-  }));
-
-  const p = S.getInitialData('rahsia').portfolio;
-  eq('acquisition cost counts consumables by quantity', p.acquisition_cost, 10000 + 200);
-  ok('book value is below acquisition cost after a year', p.book_value < p.acquisition_cost);
-  eq('depreciation is the difference', Math.round((p.acquisition_cost - p.book_value) * 100) / 100, p.depreciation);
-  eq('asset count', p.asset_count, 2);
-
-  // Decommissioned assets leave the portfolio.
-  const id = S._readTable_('Items')[0].id;
-  S._txn_(() => S.svcDecommission({ id, reason: 'Dijual', date_decommissioned: iso(daysFromNow(0)), writeoff_value: 4000 }));
-  const p2 = S.getInitialData('rahsia').portfolio;
-  eq('a decommissioned asset drops out of the portfolio', p2.asset_count, 1);
-
-  // Check-out notification.
-  const S2 = fresh();
-  const nid = S2._txn_(() => S2.svcAddItem({
+  const nid = S._txn_(() => S.svcAddItem({
     name: 'Kamera', category_id: 1, location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-01'
   })).result.id;
-  S2._txn_(() => S2.svcCheckOut({ id: nid, custodian_id: 1, expected_return_date: iso(daysFromNow(5)) }));
-  eq('check-out emails the custodian', S2.__test.sentMail.length, 1);
-  eq('addressed to them', S2.__test.sentMail[0].to, 'aminah@ukm.edu.my');
-  ok('with the asset tag in the subject', /AST-2026-0001/.test(S2.__test.sentMail[0].subject));
+  S._txn_(() => S.svcCheckOut({ id: nid, custodian_id: 1, expected_return_date: iso(daysFromNow(5)) }));
+  eq('check-out emails the custodian', S.__test.sentMail.length, 1);
+  eq('addressed to them', S.__test.sentMail[0].to, 'aminah@ukm.edu.my');
+  ok('with the asset tag in the subject', /AST-2026-0001/.test(S.__test.sentMail[0].subject));
 
   // HTML escaping — item names are user input.
   const S3 = fresh();
@@ -674,6 +618,40 @@ section('11. Portfolio summary and notification');
   S3._txn_(() => S3.svcCheckOut({ id: xid, custodian_id: 1, expected_return_date: iso(daysFromNow(5)) }));
   const html = S3.__test.sentMail[0].htmlBody;
   ok('a script-ish item name is escaped in the email', !/<img src=x/.test(html) && /&lt;img/.test(html));
+}
+
+section('11b. Asset tags belong to assets only');
+{
+  // A tag names one physical thing you can stick a label on. Inventory is
+  // a quantity of interchangeable units, so it gets no tag at all.
+  const S = fresh();
+  const asset = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', category_id: 1, location_id: 1, item_type: 'fixed_asset',
+    date_acquired: '2026-04-01'
+  }));
+  eq('an asset gets a tag', asset.result.asset_tag, 'AST-2026-0001');
+
+  const inv = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', category_id: 5, location_id: 2, item_type: 'consumable',
+    quantity_total: 100, min_stock_alert: 20, date_acquired: '2026-04-01'
+  }));
+  ok('inventory is accepted without one', inv.success, inv.error);
+  eq('and its tag is blank', inv.result.asset_tag, '');
+
+  const asset2 = S._txn_(() => S.svcAddItem({
+    name: 'Kamera', category_id: 1, location_id: 1, item_type: 'fixed_asset',
+    date_acquired: '2026-04-02'
+  }));
+  eq('inventory does not consume a number in the asset sequence',
+    asset2.result.asset_tag, 'AST-2026-0002');
+
+  const pen = S._readTable_('Items').filter((i) => i.name === 'Pen Biru')[0];
+  eq('inventory remains fully usable without a tag', pen.quantity_available, 100);
+
+  const moved = S._txn_(() => S.svcStockChange(
+    { id: pen.id, quantity: 5, custodian_id: 1, reason_notes: 'Bekalan' }, 'stock_remove'));
+  ok('including stock movements', moved.success, moved.error);
+  eq('which still decrement correctly', moved.result.quantity_available, 95);
 }
 
 section('12. Handover: ad-hoc recipients and two-way email');

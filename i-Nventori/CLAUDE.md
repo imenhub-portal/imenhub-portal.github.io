@@ -9,9 +9,11 @@ updated whenever you make a change worth a future session knowing about.
 ## What this is
 
 A Google Apps Script backend + GitHub Pages frontend + Google Sheets database, for
-tracking IMEN's office inventory: fixed assets (laptops, monitors, furniture) and
-consumables (stationery, cartridges), with check-out/check-in lifecycle, full date
-tracking, an immutable transaction ledger, and a banking-style dashboard.
+tracking IMEN's office assets and inventory. It answers two questions and only two:
+**where is each asset**, and **how much stock is left**. It is deliberately NOT an
+accounting system — there is no cost, no depreciation, no book value and no warranty
+tracking anywhere in it. Check-out/check-in with email notification, an immutable
+transaction ledger, and a dashboard split by Aset vs Inventori.
 
 - **Backend**: `Code.gs` — Apps Script bound to a Google Sheet (tabs: `Items`,
   `Categories`, `Locations`, `Custodians`, `Transactions`). Deployed as a web app.
@@ -39,7 +41,7 @@ equivalent, and the names were kept so the code stays reviewable against the spe
 |---|---|
 | Migrations | `ensureSheets_()` — idempotent, with header auto-heal |
 | Eloquent model + `$casts` | `_readTable_()` |
-| `scopeExpiringWarranty()` / `scopeOverdue()` | the `SCOPES` object |
+| `scopeOverdue()` etc. | the `SCOPES` object |
 | `DB::transaction()` | `_txn_()` (LockService) |
 | `StoreItemRequest` etc. | `_validate_(schema, payload)` |
 | Routes + `auth` middleware | `doPost` switch + `ACTIONS_ADMIN` |
@@ -153,9 +155,11 @@ anonymously from anywhere. Anonymous callers can read inventory but receive **no
 custodian records and no ledger** — custodian names/emails are personal data (this is
 the `GetAllIMenianUsers` lesson from i-nstrumen, applied up front).
 
-**Data model** — see `SCHEMA` at the top of `Code.gs`; column names are the spec's,
-verbatim. Two columns were *added* beyond the spec because its own depreciation formula
-needs them: `salvage_value` and `useful_life_years`.
+**Data model** — see `SCHEMA` at the top of `Code.gs`. The spec's financial columns
+(`unit_cost`, `salvage_value`, `useful_life_years`, `date_warranty_expiry`) were
+**removed at the owner's request** — this is a location/stock tracker, not an asset
+register for accounting. `is_portable` was added instead. If those columns still exist
+in an older sheet they are simply ignored; `ensureSheets_()` never deletes a column.
 
 **The ledger is genuinely immutable, not just by convention.** `_update_()` throws if
 handed the `Transactions` tab, so there is no code path that can edit or delete a ledger
@@ -218,6 +222,14 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   `useful_life_years: 0`, so `_bookValue_` correctly returns cost unchanged).
   Averaging them produced a headline number that meant nothing for either,
   which is what prompted the split.
+- **There is no money in this app, by decision.** No unit cost, no depreciation, no
+  book value, no warranty. It tracks *where things are* and *how many are left*. Do not
+  reintroduce a "total value" figure — it was removed because it answered a question
+  nobody here was asking, and for stationery it was meaningless anyway.
+- **Only assets carry an `asset_tag`.** A tag names one physical thing you can stick a
+  label on. Inventory is a quantity of interchangeable units, so `svcAddItem` leaves
+  its tag blank and the UI shows an "Inventori" pill in that column instead. Inventory
+  therefore does not consume numbers in the AST-YYYY-NNNN sequence.
 - **Terminology is the owner's, and the two words are not interchangeable.**
   *Aset* = kerusi, meja, komputer, alat besar — tracked one by one, depreciated,
   and loanable if movable. *Inventori* = alat tulis, kertas, kartrij — tracked
