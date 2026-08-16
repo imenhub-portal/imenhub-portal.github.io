@@ -2945,8 +2945,20 @@ function loadCatalog() {
     })
     .withFailureHandler(function (e) {
       if (PUB) return;               // a warm cache is better than an error
+      var msg = (e && e.message) || String(e || '');
+      // "Unknown API function" means the page is newer than the deployed
+      // backend — by far the most common cause, and the old generic
+      // "sila muat semula" sent people reloading forever instead of
+      // redeploying. Name the actual fix.
+      var stale = /Unknown API function/i.test(msg);
       host.innerHTML = '<div class="empty">' + icon('i-warn', 30) +
-        '<p>Tidak dapat memuatkan senarai. Sila muat semula.</p></div>';
+        (stale
+          ? '<p><b>Backend belum dikemas kini.</b><br>' +
+            'Sila paste <span class="mono">Code.gs</span> ke Apps Script, kemudian ' +
+            'Deploy &rarr; Manage deployments &rarr; Edit &rarr; New version &rarr; Deploy.</p>'
+          : '<p>Tidak dapat memuatkan senarai.<br>' +
+            '<span style="font-size:11.5px">' + esc(msg.slice(0, 160)) + '</span></p>') +
+        '<button class="btn" style="margin-top:12px" onclick="loadCatalog()">Cuba lagi</button></div>';
     })
     .getPublicCatalog();
 }
