@@ -242,7 +242,9 @@
         set('f-tarikh', d.tarikh);
         set('f-media', d.media);
         set('f-tajuk', d.tajuk);
-        set('f-penyelia', d.penyelia);
+        // Penyelia is optional — hide the whole line if the applicant left it blank.
+        var pEl = document.getElementById('f-penyelia');
+        if (pEl) { if (d.penyelia && String(d.penyelia).length) { pEl.textContent = d.penyelia; } else { pEl.parentNode.removeChild(pEl); } }
         set('f-saiz', d.saiz);
         set('f-qty', d.qty);
         set('f-price', d.price);
