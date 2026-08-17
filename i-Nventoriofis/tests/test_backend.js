@@ -211,6 +211,14 @@ function daysFromNow(n) {
   return new Date(d.getTime() + n * day);
 }
 function iso(d) { return d.toISOString().slice(0, 10); }
+// A Date from inside the vm, rendered as a local calendar day. toISOString
+// would shift across midnight in a positive timezone and make date
+// comparisons fail for reasons that have nothing to do with the code.
+function fmtISO(v) {
+  if (!v) return '';
+  const d = new Date(v.getTime ? v.getTime() : v);
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
 
 // Bootstraps a context with sheets, seed data and one custodian.
 function fresh() {
@@ -1162,6 +1170,90 @@ section('18. Return proof — the token is a capability, not a password');
   eq('a live token opens an upload session', up.ok, true);
   const upBad = S.startReturnUpload('NOTATOKEN1234', 'x.jpg', 'image/jpeg', 'https://imenhub-portal.github.io');
   eq('a bogus token does not', upBad.ok, false);
+}
+
+section('19. Topping up Alat Tulis records when and from where');
+{
+  const S = fresh();
+  const penId = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', location_id: 2, item_type: 'consumable',
+    quantity_total: 10, min_stock_alert: 5, date_acquired: '2026-01-10'
+  })).result.id;
+  const bal = () => S._findById_(S._readTable_('Items'), penId).quantity_available;
+  const lastAdd = () => S._readTable_('Transactions')
+    .filter((t) => t.action_type === 'stock_add').slice(-1)[0];
+
+  // ── A backdated delivery is filed on the day it arrived ──
+  const back = fmtISO(daysFromNow(-5));
+  const topup = S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 20, received_date: back,
+    source: 'Kedai Ali', reason_notes: 'Pembelian bulanan'
+  }, 'stock_add'));
+  ok('a topup with details succeeds', topup.success, topup.error);
+  eq('stock went up', bal(), 30);
+
+  const row = lastAdd();
+  eq('the source is stored as its own field', row.source, 'Kedai Ali');
+  eq('and dated when it actually arrived, not today',
+    fmtISO(row.transaction_date), back);
+  ok('not today', fmtISO(row.transaction_date) !== fmtISO(daysFromNow(0)));
+
+  // ── Both fields are optional ──
+  const plain = S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 5, reason_notes: 'Tanpa butiran'
+  }, 'stock_add'));
+  ok('a topup with no date or source still works', plain.success, plain.error);
+  eq('and defaults to today', fmtISO(lastAdd().transaction_date), fmtISO(daysFromNow(0)));
+  eq('with a blank source', lastAdd().source, null);
+  eq('stock still went up', bal(), 35);
+
+  // ── A future date is refused ──
+  const before = bal();
+  const future = S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 100, received_date: fmtISO(daysFromNow(3)),
+    source: 'Kedai Ali', reason_notes: 'Belum sampai'
+  }, 'stock_add'));
+  eq('a future received date is refused', future.success, false);
+  ok('naming the reason', /masa hadapan|belum sampai/i.test(future.error), future.error);
+  eq('and the balance is untouched', bal(), before);
+
+  // Today itself is fine — the boundary must not be off by one.
+  ok('today is accepted', S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 1, received_date: fmtISO(daysFromNow(0)),
+    reason_notes: 'Sampai hari ini'
+  }, 'stock_add')).success);
+
+  // ── An issue cannot borrow these fields ──
+  const sneakyDate = S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 1, received_date: fmtISO(daysFromNow(-10)), reason_notes: 'Guna'
+  }, 'stock_remove'));
+  eq('a withdrawal cannot be backdated', sneakyDate.success, false);
+  const sneakySrc = S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 1, source: 'Kedai Ali', reason_notes: 'Guna'
+  }, 'stock_remove'));
+  eq('nor attributed to a supplier', sneakySrc.success, false);
+
+  const issued = S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 2, custodian_id: 1, reason_notes: 'Bekalan pejabat'
+  }, 'stock_remove'));
+  ok('a plain withdrawal still works', issued.success, issued.error);
+  const outRow = S._readTable_('Transactions').filter((t) => t.action_type === 'stock_remove')[0];
+  eq('and carries no source', outRow.source, null);
+
+  // ── Reporting: totals per source come out of the ledger ──
+  S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 12, source: 'Kedai Ali', reason_notes: 'Tambahan'
+  }, 'stock_add'));
+  S._txn_(() => S.svcStockChange({
+    id: penId, quantity: 8, source: 'Stor Pusat', reason_notes: 'Agihan'
+  }, 'stock_add'));
+  const fromAli = S._readTable_('Transactions')
+    .filter((t) => t.action_type === 'stock_add' && t.source === 'Kedai Ali')
+    .reduce((n, t) => n + Number(t.quantity || 0), 0);
+  eq('how much came from one supplier is answerable', fromAli, 32);
+
+  // ── The ledger is still append-only through all of this ──
+  eq('no ledger row was edited or deleted', S.__test.ledgerMutations, []);
 }
 
 // ══════════════════════════════════════════════════════════════════════

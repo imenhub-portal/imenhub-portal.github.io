@@ -271,6 +271,15 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   the `is_portable` flag were both removed: a second classification had nothing left to
   hold, and every asset is movable by definition now. `catName()` survives only so the
   CSV keeps exporting whatever legacy rows already carry. Do not reintroduce either.
+- **A topup records when it arrived and where it came from; a withdrawal records
+  neither.** `svcStockChange` takes `received_date` and `source` on `stock_add` only, and
+  **throws** if either appears on a `stock_remove` — an issue happens at the counter in
+  the moment, so allowing them would let a withdrawal be quietly backdated or attributed
+  to a supplier. Backdating a *delivery* is normal (stock often arrives days before anyone
+  records it) but a **future** date is rejected: the stock is not physically there, so
+  counting it would make the balance a lie. `source` is free text with a `<datalist>` of
+  values already used, built client-side from `D.transactions` — no Suppliers table to
+  maintain, and the second delivery from the same shop is one keystroke.
 - **A request carries many items.** `Requests` holds one row per line with a shared
   `group_id`, rather than a header/detail pair of tabs — that keeps `svcDecideRequest`
   working per row, makes partial approval natural, and needs no join.

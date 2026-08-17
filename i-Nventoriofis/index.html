@@ -2105,7 +2105,8 @@ function viewLedger(embed, scope) {
       '<td style="font-size:12.5px">' + (t.custodian_id ? esc(custName(t.custodian_id)) : '<span style="color:var(--muted-3)">—</span>') + '</td>' +
       '<td class="t-num mono" style="font-weight:600;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
         (q > 0 ? '+' : '') + q + '</td>' +
-      '<td style="font-size:12.5px;color:var(--muted);max-width:300px">' + esc(t.reason_notes || '—') + '</td>' +
+      '<td style="font-size:12.5px;color:var(--muted);max-width:300px">' + esc(t.reason_notes || '—') +
+        (t.source ? ' · Sumber: <b>' + esc(t.source) + '</b>' : '') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -2641,6 +2642,30 @@ function openStock(id, action) {
     (it.min_stock_alert ? ' · minimum ' + it.min_stock_alert : '') + '</div>' +
     field('Kuantiti', input('sQty', 'number', 1, 'min="1" step="1"' + (isAdd ? '' : ' max="' + it.quantity_available + '"')), null, true);
 
+  // Topup only. Stock often arrives days before anyone gets round to
+  // recording it, so the date is asked for rather than assumed. `max` stops
+  // the obvious mistake in the browser; the server rejects future dates
+  // regardless.
+  if (isAdd) {
+    b += field('Tarikh Terima',
+      input('sDate', 'date', inputDate(new Date()), 'max="' + inputDate(new Date()) + '"'),
+      'Boleh pilih tarikh lalu jika barang sampai lebih awal');
+
+    // Free text with a datalist of sources already used — no Suppliers table
+    // to maintain, but the second delivery from the same shop is one keystroke.
+    var seen = {};
+    (D.transactions || []).forEach(function (t) {
+      if (t.source) seen[String(t.source)] = 1;
+    });
+    var past = Object.keys(seen).sort();
+    b += field('Sumber / Pembekal',
+      input('sSource', 'text', '', 'list="srcList" placeholder="cth. Kedai Ali, Stor Pusat, Hibah"') +
+      '<datalist id="srcList">' +
+        past.map(function (x) { return '<option value="' + esc(x) + '"></option>'; }).join('') +
+      '</datalist>',
+      past.length ? 'Sumber terdahulu dicadangkan semasa menaip' : 'Dari mana bekalan ini diterima');
+  }
+
   // Recipient only applies to an issue. Optional, because stock also leaves
   // for damage or loss — but recording it is what makes per-staff usage
   // reportable instead of buried in free text.
@@ -2665,7 +2690,11 @@ function openStock(id, action) {
 function doStock(btn, id, action) {
   var p = { id: id, quantity: num('sQty'), reason_notes: val('sNote') };
   if ($('sCust') && val('sCust')) p.custodian_id = num('sCust');
-  submitAction(btn, action, p, 'Stok dikemas kini.');
+  // Only a topup carries these; the server refuses them on a withdrawal.
+  if ($('sDate')) p.received_date = val('sDate');
+  if ($('sSource')) p.source = val('sSource');
+  submitAction(btn, action, p,
+    action === 'StockAdd' ? 'Stok ditambah.' : 'Stok dikeluarkan.');
 }
 
 // ── Decommission ──────────────────────────────────────────────────────
@@ -2813,6 +2842,7 @@ function renderHistory(it, txns) {
       '<span class="pill ' + (ACTION_PILL[t.action_type] || 'pill-mute') + '">' + esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span>' +
       '<div class="t-sub" style="margin-top:4px">' + fmtDateTime(t.transaction_date) +
         (t.custodian_id ? ' · ' + esc(custName(t.custodian_id)) : '') + '</div>' +
+      (t.source ? '<div class="t-sub">Sumber: <b>' + esc(t.source) + '</b></div>' : '') +
       (t.reason_notes ? '<div class="t-sub" style="color:var(--muted)">' + esc(t.reason_notes) + '</div>' : '') +
       '</div><div class="spacer"></div>' +
       '<span class="mono" style="font-weight:700;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
@@ -3725,13 +3755,14 @@ function exportCSV() {
 
 function exportLedgerCSV() {
   var rows = [['ID', 'Tarikh', 'Tindakan', 'Tag Aset', 'Item', 'Penjaga', 'Kuantiti',
-               'Jangka Pulang', 'Tarikh Pulang', 'Catatan']];
+               'Sumber', 'Jangka Pulang', 'Tarikh Pulang', 'Catatan']];
   (D.transactions || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); }).forEach(function (t) {
     var it = itemById(t.item_id);
     rows.push([
       t.id, fmtDateTime(t.transaction_date), ACTION_LABEL[t.action_type] || t.action_type,
       it ? it.asset_tag : '', it ? it.name : ('Item #' + t.item_id),
       t.custodian_id ? custName(t.custodian_id) : '', t.quantity,
+      t.source || '',
       fmtDate(t.expected_return_date), fmtDate(t.actual_return_date), t.reason_notes
     ]);
   });

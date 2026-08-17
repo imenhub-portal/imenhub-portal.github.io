@@ -137,6 +137,10 @@ const SCHEMA = {
     // Two named columns rather than one shared 'photo' field, so whose
     // evidence a row holds is never ambiguous. Only check_in rows use them.
     'photo_borrower', 'photo_admin',
+    // Where a restock came from. Structured rather than buried in
+    // reason_notes, so "how much paper did we get from Kedai Ali" is
+    // answerable. Only stock_add rows carry it.
+    'source',
     'reason_notes', 'created_at'
   ]
 };
@@ -961,6 +965,7 @@ function _ledger_(fields) {
     actual_return_date:   fields.actual_return_date || null,
     photo_borrower:       fields.photo_borrower || '',
     photo_admin:          fields.photo_admin || '',
+    source:               fields.source || '',
     reason_notes:         fields.reason_notes || '',
     created_at:           now
   });
@@ -1113,10 +1118,14 @@ function svcDeleteItem(p) {
 // which is why it is optional rather than required.
 function svcStockChange(p, action) {
   const v = _validate_({
-    id:           { required: true, type: 'number', label: 'Item' },
-    quantity:     { required: true, type: 'number', min: 1, label: 'Kuantiti' },
-    custodian_id: { type: 'number', label: 'Penerima' },
-    reason_notes: { required: true, max: 500, label: 'Sebab' }
+    id:            { required: true, type: 'number', label: 'Item' },
+    quantity:      { required: true, type: 'number', min: 1, label: 'Kuantiti' },
+    custodian_id:  { type: 'number', label: 'Penerima' },
+    // Topup only. Stock often arrives days before anyone records it, so the
+    // received date is captured rather than assumed to be today.
+    received_date: { type: 'date', label: 'Tarikh terima' },
+    source:        { max: 120, label: 'Sumber' },
+    reason_notes:  { required: true, max: 500, label: 'Sebab' }
   }, p);
 
   const item = _findById_(_readTable_('Items'), v.id);
@@ -1134,7 +1143,28 @@ function svcStockChange(p, action) {
     }
   }
 
-  const delta = (action === 'stock_add') ? v.quantity : -v.quantity;
+  const isAdd = (action === 'stock_add');
+
+  // Backdating a delivery is normal. Post-dating one is not: the stock is not
+  // physically there yet, so counting it would make the balance a lie.
+  var when = new Date();
+  var source = '';
+  if (isAdd) {
+    if (v.received_date) {
+      if (_daysBetween_(_today_(), v.received_date) > 0) {
+        throw new Error('Tarikh terima tidak boleh pada masa hadapan — stok belum sampai.');
+      }
+      when = v.received_date;
+    }
+    source = v.source || '';
+  } else if (v.received_date || v.source) {
+    // An issue happens at the counter, in the moment. Allowing either field
+    // here would let a withdrawal be quietly backdated or attributed to a
+    // supplier, neither of which means anything.
+    throw new Error('Tarikh terima dan sumber hanya untuk penambahan stok.');
+  }
+
+  const delta = isAdd ? v.quantity : -v.quantity;
   const avail = Number(item.quantity_available || 0) + delta;
   const total = Number(item.quantity_total || 0) + delta;
   if (avail < 0) {
@@ -1151,10 +1181,16 @@ function svcStockChange(p, action) {
   _ledger_({
     item_id: item.id, action_type: action, quantity: delta,
     custodian_id: recipient ? recipient.id : null,
+    transaction_date: when,
+    source: source,
     reason_notes: v.reason_notes
   });
 
-  return { id: item.id, quantity_available: avail, custodian_id: recipient ? recipient.id : null };
+  return {
+    id: item.id, quantity_available: avail,
+    custodian_id: recipient ? recipient.id : null,
+    transaction_date: when, source: source
+  };
 }
 
 // ── Check-out ───────────────────────────────────────────────
