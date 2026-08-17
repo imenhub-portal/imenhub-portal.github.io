@@ -757,12 +757,11 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 
     <nav class="topnav" id="topnav">
       <button data-view="dashboard" onclick="go('dashboard')">Ringkasan</button>
-      <button data-view="items" onclick="go('items')">Inventori</button>
-      <button data-view="loans" onclick="go('loans')">Pinjaman<span class="badge hide" id="bLoans">0</span></button>
-      <button data-view="stock" onclick="go('stock')">Stok<span class="badge hide" id="bStock">0</span></button>
       <button data-view="requests" onclick="go('requests')">Permohonan<span class="badge hide" id="bReq">0</span></button>
-      <button data-view="ledger" onclick="go('ledger')">Log Audit</button>
+      <button data-view="inventori" onclick="go('inventori')">Inventori<span class="badge hide" id="bStock">0</span></button>
+      <button data-view="aset" onclick="go('aset')">Aset<span class="badge hide" id="bLoans">0</span></button>
       <button data-view="reports" onclick="go('reports')">Laporan</button>
+      <button data-view="settings" onclick="go('settings')">Tetapan</button>
     </nav>
 
     <div class="tb-right">
@@ -799,11 +798,9 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
         </button>
       </div>
       <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
-      <button class="rail-btn" data-view="items" onclick="go('items')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
-      <button class="rail-btn" data-view="loans" onclick="go('loans')" title="Daftar Keluar/Masuk"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-swap"/></svg></button>
-      <button class="rail-btn" data-view="stock" onclick="go('stock')" title="Stok"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
       <button class="rail-btn" data-view="requests" onclick="go('requests')" title="Permohonan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></button>
-      <button class="rail-btn" data-view="ledger" onclick="go('ledger')" title="Log Audit"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg></button>
+      <button class="rail-btn" data-view="inventori" onclick="go('inventori')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
+      <button class="rail-btn" data-view="aset" onclick="go('aset')" title="Aset"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
       <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
       <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
       <div class="rail-sep"></div>
@@ -1175,13 +1172,78 @@ function render() {
   renderBadges();
   var el = $('content');
   if (VIEW === 'dashboard')      el.innerHTML = viewDashboard();
-  else if (VIEW === 'items')     el.innerHTML = viewItems();
-  else if (VIEW === 'loans')     el.innerHTML = viewLoans();
-  else if (VIEW === 'stock')     el.innerHTML = viewStock();
+  else if (VIEW === 'inventori') el.innerHTML = viewSection('inventori');
+  else if (VIEW === 'aset')      el.innerHTML = viewSection('aset');
   else if (VIEW === 'requests')  el.innerHTML = viewRequests();
-  else if (VIEW === 'ledger')    el.innerHTML = viewLedger();
   else if (VIEW === 'reports')   el.innerHTML = viewReports();
   else if (VIEW === 'settings')  el.innerHTML = viewSettings();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  SECTIONS
+//
+//  Inventori and Aset are the two things this office actually manages,
+//  so they are the top-level tabs. Everything that only makes sense for
+//  one of them — stock levels, loans, that half of the audit trail —
+//  lives inside as a sub-tab rather than competing for space in the
+//  main nav.
+// ══════════════════════════════════════════════════════════════════════
+var SECTION = {
+  inventori: {
+    title: 'Inventori',
+    sub: 'Alat tulis, kertas, kartrij — dijejak mengikut baki stok.',
+    type: 'consumable',
+    tabs: [['senarai', 'Senarai Item'], ['stok', 'Stok'], ['log', 'Log']]
+  },
+  aset: {
+    title: 'Aset',
+    sub: 'Kerusi, meja, komputer dan alat besar — dijejak seunit mengikut lokasi.',
+    type: 'fixed_asset',
+    tabs: [['senarai', 'Senarai Aset'], ['pinjaman', 'Pinjaman'], ['log', 'Log']]
+  }
+};
+var SUBTAB = { inventori: 'senarai', aset: 'senarai' };
+// The log sub-tab defaults to its own section, but can widen to the whole
+// ledger — the complete audit trail must stay browsable from somewhere.
+var LEDGER_SCOPE = 'section';
+
+function goSub(sec, tab, scope) {
+  SUBTAB[sec] = tab;
+  if (scope) LEDGER_SCOPE = scope;
+  go(sec);
+}
+
+function viewSection(sec) {
+  var c = SECTION[sec];
+  var active = SUBTAB[sec];
+  var isInv = sec === 'inventori';
+
+  var h = '<div class="page-head"><div><h2>' + c.title + '</h2><p>' + c.sub + '</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button>' +
+    (isInv
+      ? '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>'
+      : '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
+        '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset</button>') +
+    '</div>';
+
+  h += '<div class="tabs" style="display:inline-flex;margin-bottom:16px">' +
+    c.tabs.map(function (t) {
+      var badge = '';
+      if (t[0] === 'stok' && (D.alerts.low_stock || []).length) badge = ' (' + D.alerts.low_stock.length + ')';
+      if (t[0] === 'pinjaman') {
+        var n = (D.items || []).filter(function (i) { return i.open_loan; }).length;
+        if (n) badge = ' (' + n + ')';
+      }
+      return '<button class="' + (active === t[0] ? 'active' : '') + '" onclick="goSub(\'' + sec + '\',\'' + t[0] + '\')">' +
+        t[1] + badge + '</button>';
+    }).join('') + '</div>';
+
+  if (active === 'stok')          h += viewStock(true);
+  else if (active === 'pinjaman') h += viewLoans(true);
+  else if (active === 'log')      h += viewLedger(true, c.type);
+  else                            h += viewItems(true, c.type);
+  return h;
 }
 
 function renderBadges() {
@@ -1346,7 +1408,7 @@ function viewDashboard() {
   // ══════════════ ASET ══════════════
   h += sectionHead('Aset',
     'Kerusi, meja, komputer dan alat besar — dijejak seunit mengikut lokasi.',
-    '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'items\')">Lihat semua ' + icon('i-out', 13) + '</button>');
+    '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'aset\')">Lihat semua ' + icon('i-out', 13) + '</button>');
 
   // Where the assets physically are — the core question this app answers.
   var byLoc = {};
@@ -1384,15 +1446,15 @@ function viewDashboard() {
 
   h += '<div class="tiles">' +
     tile('i-box', 'Tersedia', assets.filter(function (i) { return !i.open_loan; }).length,
-         'Berada di lokasi', 'items', true,
+         'Berada di lokasi', 'aset', true,
          '<div class="trend"><span>sedia untuk dipinjam</span></div>') +
     tile('i-out', 'Sedang Dipinjam', onLoan.length,
-         overdue ? overdue + ' lewat' : 'Mengikut jadual', 'loans', false,
+         overdue ? overdue + ' lewat' : 'Mengikut jadual', 'aset', false,
          overdue ? '<div class="trend down">↑ ' + overdue + ' <span>lewat dipulangkan</span></div>'
                  : '<div class="trend up">✓ <span>tiada lewat</span></div>') +
     tile('i-pin', 'Lokasi', locKeys.length, 'Tempat penyimpanan', 'settings', false,
          '<div class="trend flat"><span>' + (D.locations || []).length + ' lokasi berdaftar</span></div>') +
-    tile('i-clock', 'Pemeriksaan', (a.inspection || []).length, 'Tertunggak', 'items', false,
+    tile('i-clock', 'Pemeriksaan', (a.inspection || []).length, 'Tertunggak', 'aset', false,
          '<div class="trend flat"><span>' + (a.audit || []).length + ' audit tertunggak</span></div>') +
     '</div>';
 
@@ -1400,7 +1462,7 @@ function viewDashboard() {
   h += '<div class="card"><div class="card-head"><div style="flex:1">' +
     '<h3>Aset Di Luar Lokasi</h3>' +
     '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Siapa memegangnya sekarang</p></div>' +
-    '<button class="btn btn-sm btn-ghost" onclick="go(\'loans\')">Semua</button></div><div class="card-body">';
+    '<button class="btn btn-sm btn-ghost" onclick="goSub(\'aset\',\'pinjaman\')">Semua</button></div><div class="card-body">';
   if (!onLoan.length) {
     h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:20px 0;margin:0">' +
          'Semua aset berada di lokasi masing-masing.</p>';
@@ -1424,7 +1486,7 @@ function viewDashboard() {
   // ══════════════ INVENTORI ══════════════
   h += sectionHead('Inventori',
     'Alat tulis, kertas, kartrij — dijejak mengikut baki stok.',
-    '<button class="btn btn-sm" onclick="go(\'stock\')">Urus stok ' + icon('i-out', 13) + '</button>');
+    '<button class="btn btn-sm" onclick="go(\'inventori\')">Urus stok ' + icon('i-out', 13) + '</button>');
 
   h += '<div class="dash-top">';
 
@@ -1442,7 +1504,7 @@ function viewDashboard() {
       ' <span>· ' + cons.length + ' jenis item</span></div>' +
     '<div class="hero-actions">' +
       '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>' +
-      '<button class="btn" onclick="go(\'stock\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
+      '<button class="btn" onclick="go(\'inventori\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
     '</div>' +
     '<div class="substrip"><div class="cap">Paling hampir habis <b>· ' + cons.length + ' jenis item</b></div>' +
     '<div class="chips">' +
@@ -1458,14 +1520,14 @@ function viewDashboard() {
     '</div></div></div>';
 
   h += '<div class="tiles">' +
-    tile('i-layers', 'Jenis Item', cons.length, 'Dalam inventori', 'stock', true,
+    tile('i-layers', 'Jenis Item', cons.length, 'Dalam inventori', 'inventori', true,
          '<div class="trend"><span>' + stockUnits + ' unit di tangan</span></div>') +
-    tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'stock', false,
+    tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'inventori', false,
          low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
              : '<div class="trend up">✓ <span>paras selamat</span></div>') +
-    tile('i-out', 'Dikeluarkan (30 hari)', issued30.totalUnits, 'unit', 'ledger', false,
+    tile('i-out', 'Dikeluarkan (30 hari)', issued30.totalUnits, 'unit', 'inventori', false,
          '<div class="trend flat"><span>kepada ' + issued30.staff.length + ' staf</span></div>') +
-    tile('i-users', 'Penerima', issued30.staff.length, 'staf dalam 30 hari', 'ledger', false,
+    tile('i-users', 'Penerima', issued30.staff.length, 'staf dalam 30 hari', 'inventori', false,
          '<div class="trend flat"><span>' + (issued30.staff.length ? 'tertinggi: ' +
             esc(custName(issued30.staff[0].id).split(' ')[0]) : 'belum ada rekod') + '</span></div>') +
     '</div>';
@@ -1473,7 +1535,7 @@ function viewDashboard() {
   h += '<div class="card"><div class="card-head"><div style="flex:1">' +
     '<h3>Pengeluaran Mengikut Staf</h3>' +
     '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">30 hari terakhir</p></div>' +
-    '<button class="btn btn-sm btn-ghost" onclick="go(\'ledger\')">Log penuh</button></div><div class="card-body">';
+    '<button class="btn btn-sm btn-ghost" onclick="goSub(\'aset\',\'log\',\'all\')">Log penuh</button></div><div class="card-body">';
   if (!issued30.staff.length) {
     h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">' +
          'Belum ada pengeluaran stok direkodkan kepada staf.<br>' +
@@ -1535,7 +1597,7 @@ function viewDashboard() {
 
   // ══════════════ AKTIVITI ══════════════
   h += sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
-    '<button class="btn btn-sm" onclick="go(\'ledger\')">Log penuh ' + icon('i-out', 13) + '</button>');
+    '<button class="btn btn-sm" onclick="goSub(\'aset\',\'log\',\'all\')">Log penuh ' + icon('i-out', 13) + '</button>');
 
   var recent = (D.transactions || []).slice().sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 8);
   h += '<div class="card">';
@@ -1667,18 +1729,25 @@ function filteredItems() {
   });
 }
 
-function viewItems() {
+// `forceType` is set by the section that embeds this, so the old
+// all/asset/inventory tab strip is redundant there and is dropped.
+function viewItems(embed, forceType) {
+  if (forceType) FILTER.type = forceType;
+  // Inventory carries no asset tag, so that column would be a wall of
+  // identical pills. Hide it rather than pad it out.
+  ITEMS_HIDE_TAG = (forceType === 'consumable');
   var rows = filteredItems();
-  var h = '<div class="page-head"><div><h2>Inventori</h2>' +
+  var h = embed ? '' :
+    '<div class="page-head"><div><h2>Senarai</h2>' +
     '<p>' + rows.length + ' daripada ' + (D.items || []).length + ' item dipaparkan</p></div>' +
     '<div class="spacer"></div>' +
-    '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button>' +
     '<button class="btn btn-primary" onclick="openItemDrawer()">' + icon('i-plus', 15) + ' Tambah Item</button></div>';
 
   h += '<div class="card"><div class="filters">' +
-    '<div class="tabs">' +
-      tabBtn('all', 'Semua') + tabBtn('fixed_asset', 'Aset') + tabBtn('consumable', 'Inventori') +
-    '</div>' +
+    (forceType ? '' :
+      '<div class="tabs">' +
+        tabBtn('all', 'Semua') + tabBtn('fixed_asset', 'Aset') + tabBtn('consumable', 'Inventori') +
+      '</div>') +
     '<input id="fq" placeholder="Cari nama, tag, siri…" value="' + esc(FILTER.q) + '" oninput="FILTER.q=this.value;renderTableOnly()">' +
     selectFilter('fstatus', 'status', 'Semua Status', (D.meta.item_status || []).map(function (s) {
       return { v: s, t: (STATUS_META[s] || {}).label || s };
@@ -1720,13 +1789,16 @@ function th(key, label, extra) {
     esc(label) + '<span class="arw">' + (on ? (SORT.dir > 0 ? '▲' : '▼') : '▲') + '</span></th>';
 }
 
+var ITEMS_HIDE_TAG = false;
+
 function itemsTable(rows) {
   if (!rows.length) {
     return '<div class="empty">' + icon('i-box', 30) +
       '<p>Tiada item sepadan.' + (hasFilter() ? ' Cuba longgarkan penapis.' : ' Klik “Tambah Item” untuk bermula.') + '</p></div>';
   }
   var h = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-    th('asset_tag', 'Tag Aset') + th('name', 'Nama Item') + th('category_id', 'Kategori') +
+    (ITEMS_HIDE_TAG ? '' : th('asset_tag', 'Tag Aset')) +
+    th('name', 'Nama Item') + th('category_id', 'Kategori') +
     th('location_id', 'Lokasi') + th('status', 'Status') +
     th('quantity_available', 'Baki', 't-num') + th('date_acquired', 'Diperoleh') +
     '<th style="width:40px"></th></tr></thead><tbody>';
@@ -1736,9 +1808,10 @@ function itemsTable(rows) {
     var lowFlag = (i.item_type === 'consumable' && Number(i.quantity_available) <= Number(i.min_stock_alert || 0));
 
     return '<tr class="' + (loan && loan.is_overdue ? 'overdue-row' : '') + '">' +
-      '<td>' + (i.asset_tag
-        ? '<span class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</span>'
-        : '<span class="pill pill-mute">Inventori</span>') + '</td>' +
+      (ITEMS_HIDE_TAG ? '' :
+        '<td>' + (i.asset_tag
+          ? '<span class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</span>'
+          : '<span class="pill pill-mute">Inventori</span>') + '</td>') +
       '<td><div class="t-name">' + esc(i.name) + '</div>' +
         '<div class="t-sub">' + esc(TYPE_LABEL[i.item_type] || i.item_type) +
         (i.serial_number ? ' · <span class="mono">' + esc(i.serial_number) + '</span>' : '') + '</div></td>' +
@@ -1802,15 +1875,14 @@ function mi(ic, label, fn, danger) {
 // ══════════════════════════════════════════════════════════════════════
 //  VIEW — DAFTAR KELUAR/MASUK
 // ══════════════════════════════════════════════════════════════════════
-function viewLoans() {
+function viewLoans(embed) {
   var loans = (D.items || []).filter(function (i) { return i.open_loan; })
     .sort(function (a, b) { return toDate(a.open_loan.expected_return_date) - toDate(b.open_loan.expected_return_date); });
   var overdue = loans.filter(function (i) { return i.open_loan.is_overdue; });
 
-  var h = '<div class="page-head"><div><h2>Daftar Keluar / Masuk</h2>' +
-    '<p>' + loans.length + ' aset sedang dipinjam · ' + overdue.length + ' lewat dipulangkan</p></div>' +
-    '<div class="spacer"></div>' +
-    '<button class="btn btn-primary" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button></div>';
+  var h = embed ? '' :
+    '<div class="page-head"><div><h2>Daftar Keluar / Masuk</h2>' +
+    '<p>' + loans.length + ' aset sedang dipinjam · ' + overdue.length + ' lewat dipulangkan</p></div></div>';
 
   if (!loans.length) {
     return h + '<div class="card"><div class="empty">' + icon('i-swap', 30) +
@@ -1845,7 +1917,7 @@ function viewLoans() {
 // ══════════════════════════════════════════════════════════════════════
 //  VIEW — STOK
 // ══════════════════════════════════════════════════════════════════════
-function viewStock() {
+function viewStock(embed) {
   var cons = (D.items || []).filter(function (i) {
     return i.item_type === 'consumable' && i.status !== 'decommissioned' && i.status !== 'disposed';
   }).sort(function (a, b) {
@@ -1858,10 +1930,9 @@ function viewStock() {
   var low = cons.filter(function (i) { return Number(i.quantity_available) <= Number(i.min_stock_alert || 0); });
   var units = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
 
-  var h = '<div class="page-head"><div><h2>Stok</h2>' +
-    '<p>' + cons.length + ' item inventori · ' + low.length + ' pada paras rendah</p></div>' +
-    '<div class="spacer"></div>' +
-    '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button></div>';
+  var h = embed ? '' :
+    '<div class="page-head"><div><h2>Stok</h2>' +
+    '<p>' + cons.length + ' item inventori · ' + low.length + ' pada paras rendah</p></div></div>';
 
   h += '<div class="grid g-3" style="margin-bottom:16px">' +
     kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Item', cons.length, 'Dalam inventori', 'stock') +
@@ -1906,9 +1977,17 @@ function viewStock() {
 // ══════════════════════════════════════════════════════════════════════
 var LEDGER_FILTER = { action: '', q: '' };
 
-function viewLedger() {
+// `scope` narrows the ledger to one section's item type. LEDGER_SCOPE
+// can widen it back to everything, so the full audit trail is never
+// unreachable just because it now lives under a section.
+function viewLedger(embed, scope) {
+  var narrow = scope && LEDGER_SCOPE === 'section';
   var txns = (D.transactions || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
   var filtered = txns.filter(function (t) {
+    if (narrow) {
+      var itx = itemById(t.item_id);
+      if (!itx || itx.item_type !== scope) return false;
+    }
     if (LEDGER_FILTER.action && t.action_type !== LEDGER_FILTER.action) return false;
     if (!LEDGER_FILTER.q) return true;
     var it = itemById(t.item_id);
@@ -1916,10 +1995,20 @@ function viewLedger() {
       .join(' ').toLowerCase().indexOf(LEDGER_FILTER.q.toLowerCase()) !== -1;
   });
 
-  var h = '<div class="page-head"><div><h2>Log Audit</h2>' +
+  var h = embed ? '' :
+    '<div class="page-head"><div><h2>Log Audit</h2>' +
     '<p>Lejar tidak boleh diubah — ' + txns.length + ' transaksi direkodkan</p></div>' +
     '<div class="spacer"></div>' +
     '<button class="btn" onclick="exportLedgerCSV()">' + icon('i-down', 15) + ' Eksport CSV</button></div>';
+
+  if (embed && scope) {
+    h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px">' +
+      '<div class="tabs">' +
+        '<button class="' + (LEDGER_SCOPE === 'section' ? 'active' : '') + '" onclick="LEDGER_SCOPE=\'section\';render()">Seksyen ini</button>' +
+        '<button class="' + (LEDGER_SCOPE === 'all' ? 'active' : '') + '" onclick="LEDGER_SCOPE=\'all\';render()">Semua rekod</button>' +
+      '</div><div style="flex:1"></div>' +
+      '<button class="btn btn-sm" onclick="exportLedgerCSV()">' + icon('i-down', 13) + ' Eksport CSV</button></div>';
+  }
 
   h += '<div class="info-box" style="display:flex;gap:9px;align-items:flex-start">' + icon('i-shield', 16) +
     '<span>Setiap pergerakan stok dan kitaran hayat direkod sebagai baris baharu. Rekod sedia ada tidak pernah disunting atau dipadam — daftar masuk mencipta rekod baharu, bukan mengubah rekod daftar keluar.</span></div>';
@@ -2104,7 +2193,7 @@ function viewSettings() {
     '<div class="spacer"></div><button class="btn btn-sm" onclick="runDateCheck(this)">Jalankan Sekarang</button></div>' +
     '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Lejar tidak boleh diubah</div>' +
     '<div class="t-sub">' + (D.transactions || []).length + ' transaksi. Tiada laluan kod menyunting atau memadam rekod lejar.</div></div>' +
-    '<div class="spacer"></div><button class="btn btn-sm" onclick="go(\'ledger\')">Lihat Log</button></div>' +
+    '<div class="spacer"></div><button class="btn btn-sm" onclick="goSub(\'aset\',\'log\',\'all\')">Lihat Log</button></div>' +
     '</div></div>';
   return h;
 }
@@ -2329,7 +2418,7 @@ function openCheckOut(id) {
       'Sebab lazim: semua sudah dipinjam, atau aset ditanda <b>bukan mudah alih</b> (meja, kerusi).<br><br>' +
       'Untuk alat tulis dan kertas, gunakan <b>Keluar Stok</b> di bahagian Inventori — ia dikeluarkan, bukan dipinjam.</div>',
       '<button class="btn" onclick="closeDrawer()">Tutup</button>' +
-      '<button class="btn btn-primary" onclick="closeDrawer();go(\'stock\')">Buka Stok</button>');
+      '<button class="btn btn-primary" onclick="closeDrawer();go(\'inventori\')">Buka Stok</button>');
     return;
   }
   var due = new Date(); due.setDate(due.getDate() + 14);
@@ -2985,7 +3074,7 @@ function renderCatalog() {
 
   h += '<div class="pub-filters">' +
     '<div class="tabs">' +
-      pubTab('all', 'Semua') + pubTab('fixed_asset', 'Aset') + pubTab('consumable', 'Inventori') +
+      pubTab('consumable', 'Inventori') + pubTab('fixed_asset', 'Aset') + pubTab('all', 'Semua') +
     '</div>' +
     '<div class="searchbox" style="flex:1;max-width:320px">' +
       '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>' +

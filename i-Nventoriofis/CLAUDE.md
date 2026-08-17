@@ -253,6 +253,18 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   needs no password — but it only ever creates a *pending* row. Nothing moves until an
   admin approves. Availability is re-checked server-side at submit AND again at approve,
   because the browser's copy of the catalog can be minutes stale.
+- **Inventori and Aset are the two top-level sections, and that is the whole
+  organising idea — do not flatten them back into one item list.** They are
+  different kinds of thing (see the terminology note below), so everything that
+  only applies to one lives inside it as a sub-tab: Stok under Inventori,
+  Pinjaman under Aset, and each half of the audit log under its own section.
+  Ringkasan stays as the single combined dashboard across both.
+  `viewSection()` owns the shell; `viewItems/viewStock/viewLoans/viewLedger`
+  each take an `embed` flag so they can render without their own page header.
+- **The section log defaults to its own type but can widen to `Semua rekod`
+  (`LEDGER_SCOPE`).** Splitting the ledger by section is good for daily use, but
+  an audit trail you cannot read end to end is not an audit trail — so the full
+  combined view stays one click away, and CSV export is always the whole ledger.
 - **There is no money in this app, by decision.** No unit cost, no depreciation, no
   book value, no warranty. It tracks *where things are* and *how many are left*. Do not
   reintroduce a "total value" figure — it was removed because it answered a question
