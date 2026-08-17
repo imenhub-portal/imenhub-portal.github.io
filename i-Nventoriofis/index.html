@@ -756,10 +756,10 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
     </div>
 
     <nav class="topnav" id="topnav">
-      <button data-view="dashboard" onclick="go('dashboard')">Ringkasan</button>
       <button data-view="requests" onclick="go('requests')">Permohonan<span class="badge hide" id="bReq">0</span></button>
       <button data-view="inventori" onclick="go('inventori')">Inventori<span class="badge hide" id="bStock">0</span></button>
       <button data-view="aset" onclick="go('aset')">Aset<span class="badge hide" id="bLoans">0</span></button>
+      <button data-view="dashboard" onclick="go('dashboard')">Ringkasan</button>
       <button data-view="reports" onclick="go('reports')">Laporan</button>
       <button data-view="settings" onclick="go('settings')">Tetapan</button>
     </nav>
@@ -797,10 +797,10 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
         </button>
       </div>
-      <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
       <button class="rail-btn" data-view="requests" onclick="go('requests')" title="Permohonan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></button>
       <button class="rail-btn" data-view="inventori" onclick="go('inventori')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
       <button class="rail-btn" data-view="aset" onclick="go('aset')" title="Aset"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
+      <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
       <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
       <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
       <div class="rail-sep"></div>
@@ -3014,7 +3014,9 @@ function palPick(id) {
 //  is holding something.
 // ══════════════════════════════════════════════════════════════════════
 var PUB = null;                       // the catalog
-var PUB_FILTER = { q: '', type: 'all' };
+// Staff come here for stationery far more often than for equipment, so
+// Inventori is the landing tab rather than a mixed list.
+var PUB_FILTER = { q: '', type: 'consumable' };
 
 function showPublic() {
   $('gate').classList.add('hide');
