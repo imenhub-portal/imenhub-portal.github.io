@@ -1,5 +1,5 @@
 // ============================================================
-//  i-NVENTORI — Sistem Inventori & Pengurusan Aset Pejabat
+//  i-NVENTORI OFIS — Sistem Inventori & Pengurusan Aset Pejabat
 //  Backend: Google Apps Script + Google Sheets
 //
 //  Paste this ENTIRE file into the bound Apps Script project's Code.gs,
@@ -25,10 +25,10 @@
 const SPREADSHEET_ID = '1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E';
 const FOLDER_ID      = '1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7';
 const ADMIN_EMAIL    = 'imenmakmal@gmail.com';
-const APP_NAME       = 'i-Nventori OFFICE';
+const APP_NAME       = 'i-Nventori Ofis';
 
 // Where doGet fetches the live UI from (single source of truth: the repo).
-const UI_RAW_URL   = 'https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-Nventori/index.html';
+const UI_RAW_URL   = 'https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-Nventoriofis/index.html';
 const PAGES_ORIGIN = 'https://imenhub-portal.github.io';
 
 // Admin password. Script Properties ONLY — this file is committed to a
@@ -1352,9 +1352,9 @@ function _esc_(s) {
 
 function _emailLayout_(title, inner) {
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">' +
-    '<div style="background:#0f172a;color:#ffffff;padding:16px 20px;font-size:15px;font-weight:bold;">i-Nventori IMEN — ' + _esc_(title) + '</div>' +
+    '<div style="background:#0f172a;color:#ffffff;padding:16px 20px;font-size:15px;font-weight:bold;">i-Nventori Ofis — ' + _esc_(title) + '</div>' +
     '<div style="padding:20px;color:#1e293b;font-size:14px;line-height:1.6;">' + inner + '</div>' +
-    '<div style="padding:12px 20px;background:#f8fafc;color:#94a3b8;font-size:11px;">Sistem Inventori IMEN &middot; Emel automatik, jangan balas.</div>' +
+    '<div style="padding:12px 20px;background:#f8fafc;color:#94a3b8;font-size:11px;">i-Nventori Ofis &middot; IMEN, UKM &middot; Emel automatik, jangan balas.</div>' +
   '</div>';
 }
 
@@ -1409,7 +1409,7 @@ function _mailCheckOut_(item, custodian, expected, qty, txnId, loc, cat) {
   );
   MailApp.sendEmail({
     to: custodian.email, cc: ADMIN_EMAIL,
-    subject: '[i-Nventori] Aset ' + item.asset_tag + ' didaftar keluar kepada anda',
+    subject: '[i-Nventori Ofis] Aset ' + item.asset_tag + ' didaftar keluar kepada anda',
     htmlBody: body
   });
 }
@@ -1449,7 +1449,7 @@ function _mailCheckIn_(item, custodian, loan, returned, txnId, loc, cat) {
   );
   MailApp.sendEmail({
     to: custodian.email, cc: ADMIN_EMAIL,
-    subject: '[i-Nventori] Aset ' + item.asset_tag + ' telah dipulangkan',
+    subject: '[i-Nventori Ofis] Aset ' + item.asset_tag + ' telah dipulangkan',
     htmlBody: body
   });
 }
@@ -1501,7 +1501,7 @@ function _mailRequestReceived_(item, v, reqId) {
   ];
   MailApp.sendEmail({
     to: v.requester_email,
-    subject: '[i-Nventori] Permohonan diterima — ' + item.name,
+    subject: '[i-Nventori Ofis] Permohonan diterima — ' + item.name,
     htmlBody: _emailLayout_('Permohonan Diterima',
       '<p>Salam <b>' + _esc_(v.requester_name) + '</b>,</p>' +
       '<p>Permohonan anda telah diterima dan sedang <b>menunggu kelulusan admin</b>.</p>' +
@@ -1510,7 +1510,7 @@ function _mailRequestReceived_(item, v, reqId) {
   });
   MailApp.sendEmail({
     to: ADMIN_EMAIL,
-    subject: '[i-Nventori] Permohonan baharu — ' + item.name,
+    subject: '[i-Nventori Ofis] Permohonan baharu — ' + item.name,
     htmlBody: _emailLayout_('Permohonan Baharu Menunggu',
       '<p>Permohonan baharu daripada <b>' + _esc_(v.requester_name) + '</b> (' + _esc_(v.requester_email) + '):</p>' +
       _kvRows_(rows) +
@@ -1523,7 +1523,7 @@ function _mailRequestDecided_(item, req, decision, notes) {
   MailApp.sendEmail({
     to: req.requester_email,
     cc: ADMIN_EMAIL,
-    subject: '[i-Nventori] Permohonan ' + (approved ? 'DILULUSKAN' : 'DITOLAK') + ' — ' + item.name,
+    subject: '[i-Nventori Ofis] Permohonan ' + (approved ? 'DILULUSKAN' : 'DITOLAK') + ' — ' + item.name,
     htmlBody: _emailLayout_(approved ? 'Permohonan Diluluskan' : 'Permohonan Ditolak',
       '<p>Salam <b>' + _esc_(req.requester_name) + '</b>,</p>' +
       '<p>Permohonan anda telah <b>' + (approved ? 'diluluskan' : 'ditolak') + '</b>.</p>' +
@@ -1612,7 +1612,7 @@ function checkDates(skipMail) {
   try {
     MailApp.sendEmail({
       to: ADMIN_EMAIL,
-      subject: '[i-Nventori] ' + total + ' amaran inventori — ' + _fmtDate_(today),
+      subject: '[i-Nventori Ofis] ' + total + ' amaran inventori — ' + _fmtDate_(today),
       htmlBody: _emailLayout_('Amaran Harian', html)
     });
     summary.mailed = true;
@@ -1717,11 +1717,11 @@ function doGet(e) {
   if (!html) {
     html = '<!DOCTYPE html><html lang="ms"><body style="font-family:system-ui;padding:40px">' +
            '<h2>i-Nventori</h2><p>UI tidak dapat dimuatkan dari GitHub buat sementara waktu. ' +
-           'Sila cuba <a href="' + PAGES_ORIGIN + '/i-Nventori/">' + PAGES_ORIGIN + '/i-Nventori/</a>.</p>' +
+           'Sila cuba <a href="' + PAGES_ORIGIN + '/i-Nventoriofis/">' + PAGES_ORIGIN + '/i-Nventoriofis/</a>.</p>' +
            '</body></html>';
   }
   return HtmlService.createHtmlOutput(html)
-    .setTitle('i-Nventori IMEN')
+    .setTitle('i-Nventori Ofis')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

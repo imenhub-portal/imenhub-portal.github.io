@@ -1,0 +1,3314 @@
+<!DOCTYPE html>
+<!--
+  i-NVENTORI OFIS — Sistem Inventori & Pengurusan Aset Pejabat, IMEN
+  Single self-contained file: no build step, no framework, no CSS toolkit.
+  Backend: Apps Script (Code.gs) + Google Sheets.
+
+  Served two ways from this one file:
+    - GitHub Pages  https://imenhub-portal.github.io/i-Nventoriofis/
+    - Apps Script's doGet, which fetches this file live from GitHub
+  The shim below is what makes both work with identical calling code.
+-->
+<html lang="ms">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>i-Nventori Ofis — Inventori & Aset IMEN</title>
+
+<script>
+// ── GITHUB-PAGES MODE SHIM ────────────────────────────────────────────
+// Under Apps Script, google.script.run already exists. On GitHub Pages it
+// does not, so this recreates the same chained API on top of fetch().
+// POSTs text/plain deliberately: that is a CORS "simple request", and
+// Apps Script cannot answer a preflight.
+(function () {
+  if (window.google && window.google.script && window.google.script.run) return;
+  var API_URL = 'https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec';
+  var API_FNS = ['getInitialData', 'getPublicCatalog', 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload'];
+  function makeRunner() {
+    var onOk = function () {};
+    var onErr = function (e) { console.error('[API]', e); };
+    var runner = {
+      withSuccessHandler: function (fn) { if (fn) onOk = fn; return runner; },
+      withFailureHandler: function (fn) { if (fn) onErr = fn; return runner; },
+      withUserObject: function () { return runner; }
+    };
+    API_FNS.forEach(function (name) {
+      runner[name] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ fn: name, args: args })
+        })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+          if (d && d.ok) onOk(d.result);
+          else onErr(new Error((d && d.error) || 'Ralat API tidak diketahui'));
+        })
+        .catch(onErr);
+      };
+    });
+    return runner;
+  }
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  Object.defineProperty(window.google.script, 'run', { get: makeRunner });
+})();
+
+// ── EARLY FETCH ───────────────────────────────────────────────────────
+// Fired from <head>, before the body parses, so the network round-trip
+// overlaps with rendering instead of following it. boot() picks up
+// whatever this parked on window.__early.
+window.__early = null;
+window.__earlyDone = null;
+// WHICH password this prefetch used. On a first visit that is '' (anonymous),
+// and the server correctly answers is_admin:false. boot() must therefore NEVER
+// consume this result under a different password than the one it was fetched
+// with — doing so made a successful login look like an expired session and
+// bounced the user straight back to the login screen.
+window.__earlyPass = null;
+// True only while a prefetch is genuinely in flight. Without this, a
+// prefetch that never got issued (the catch below) would leave boot()
+// waiting forever for a result that is never coming.
+window.__earlyPending = false;
+(function () {
+  try {
+    var pass = localStorage.getItem('inv_pass') || '';
+    window.__earlyPass = pass;
+    // Without a stored password this visitor is a requester, not an admin,
+    // so there is no point prefetching the admin payload they cannot see.
+    if (!pass) return;
+    window.__earlyPending = true;
+    google.script.run
+      .withSuccessHandler(function (d) {
+        window.__early = d; window.__earlyPending = false;
+        if (window.__earlyDone) window.__earlyDone(d);
+      })
+      .withFailureHandler(function (e) {
+        console.warn('[early]', e); window.__earlyPending = false;
+        if (window.__earlyDone) window.__earlyDone(null);
+      })
+      .getInitialData(pass);
+  } catch (e) { window.__earlyPending = false; /* boot() will fetch normally */ }
+})();
+</script>
+
+<script>
+// Runs before any paint — must stay tiny and dependency-free.
+(function(){try{var t=localStorage.getItem('inv_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ═══ DESIGN TOKENS ═══════════════════════════════════════════════════
+   Warm-neutral canvas, one white app shell floating on it, coral accent.
+   Every colour is a token so the dark theme below is a pure swap. */
+:root{
+  --bg:#efeeec;
+  --surface:#ffffff;
+  --surface-2:#f7f7f8;
+  --surface-3:#f1f1f2;
+  --ink:#16181d;
+  --ink-2:#33383f;
+  --muted:#6b7280;
+  --muted-2:#a1a5ad;
+  --muted-3:#c9ccd1;
+  --border:#ededee;
+  --border-2:#e2e2e4;
+
+  --accent:#f4511e;
+  --accent-2:#ff6f43;
+  --accent-deep:#d63f10;
+  --accent-soft:#fff1ec;
+
+  --ok:#15a34a;   --ok-bg:#eefbf3;   --ok-bd:#c2f0d4;
+  --info:#2563eb; --info-bg:#eff4ff; --info-bd:#c9dbff;
+  --warn:#e08700; --warn-bg:#fff8ec; --warn-bd:#ffe2b0;
+  --err:#e5342f;  --err-bg:#fff0ef;  --err-bd:#ffcfcd;
+
+  --r-shell:26px; --r-card:18px; --r-sm:11px; --r-pill:999px;
+  --shadow-xs:0 1px 2px rgba(22,24,29,.04);
+  --shadow-sm:0 2px 8px rgba(22,24,29,.06);
+  /* Resting elevation for every card surface: a tight contact shadow plus a
+     wider soft one, so cards read as lifted off the canvas rather than drawn
+     on it. */
+  --shadow-card:0 1px 2px rgba(22,24,29,.05), 0 4px 14px rgba(22,24,29,.06);
+  --shadow-card-hover:0 2px 4px rgba(22,24,29,.06), 0 10px 26px rgba(22,24,29,.10);
+  --shadow-lg:0 24px 60px rgba(22,24,29,.18);
+  --shadow-shell:0 8px 40px rgba(22,24,29,.07);
+  --font:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, monospace;
+  --rail-w:64px;
+}
+
+/* Dark theme — token swap only, no layout changes. */
+[data-theme="dark"]{
+  --bg:#0d0e10;
+  --surface:#17191d;
+  --surface-2:#1d2025;
+  --surface-3:#23262c;
+  --ink:#f2f3f5;
+  --ink-2:#dfe1e5;
+  --muted:#9aa0aa;
+  --muted-2:#71767f;
+  --muted-3:#4a4f57;
+  --border:#272a30;
+  --border-2:#32363e;
+  --accent-soft:#2b1710;
+  --ok-bg:#10241a;   --ok-bd:#1c4430;
+  --info-bg:#111c33; --info-bd:#1e3563;
+  --warn-bg:#2a2010; --warn-bd:#4d3a13;
+  --err-bg:#2e1414;  --err-bd:#5a2523;
+  --shadow-shell:0 8px 40px rgba(0,0,0,.5);
+  --shadow-lg:0 24px 60px rgba(0,0,0,.6);
+  /* Dark surfaces need a deeper, tighter shadow — the soft light-mode one
+     is invisible against a near-black canvas. */
+  --shadow-card:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.35);
+  --shadow-card-hover:0 2px 6px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); background:var(--bg); color:var(--ink);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  transition:background .2s, color .2s;
+}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.03em}
+button,input,select,textarea{font-family:inherit; font-size:inherit; color:inherit}
+a{color:var(--accent); text-decoration:none}
+h1,h2,h3,h4{margin:0; font-weight:600; letter-spacing:-.02em}
+.hide{display:none !important}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--muted-3);border-radius:9px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ═══ LOGIN GATE ═════════════════════════════════════════════════════ */
+#gate{
+  position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center;
+  background:var(--bg); padding:20px;
+}
+.gate-card{
+  background:var(--surface); border-radius:24px; padding:36px 32px; width:100%; max-width:390px;
+  box-shadow:var(--shadow-shell); border:1px solid var(--border);
+}
+.gate-logo{
+  width:46px; height:46px; border-radius:var(--r-pill); background:var(--accent);
+  display:flex; align-items:center; justify-content:center; color:#fff; margin-bottom:20px;
+}
+.gate-card h1{font-size:21px; margin-bottom:5px}
+.gate-card p{color:var(--muted); font-size:13px; margin:0 0 24px}
+
+/* ═══ APP SHELL ══════════════════════════════════════════════════════
+   The whole app is one white rounded card floating on the canvas. */
+#app{
+  max-width:1440px; margin:0 auto; padding:18px 20px 26px;
+}
+.shell{
+  background:var(--surface); border-radius:var(--r-shell); box-shadow:var(--shadow-shell);
+  overflow:hidden; display:flex; flex-direction:column; min-height:calc(100vh - 44px);
+}
+
+/* ── Top bar: logo pill · centre nav · actions ───────────────────── */
+#topbar{display:flex; align-items:center; gap:14px; padding:16px 20px 12px}
+.logo{
+  display:flex; align-items:center; gap:9px; padding:6px 15px 6px 7px;
+  border:1px solid var(--border-2); border-radius:var(--r-pill); background:var(--surface);
+}
+.logo .mark{
+  width:29px; height:29px; border-radius:var(--r-pill); background:var(--accent);
+  display:flex; align-items:center; justify-content:center; color:#fff; flex:0 0 29px;
+}
+.logo b{font-size:15px; letter-spacing:-.03em}
+.logo span{font-size:9.5px; color:var(--muted-2); display:block; line-height:1; margin-top:1px; letter-spacing:.04em}
+
+/* Centre nav — active item is a solid dark pill. */
+.topnav{
+  display:flex; align-items:center; gap:2px; margin:0 auto;
+  border:1px solid var(--border-2); border-radius:var(--r-pill); padding:4px;
+}
+.topnav button{
+  border:0; background:transparent; color:var(--muted); cursor:pointer;
+  padding:7px 15px; border-radius:var(--r-pill); font-size:13.5px; font-weight:500;
+  white-space:nowrap; transition:background .15s, color .15s;
+}
+.topnav button:hover{color:var(--ink)}
+.topnav button.active{background:var(--ink); color:var(--surface); font-weight:600}
+.topnav button .badge{
+  margin-left:6px; background:var(--accent); color:#fff; font-size:10px; font-weight:700;
+  padding:1px 6px; border-radius:var(--r-pill);
+}
+.topnav button.active .badge{background:rgba(255,255,255,.24)}
+
+.tb-right{display:flex; align-items:center; gap:8px}
+.icon-btn{
+  position:relative; width:36px; height:36px; border:1px solid var(--border-2); background:var(--surface);
+  border-radius:var(--r-pill); cursor:pointer; color:var(--ink-2);
+  display:flex; align-items:center; justify-content:center; transition:background .15s, border-color .15s;
+}
+.icon-btn:hover{background:var(--surface-2); border-color:var(--muted-3)}
+.dot{
+  position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; padding:0 4px;
+  background:var(--accent); color:#fff; border-radius:var(--r-pill); font-size:10px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; border:2px solid var(--surface);
+}
+.userchip{
+  display:flex; align-items:center; gap:9px; padding:4px 12px 4px 5px;
+  border:1px solid var(--border-2); border-radius:var(--r-pill); cursor:pointer; background:var(--surface);
+}
+.userchip:hover{background:var(--surface-2)}
+.avatar{
+  width:31px; height:31px; border-radius:var(--r-pill); background:var(--ink); color:var(--surface);
+  display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:700; flex:0 0 31px;
+}
+.userchip .nm{font-size:12.5px; font-weight:600; line-height:1.25}
+.userchip .em{font-size:10.5px; color:var(--muted-2); line-height:1.25}
+
+/* ── Body: icon rail + content ───────────────────────────────────── */
+.shell-body{display:flex; flex:1; min-height:0}
+#rail{
+  width:var(--rail-w); flex:0 0 var(--rail-w); display:flex; flex-direction:column;
+  align-items:center; gap:5px; padding:8px 0 16px;
+}
+.rail-btn{
+  width:38px; height:38px; border:0; background:transparent; border-radius:12px; cursor:pointer;
+  color:var(--muted-2); display:flex; align-items:center; justify-content:center;
+  transition:background .15s, color .15s;
+}
+.rail-btn:hover{background:var(--surface-3); color:var(--ink)}
+.rail-btn.active{background:var(--ink); color:var(--surface)}
+.rail-sep{flex:1}
+.rail-theme{
+  display:flex; flex-direction:column; gap:2px; margin-bottom:10px;
+  border-radius:var(--r-pill); padding:3px; background:var(--surface-3);
+}
+.rail-theme button{
+  width:30px; height:30px; border:0; background:transparent; border-radius:var(--r-pill); cursor:pointer;
+  color:var(--muted-2); display:flex; align-items:center; justify-content:center;
+}
+.rail-theme button.active{background:var(--surface); color:var(--accent); box-shadow:var(--shadow-xs)}
+
+#content{flex:1; min-width:0; padding:4px 22px 30px}
+
+/* ═══ HEADINGS ═══════════════════════════════════════════════════════ */
+.page-head{display:flex; align-items:flex-start; gap:14px; margin-bottom:20px; flex-wrap:wrap}
+.page-head h2{font-size:29px; letter-spacing:-.035em; font-weight:600}
+.page-head p{margin:5px 0 0; color:var(--muted); font-size:13.5px}
+.page-head .spacer{flex:1}
+
+/* ═══ BUTTONS ════════════════════════════════════════════════════════ */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  padding:9px 16px; border-radius:var(--r-pill); border:1px solid var(--border-2);
+  background:var(--surface); color:var(--ink-2); font-size:13.5px; font-weight:500;
+  cursor:pointer; white-space:nowrap; transition:background .15s, border-color .15s, color .15s;
+}
+.btn:hover{background:var(--surface-2); border-color:var(--muted-3)}
+.btn:disabled{opacity:.55; cursor:not-allowed}
+.btn-primary{background:var(--ink); border-color:var(--ink); color:var(--surface); font-weight:600}
+.btn-primary:hover{background:#000; border-color:#000; color:#fff}
+.btn-accent{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+.btn-accent:hover{background:var(--accent-deep); border-color:var(--accent-deep)}
+.btn-danger{background:var(--err); border-color:var(--err); color:#fff; font-weight:600}
+.btn-danger:hover{filter:brightness(.93)}
+.btn-ghost{border-color:transparent; background:transparent}
+.btn-ghost:hover{background:var(--surface-3)}
+.btn-sm{padding:6px 12px; font-size:12.5px}
+.btn-block{width:100%}
+
+/* ═══ CARDS ══════════════════════════════════════════════════════════ */
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card)}
+.card-head{padding:16px 18px 12px; display:flex; align-items:center; gap:10px}
+.card-head h3{font-size:15px}
+.card-head .spacer{flex:1}
+.card-body{padding:0 18px 18px}
+.card-pad{padding:18px}
+.grid{display:grid; gap:14px}
+.g-4{grid-template-columns:repeat(4,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-2{grid-template-columns:repeat(2,1fr)}
+
+/* Dashboard master grid: summary column · stat tiles · chart */
+.dash-top{display:grid; grid-template-columns:1fr 1fr 1.15fr; gap:14px; align-items:start}
+.dash-mid{display:grid; grid-template-columns:1fr 2fr; gap:14px; margin-top:14px; align-items:start}
+
+/* Hero value card */
+.hero{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card); padding:18px; box-shadow:var(--shadow-card)}
+.hero .lbl{font-size:12.5px; color:var(--muted); font-weight:500}
+.hero .big{font-size:31px; font-weight:700; letter-spacing:-.04em; margin:7px 0 8px}
+.trend{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600}
+.trend.up{color:var(--ok)} .trend.down{color:var(--err)} .trend.flat{color:var(--muted-2)}
+.trend span{color:var(--muted-2); font-weight:400}
+.hero-actions{display:flex; gap:8px; margin-top:14px}
+.hero-actions .btn{flex:1}
+
+/* Sub-list inside the hero card (mirrors the "Wallets" strip) */
+.substrip{border-top:1px solid var(--border); margin-top:16px; padding-top:13px}
+.substrip .cap{font-size:12px; color:var(--muted); margin-bottom:10px}
+.substrip .cap b{color:var(--ink)}
+.chips{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.chip{border:1px solid var(--border-2); border-radius:12px; padding:9px 10px; min-width:0; box-shadow:var(--shadow-xs)}
+.chip .t{font-size:11.5px; font-weight:600; display:flex; align-items:center; gap:5px; margin-bottom:5px}
+.chip .v{font-size:13px; font-weight:700; letter-spacing:-.02em}
+.chip .s{font-size:9.5px; color:var(--muted-2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.chip .st{font-size:10px; font-weight:600; margin-top:3px}
+
+/* Stat tiles — the 2×2 block, first one filled with the accent. */
+.tiles{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.tile{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:16px; cursor:pointer; box-shadow:var(--shadow-card);
+  transition:border-color .15s, box-shadow .15s, transform .15s;
+}
+.tile:hover{border-color:var(--muted-3); box-shadow:var(--shadow-card-hover); transform:translateY(-1px)}
+.tile .top{display:flex; align-items:flex-start; gap:8px; margin-bottom:14px}
+.tile .lbl{font-size:12.5px; color:var(--muted); font-weight:500}
+.tile .ico{
+  margin-left:auto; width:28px; height:28px; border-radius:var(--r-pill); background:var(--surface-3);
+  display:flex; align-items:center; justify-content:center; color:var(--ink-2); flex:0 0 28px;
+}
+.tile .val{font-size:26px; font-weight:700; letter-spacing:-.04em; line-height:1}
+.tile .sub{margin-top:7px}
+.tile.accent{background:var(--accent); border-color:var(--accent); color:#fff}
+.tile.accent .lbl{color:rgba(255,255,255,.85)}
+.tile.accent .ico{background:rgba(255,255,255,.2); color:#fff}
+.tile.accent .trend{color:#fff}
+.tile.accent .trend span{color:rgba(255,255,255,.75)}
+.tile.accent:hover{border-color:var(--accent-deep); background:var(--accent-deep)}
+
+/* ═══ CHART ══════════════════════════════════════════════════════════ */
+.chart-legend{display:flex; align-items:center; gap:12px; font-size:11.5px; color:var(--muted)}
+.chart-legend i{width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:5px}
+.chart{display:flex; align-items:flex-end; gap:2px; height:186px; padding-top:6px}
+.chart .yaxis{
+  display:flex; flex-direction:column; justify-content:space-between; height:160px;
+  font-size:9.5px; color:var(--muted-2); padding-right:8px; text-align:right; flex:0 0 auto;
+}
+.chart .plot{flex:1; display:flex; align-items:flex-end; justify-content:space-around; height:160px; gap:4px; position:relative}
+.chart .grid-line{position:absolute; left:0; right:0; border-top:1px dashed var(--border-2)}
+.bargroup{display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; min-width:0; height:100%}
+.bars{display:flex; align-items:flex-end; gap:3px; height:100%; width:100%; justify-content:center}
+.bar{width:9px; border-radius:3px 3px 0 0; min-height:3px; transition:opacity .15s}
+.bar:hover{opacity:.75}
+.bar.b-in{background:var(--ink)}
+/* Hatched fill mirrors the reference chart's striped bars. */
+.bar.b-out{
+  background:repeating-linear-gradient(135deg, var(--accent) 0 3px, var(--accent-2) 3px 6px);
+}
+.bargroup .mlabel{font-size:9.5px; color:var(--muted-2); white-space:nowrap}
+
+/* ═══ STATUS PILLS ═══════════════════════════════════════════════════ */
+.pill{
+  display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:var(--r-pill);
+  font-size:11.5px; font-weight:600; border:1px solid; white-space:nowrap; line-height:1.55;
+}
+.pill-ok{background:var(--ok-bg); color:var(--ok); border-color:var(--ok-bd)}
+.pill-info{background:var(--info-bg); color:var(--info); border-color:var(--info-bd)}
+.pill-warn{background:var(--warn-bg); color:var(--warn); border-color:var(--warn-bd)}
+.pill-err{background:var(--err-bg); color:var(--err); border-color:var(--err-bd)}
+.pill-mute{background:var(--surface-3); color:var(--muted); border-color:var(--border-2)}
+.pill i{width:5px; height:5px; border-radius:50%; background:currentColor; display:block; flex:0 0 5px}
+/* Bare dot + text, as in the reference table's status column. */
+.dotstat{display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:500; white-space:nowrap}
+.dotstat i{width:6px; height:6px; border-radius:50%; display:block; flex:0 0 6px}
+
+/* ═══ DATA TABLE ═════════════════════════════════════════════════════ */
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:13px}
+table.tbl th{
+  text-align:left; padding:10px 14px; background:var(--surface-2); color:var(--muted);
+  font-size:11.5px; font-weight:500; white-space:nowrap;
+}
+table.tbl thead tr th:first-child{border-radius:10px 0 0 10px}
+table.tbl thead tr th:last-child{border-radius:0 10px 10px 0}
+table.tbl th.sortable{cursor:pointer; user-select:none}
+table.tbl th.sortable:hover{color:var(--ink-2)}
+table.tbl th .arw{opacity:.3; font-size:8px; margin-left:3px}
+table.tbl th.sorted .arw{opacity:1; color:var(--accent)}
+table.tbl td{padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:middle}
+table.tbl tbody tr:last-child td{border-bottom:0}
+table.tbl tbody tr:hover td{background:var(--surface-2)}
+table.tbl tbody tr.sel td{background:var(--surface-2)}
+table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
+.t-name{font-weight:600; color:var(--ink)}
+.t-sub{font-size:11.5px; color:var(--muted-2)}
+.t-num{text-align:right}
+.empty{padding:50px 20px; text-align:center; color:var(--muted-2)}
+.empty svg{margin-bottom:10px; opacity:.45}
+/* Square app-icon tile beside a row's name, as in the reference. */
+.rowicon{
+  width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+  flex:0 0 26px; font-size:11px; font-weight:700;
+}
+.cellflex{display:flex; align-items:center; gap:10px; min-width:0}
+.ck{
+  width:16px; height:16px; border:1.5px solid var(--border-2); border-radius:5px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; background:var(--surface); color:transparent;
+}
+.ck.on{background:var(--ink); border-color:var(--ink); color:var(--surface)}
+
+/* Row action menu */
+.rowmenu{position:relative}
+.rowmenu-pop{
+  position:absolute; right:0; top:calc(100% + 4px); background:var(--surface); border:1px solid var(--border-2);
+  border-radius:14px; box-shadow:var(--shadow-lg); min-width:190px; padding:6px; z-index:30;
+}
+.rowmenu-pop button{
+  display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; border:0; background:none;
+  cursor:pointer; border-radius:9px; font-size:13px; color:var(--ink-2); text-align:left;
+}
+.rowmenu-pop button:hover{background:var(--surface-3)}
+.rowmenu-pop button.danger{color:var(--err)}
+.rowmenu-pop hr{border:0; border-top:1px solid var(--border); margin:5px 0}
+
+/* Filter bar */
+.filters{display:flex; gap:9px; flex-wrap:wrap; align-items:center; padding:0 18px 14px}
+.filters input,.filters select{
+  padding:8px 13px; border:1px solid var(--border-2); border-radius:var(--r-pill); background:var(--surface);
+  outline:none; font-size:13px; min-width:135px;
+}
+.filters input:focus,.filters select:focus{border-color:var(--accent)}
+.searchbox{position:relative}
+.searchbox svg{position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--muted-2); pointer-events:none}
+.searchbox input{padding-left:34px}
+.tabs{display:flex; gap:2px; background:var(--surface-3); padding:3px; border-radius:var(--r-pill)}
+.tabs button{
+  padding:6px 14px; border:0; background:none; border-radius:var(--r-pill); cursor:pointer;
+  font-size:12.5px; font-weight:500; color:var(--muted);
+}
+.tabs button.active{background:var(--surface); color:var(--ink); font-weight:600; box-shadow:var(--shadow-xs)}
+
+/* ═══ SLIDE-OVER DRAWER ══════════════════════════════════════════════ */
+#scrim{position:fixed; inset:0; background:rgba(22,24,29,.4); z-index:99; opacity:0; transition:opacity .2s}
+#drawer{
+  position:fixed; top:12px; right:12px; bottom:12px; width:520px; max-width:calc(100vw - 24px);
+  background:var(--surface); z-index:100; box-shadow:var(--shadow-lg); border-radius:22px;
+  display:flex; flex-direction:column; transform:translateX(calc(100% + 20px));
+  transition:transform .26s cubic-bezier(.4,0,.2,1);
+}
+#drawer.open{transform:translateX(0)}
+#scrim.open{opacity:1}
+.dr-head{padding:18px 20px 14px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border)}
+.dr-head h3{font-size:17px}
+.dr-head p{margin:3px 0 0; font-size:12px; color:var(--muted)}
+.dr-body{flex:1; overflow-y:auto; padding:20px}
+.dr-foot{padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:9px; justify-content:flex-end}
+
+/* Forms */
+.field{margin-bottom:14px}
+.field label{display:block; font-size:12px; font-weight:600; color:var(--ink-2); margin-bottom:6px}
+.field label .req{color:var(--accent)}
+.field input,.field select,.field textarea{
+  width:100%; padding:10px 13px; border:1px solid var(--border-2); border-radius:12px;
+  outline:none; background:var(--surface); transition:border-color .15s, box-shadow .15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);
+}
+.field textarea{resize:vertical; min-height:70px}
+.field .hint{font-size:11.5px; color:var(--muted-2); margin-top:5px}
+.row-2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.fs{border:1px solid var(--border); border-radius:var(--r-card); padding:16px; margin-bottom:16px}
+.fs legend{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); padding:0 7px}
+.err-box{background:var(--err-bg); border:1px solid var(--err-bd); color:var(--err); padding:11px 13px; border-radius:12px; font-size:13px; margin-bottom:14px}
+.info-box{background:var(--surface-2); border:1px solid var(--border-2); color:var(--ink-2); padding:11px 13px; border-radius:12px; font-size:12.5px; margin-bottom:14px}
+
+/* Upload */
+.drop{border:1.5px dashed var(--border-2); border-radius:12px; padding:16px; text-align:center; cursor:pointer; background:var(--surface-2); font-size:12.5px}
+.drop:hover{border-color:var(--accent); background:var(--accent-soft)}
+.drop.done{border-style:solid; border-color:var(--ok-bd); background:var(--ok-bg); color:var(--ok)}
+.prog{height:4px; background:var(--surface-3); border-radius:var(--r-pill); overflow:hidden; margin-top:8px}
+.prog span{display:block; height:100%; background:var(--accent); width:0; transition:width .2s}
+
+/* ═══ TOAST ══════════════════════════════════════════════════════════ */
+#toasts{position:fixed; bottom:22px; right:22px; z-index:300; display:flex; flex-direction:column; gap:9px}
+.toast{
+  background:var(--ink); color:var(--surface); padding:12px 16px; border-radius:14px; box-shadow:var(--shadow-lg);
+  font-size:13px; display:flex; align-items:center; gap:9px; max-width:380px; animation:slideIn .2s ease;
+}
+.toast.ok{background:var(--ok); color:#fff} .toast.err{background:var(--err); color:#fff}
+@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+
+/* ═══ SEARCH PALETTE (Ctrl+K) ════════════════════════════════════════ */
+#palette{position:fixed; inset:0; z-index:250; background:rgba(22,24,29,.42); display:flex; align-items:flex-start; justify-content:center; padding-top:11vh}
+.pal-box{background:var(--surface); border-radius:20px; width:100%; max-width:580px; box-shadow:var(--shadow-lg); overflow:hidden}
+.pal-box input{width:100%; padding:17px 20px; border:0; border-bottom:1px solid var(--border); outline:none; font-size:15px; background:var(--surface)}
+.pal-list{max-height:52vh; overflow-y:auto; padding:7px}
+.pal-item{display:flex; align-items:center; gap:11px; padding:10px 13px; border-radius:12px; cursor:pointer}
+.pal-item:hover,.pal-item.sel{background:var(--surface-3)}
+.pal-item .t-sub{margin-left:auto}
+
+/* ═══ QR ═════════════════════════════════════════════════════════════ */
+#qrbox{display:flex; flex-direction:column; align-items:center; gap:14px; padding:8px 0}
+#qrcanvas{padding:16px; background:#fff; border:1px solid var(--border-2); border-radius:16px}
+#scanner{width:100%; border-radius:14px; overflow:hidden}
+
+/* ═══ MISC ═══════════════════════════════════════════════════════════ */
+.stack{display:flex; flex-direction:column; gap:14px}
+.alert-row{display:flex; align-items:center; gap:11px; padding:10px 0; border-bottom:1px solid var(--border)}
+.alert-row:last-child{border-bottom:0}
+.alert-row .spacer{flex:1}
+.mini-bar{height:6px; background:var(--surface-3); border-radius:var(--r-pill); overflow:hidden; width:84px; flex:0 0 auto}
+.mini-bar span{display:block; height:100%; border-radius:var(--r-pill)}
+.limitbar{height:9px; background:var(--surface-3); border-radius:var(--r-pill); overflow:hidden; margin:12px 0 9px}
+.limitbar span{display:block; height:100%; border-radius:var(--r-pill); background:var(--accent)}
+.spin{width:15px; height:15px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loading{padding:80px; text-align:center; color:var(--muted-2)}
+
+/* Loan highlight cards (the "My Cards" analogue) */
+.loancard{
+  border-radius:16px; padding:14px; color:#fff; min-height:118px; display:flex; flex-direction:column;
+  background:var(--ink); position:relative; overflow:hidden; box-shadow:var(--shadow-card);
+  transition:box-shadow .15s, transform .15s;
+}
+.loancard:hover{box-shadow:var(--shadow-card-hover); transform:translateY(-1px)}
+.loancard.warn{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-deep) 100%)}
+.loancard .tag{font-size:10px; font-weight:700; letter-spacing:.04em; opacity:.85}
+.loancard .nm{font-size:13.5px; font-weight:600; margin-top:5px; line-height:1.3}
+.loancard .foot{margin-top:auto; display:flex; align-items:flex-end; gap:10px; font-size:10.5px}
+.loancard .foot b{display:block; font-size:11.5px; font-weight:600}
+.loancard .foot span{opacity:.7}
+.loanpill{
+  align-self:flex-start; background:rgba(255,255,255,.2); border-radius:var(--r-pill);
+  padding:2px 9px; font-size:10px; font-weight:600;
+}
+
+/* ═══ PUBLIC PAGE (PEMOHON) ══════════════════════════════════════════ */
+#public{max-width:1180px; margin:0 auto; padding:18px 20px 50px}
+.pub-head{
+  display:flex; align-items:center; gap:14px; padding:16px 20px; background:var(--surface);
+  border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); margin-bottom:18px;
+}
+.pub-hero{margin:26px 4px 20px}
+.pub-hero h1{font-size:30px; letter-spacing:-.035em; font-weight:600}
+.pub-hero p{margin:7px 0 0; color:var(--muted); font-size:14px; max-width:620px}
+.pub-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px}
+.pub-stat{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:15px 17px; box-shadow:var(--shadow-card);
+}
+.pub-stat .v{font-size:25px; font-weight:700; letter-spacing:-.04em; line-height:1}
+.pub-stat .l{font-size:12px; color:var(--muted); margin-top:5px}
+.pub-filters{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px}
+.pub-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:14px}
+.pub-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:15px; box-shadow:var(--shadow-card); display:flex; flex-direction:column;
+  transition:box-shadow .15s, transform .15s;
+}
+.pub-card:hover{box-shadow:var(--shadow-card-hover); transform:translateY(-1px)}
+.pub-card-top{display:flex; align-items:flex-start; gap:10px; margin-bottom:11px}
+.pub-name{font-weight:600; font-size:14px; line-height:1.3}
+.pub-meta{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; margin-top:5px}
+.pub-note{
+  font-size:11.5px; color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn-bd);
+  border-radius:9px; padding:7px 9px; margin-top:9px; display:flex; align-items:center; gap:6px;
+}
+.pub-foot{text-align:center; color:var(--muted-2); font-size:11.5px; margin-top:34px}
+
+/* ═══ RESPONSIVE ═════════════════════════════════════════════════════ */
+@media (max-width:1180px){
+  .dash-top{grid-template-columns:1fr 1fr}
+  .dash-top > *:nth-child(3){grid-column:1 / -1}
+  .dash-mid{grid-template-columns:1fr}
+}
+@media (max-width:980px){
+  .topnav{display:none}
+  .userchip .nm,.userchip .em{display:none}
+  .userchip{padding:4px}
+}
+@media (max-width:820px){
+  .pub-stats{grid-template-columns:1fr}
+  .pub-grid{grid-template-columns:1fr}
+  #public{padding:10px 12px 40px}
+  .pub-hero h1{font-size:23px}
+  #app{padding:8px 8px 14px}
+  .shell{border-radius:20px; min-height:calc(100vh - 22px)}
+  .dash-top,.tiles,.g-4,.g-3,.g-2,.row-2,.chips{grid-template-columns:1fr}
+  #rail{
+    width:100%; flex:0 0 auto; flex-direction:row; justify-content:flex-start;
+    overflow-x:auto; padding:0 12px 8px; gap:4px;
+  }
+  .rail-sep,.rail-theme{display:none}
+  .shell-body{flex-direction:column}
+  #content{padding:4px 14px 26px}
+  .page-head h2{font-size:23px}
+  #drawer{top:0; right:0; bottom:0; border-radius:0; max-width:100vw}
+}
+@media print{
+  #rail,#topbar,.filters,.rowmenu,#toasts{display:none !important}
+  body{background:#fff}
+  .shell{box-shadow:none; border-radius:0}
+  .card{break-inside:avoid}
+}
+
+</style>
+</head>
+<body>
+
+<!-- Lucide icon sprite, inlined so the page has no icon CDN dependency. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<g id="i-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></g>
+<g id="i-dash"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g>
+<g id="i-swap"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></g>
+<g id="i-layers"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12.5-9.17 4.16a2 2 0 0 1-1.66 0L2 12.5"/><path d="m22 17.5-9.17 4.16a2 2 0 0 1-1.66 0L2 17.5"/></g>
+<g id="i-history"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></g>
+<g id="i-chart"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></g>
+<g id="i-gear"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g>
+<g id="i-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<g id="i-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></g>
+<g id="i-plus"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<g id="i-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<g id="i-dots"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></g>
+<g id="i-menu"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></g>
+<g id="i-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></g>
+<g id="i-in"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></g>
+<g id="i-trash"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></g>
+<g id="i-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></g>
+<g id="i-qr"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></g>
+<g id="i-scan"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></g>
+<g id="i-shield"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></g>
+<g id="i-warn"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<g id="i-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g>
+<g id="i-money"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></g>
+<g id="i-check"><path d="M20 6 9 17l-5-5"/></g>
+<g id="i-down"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></g>
+<g id="i-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>
+<g id="i-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></g>
+<g id="i-tag"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/></g>
+<g id="i-logout"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></g>
+<g id="i-lock"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></g>
+<g id="i-refresh"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></g>
+<g id="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></g>
+<g id="i-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></g>
+</defs></svg>
+
+<!-- ═══ PUBLIC PAGE — PEMOHON ════════════════════════════════════════
+     The default landing view. No password: staff browse availability and
+     submit a request, which an admin then approves. ═══════════════════ -->
+<div id="public" class="hide">
+  <div class="pub-head">
+    <div class="logo" style="border:0;padding:0">
+      <div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
+      <div><b>i-Nventori</b><span>OFIS</span></div>
+    </div>
+    <div style="flex:1"></div>
+    <button class="icon-btn" id="pubTheme" onclick="setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')" title="Tukar tema">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun"/></svg>
+    </button>
+    <button class="btn btn-sm" onclick="loadCatalog();toast('Senarai disegarkan','ok')">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg>
+      Segar
+    </button>
+    <button class="btn btn-sm btn-primary" onclick="showGate()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-lock"/></svg>
+      Log Masuk Admin
+    </button>
+  </div>
+
+  <div class="pub-hero">
+    <h1>Mohon Aset &amp; Inventori</h1>
+    <p>Semak apa yang tersedia dan di mana ia berada, kemudian hantar permohonan.
+       Admin akan meluluskan dan anda dimaklumkan melalui emel.</p>
+  </div>
+
+  <div id="pubBody"><div id="loading">Memuatkan senarai…</div></div>
+
+  <div class="pub-foot">i-Nventori Ofis · IMEN, UKM</div>
+</div>
+
+<!-- ═══ LOGIN GATE ═══════════════════════════════════════════════════ -->
+<div id="gate" class="hide">
+  <div class="gate-card">
+    <div class="gate-logo"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
+    <h1>i-Nventori Ofis</h1>
+    <p>Sistem Inventori &amp; Pengurusan Aset — IMEN</p>
+    <div id="gateErr" class="err-box hide"></div>
+    <div class="field">
+      <label for="gatePass">Kata Laluan Admin</label>
+      <input type="password" id="gatePass" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button class="btn btn-accent btn-block" id="gateBtn" onclick="doLogin()">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-lock"/></svg>
+      Log Masuk
+    </button>
+    <p style="margin-top:18px;font-size:11.5px;color:var(--muted-2);text-align:center">
+      Akses terhad kepada admin inventori IMEN.<br>
+      <a href="#" onclick="showPublic();return false" style="font-weight:600">&larr; Kembali ke halaman pemohon</a>
+    </p>
+  </div>
+</div>
+
+<!-- ═══ APP SHELL ════════════════════════════════════════════════════ -->
+<div id="app" class="hide">
+ <div class="shell">
+
+  <header id="topbar">
+    <div class="logo">
+      <div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></div>
+      <div><b>i-Nventori</b><span>OFIS</span></div>
+    </div>
+
+    <nav class="topnav" id="topnav">
+      <button data-view="dashboard" onclick="go('dashboard')">Ringkasan</button>
+      <button data-view="items" onclick="go('items')">Inventori</button>
+      <button data-view="loans" onclick="go('loans')">Pinjaman<span class="badge hide" id="bLoans">0</span></button>
+      <button data-view="stock" onclick="go('stock')">Stok<span class="badge hide" id="bStock">0</span></button>
+      <button data-view="requests" onclick="go('requests')">Permohonan<span class="badge hide" id="bReq">0</span></button>
+      <button data-view="ledger" onclick="go('ledger')">Log Audit</button>
+      <button data-view="reports" onclick="go('reports')">Laporan</button>
+    </nav>
+
+    <div class="tb-right">
+      <button class="icon-btn" onclick="openPalette()" title="Cari (Ctrl+K)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openScanner()" title="Imbas kod QR">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-scan"/></svg>
+      </button>
+      <button class="icon-btn" onclick="go('dashboard')" title="Amaran">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg>
+        <span class="dot hide" id="bellDot">0</span>
+      </button>
+      <button class="btn btn-accent btn-sm" onclick="openItemDrawer()">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><use href="#i-plus"/></svg>
+        Tambah
+      </button>
+      <div class="userchip" onclick="doLogout()" title="Log keluar">
+        <div class="avatar">AD</div>
+        <div><div class="nm">admin</div><div class="em">imenmakmal@gmail.com</div></div>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-down"/></svg>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell-body">
+    <aside id="rail">
+      <div class="rail-theme">
+        <button id="thLight" class="active" onclick="setTheme('light')" title="Tema cerah">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun"/></svg>
+        </button>
+        <button id="thDark" onclick="setTheme('dark')" title="Tema gelap">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
+        </button>
+      </div>
+      <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
+      <button class="rail-btn" data-view="items" onclick="go('items')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
+      <button class="rail-btn" data-view="loans" onclick="go('loans')" title="Daftar Keluar/Masuk"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-swap"/></svg></button>
+      <button class="rail-btn" data-view="stock" onclick="go('stock')" title="Stok"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
+      <button class="rail-btn" data-view="requests" onclick="go('requests')" title="Permohonan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></button>
+      <button class="rail-btn" data-view="ledger" onclick="go('ledger')" title="Log Audit"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-history"/></svg></button>
+      <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
+      <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn" onclick="refresh();toast('Data disegarkan','ok')" title="Segar semula"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg></button>
+      <button class="rail-btn" onclick="doLogout()" title="Log keluar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-logout"/></svg></button>
+    </aside>
+
+    <main id="content"><div id="loading">Memuatkan data inventori…</div></main>
+  </div>
+
+ </div>
+</div>
+
+<!-- ═══ SLIDE-OVER DRAWER ════════════════════════════════════════════ -->
+<div id="scrim" class="hide" onclick="closeDrawer()"></div>
+<aside id="drawer" role="dialog" aria-modal="true">
+  <div class="dr-head">
+    <div style="flex:1"><h3 id="drTitle">—</h3><p id="drSub"></p></div>
+    <button class="icon-btn" onclick="closeDrawer()" aria-label="Tutup">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-x"/></svg>
+    </button>
+  </div>
+  <div class="dr-body" id="drBody"></div>
+  <div class="dr-foot" id="drFoot"></div>
+</aside>
+
+<!-- ═══ Ctrl+K PALETTE ═══════════════════════════════════════════════ -->
+<div id="palette" class="hide" onclick="if(event.target.id==='palette')closePalette()">
+  <div class="pal-box">
+    <input id="palInput" placeholder="Cari nama, tag aset, atau nombor siri…" oninput="renderPalette()" onkeydown="palKey(event)">
+    <div class="pal-list" id="palList"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════════════
+var D = null;            // the payload from getInitialData
+var PASS = '';           // admin password, kept in memory + localStorage
+var VIEW = 'dashboard';
+var SORT = { key: 'asset_tag', dir: 1 };
+var FILTER = { q: '', type: 'all', status: '', category: '', location: '' };
+var CACHE_KEY = 'inv_cache_v1';
+
+// ══════════════════════════════════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function $(id) { return document.getElementById(id); }
+
+function toDate(v) {
+  if (!v) return null;
+  var d = (v instanceof Date) ? v : new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+function fmtDate(v) {
+  var d = toDate(v);
+  if (!d) return '—';
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+}
+function fmtDateTime(v) {
+  var d = toDate(v);
+  if (!d) return '—';
+  return fmtDate(d) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+}
+function inputDate(v) {
+  var d = toDate(v);
+  if (!d) return '';
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function today() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function daysBetween(a, b) {
+  var x = toDate(a), y = toDate(b);
+  if (!x || !y) return null;
+  x.setHours(0, 0, 0, 0); y.setHours(0, 0, 0, 0);
+  return Math.round((y - x) / 86400000);
+}
+
+function icon(name, size) {
+  // viewBox is REQUIRED: the sprite is drawn on a 24x24 grid, and without
+  // it the icon renders at 1 user unit per px and gets clipped to its
+  // top-left corner at any size below 24.
+  return '<svg viewBox="0 0 24 24" width="' + (size || 16) + '" height="' + (size || 16) + '" ' +
+         'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+         'stroke-linejoin="round"><use href="#' + name + '"/></svg>';
+}
+
+// Status pill — the fintech badge vocabulary, one place.
+var STATUS_META = {
+  available:      { cls: 'pill-ok',   label: 'Tersedia' },
+  assigned:       { cls: 'pill-info', label: 'Dipinjam' },
+  maintenance:    { cls: 'pill-warn', label: 'Penyelenggaraan' },
+  decommissioned: { cls: 'pill-err',  label: 'Dilupuskan' },
+  disposed:       { cls: 'pill-err',  label: 'Dibuang' }
+};
+function pill(status) {
+  var m = STATUS_META[status] || { cls: 'pill-mute', label: status || '—' };
+  return '<span class="pill ' + m.cls + '"><i></i>' + esc(m.label) + '</span>';
+}
+
+// The owner's vocabulary, and it is not interchangeable:
+//   Aset      = kerusi, meja, komputer, alat besar — tracked individually
+//   Inventori = alat tulis, kertas, kartrij — tracked by quantity
+// The DB enum stays fixed_asset/consumable; only the labels change.
+var TYPE_LABEL = { fixed_asset: 'Aset', consumable: 'Inventori' };
+var ACTION_LABEL = {
+  stock_add: 'Tambah Stok', stock_remove: 'Keluar Stok', check_out: 'Daftar Keluar',
+  check_in: 'Daftar Masuk', decommission: 'Pelupusan', audit_adjust: 'Pelarasan Audit'
+};
+var ACTION_PILL = {
+  stock_add: 'pill-ok', stock_remove: 'pill-warn', check_out: 'pill-info',
+  check_in: 'pill-ok', decommission: 'pill-err', audit_adjust: 'pill-mute'
+};
+
+function toast(msg, kind) {
+  var el = document.createElement('div');
+  el.className = 'toast ' + (kind || '');
+  el.innerHTML = (kind === 'ok' ? icon('i-check', 15) : kind === 'err' ? icon('i-warn', 15) : '') + '<span>' + esc(msg) + '</span>';
+  $('toasts').appendChild(el);
+  setTimeout(function () { el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 250); }, kind === 'err' ? 5200 : 3200);
+}
+
+// Lookups
+function catName(id) { var c = find(D.categories, id); return c ? c.name : '—'; }
+function locName(id) { var l = find(D.locations, id); return l ? [l.building, l.floor, l.room_number].filter(Boolean).join(' · ') : '—'; }
+function custName(id) { var c = find(D.custodians, id); return c ? c.name : (id ? 'Penjaga #' + id : '—'); }
+function find(arr, id) {
+  if (!arr) return null;
+  for (var i = 0; i < arr.length; i++) if (Number(arr[i].id) === Number(id)) return arr[i];
+  return null;
+}
+function itemById(id) { return find(D.items, id); }
+
+// ══════════════════════════════════════════════════════════════════════
+//  API
+// ══════════════════════════════════════════════════════════════════════
+function api(action, payload, onOk, onErr) {
+  var p = payload || {};
+  p.__pass = PASS;
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.success) { if (onOk) onOk(res.result); }
+      else {
+        var msg = (res && res.error) || 'Ralat tidak diketahui';
+        if (onErr) onErr(msg); else toast(msg, 'err');
+      }
+    })
+    .withFailureHandler(function (e) {
+      var msg = (e && e.message) || String(e);
+      if (onErr) onErr(msg); else toast(msg, 'err');
+    })
+    .handleAction(action, p);
+}
+
+// Reload the payload from the server and re-render the current view.
+// `silent` suppresses the failure toast — used by the background refresh
+// on boot, where a warm cache means a network blip is not worth a banner.
+function refresh(cb) {
+  var silent = (cb === true);
+  var done = (typeof cb === 'function') ? cb : null;
+  google.script.run
+    .withSuccessHandler(function (d) {
+      if (d) { D = d; saveCache(d); }
+      render();
+      if (done) done();
+    })
+    .withFailureHandler(function (e) {
+      if (!silent) toast('Gagal menyegarkan: ' + ((e && e.message) || e), 'err');
+      if (done) done();
+    })
+    .getInitialData(PASS);
+}
+
+// ── Stale-while-revalidate cache ──────────────────────────────────────
+// Paint from localStorage immediately, then replace with live data when
+// it lands. Display-only: every write still goes to the server.
+function saveCache(d) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), d: d }));
+  } catch (e) { /* quota — the cache is an optimisation, not a requirement */ }
+}
+function loadCache() {
+  try {
+    var raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    return (o && o.d) ? o.d : null;
+  } catch (e) { return null; }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════════════════════
+function doLogin() {
+  var pass = $('gatePass').value;
+  if (!pass) { showGateErr('Sila masukkan kata laluan.'); return; }
+  var btn = $('gateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Menyemak…';
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      btn.disabled = false;
+      btn.innerHTML = icon('i-lock', 15) + ' Log Masuk';
+      if (r && r.unconfigured) {
+        showGateErr('ADMIN_PASSWORD belum ditetapkan dalam Script Properties. ' +
+                    'Buka Apps Script → Project Settings → Script Properties.');
+        return;
+      }
+      if (r && r.ok) {
+        PASS = pass;
+        try { localStorage.setItem('inv_pass', pass); } catch (e) {}
+        $('gate').classList.add('hide');
+        $('app').classList.remove('hide');
+        boot();
+      } else {
+        showGateErr('Kata laluan salah.');
+      }
+    })
+    .withFailureHandler(function (e) {
+      btn.disabled = false;
+      btn.innerHTML = icon('i-lock', 15) + ' Log Masuk';
+      showGateErr('Tidak dapat menghubungi pelayan: ' + ((e && e.message) || e));
+    })
+    .adminLogin(pass);
+}
+function showGateErr(m) {
+  var el = $('gateErr');
+  el.textContent = m;
+  el.classList.remove('hide');
+}
+function showGate() {
+  $('public').classList.add('hide');
+  $('app').classList.add('hide');
+  $('gate').classList.remove('hide');
+  setTimeout(function () { var g = $('gatePass'); if (g) g.focus(); }, 60);
+}
+
+function doLogout() {
+  PASS = '';
+  try { localStorage.removeItem('inv_pass'); localStorage.removeItem(CACHE_KEY); } catch (e) {}
+  location.reload();   // lands on the public page, since no password remains
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════════════════
+// Instant-load contract:
+//   Repeat visit  -> paint from localStorage immediately, no spinner, no
+//                    banner. The network refresh happens silently and only
+//                    repaints if the data actually changed.
+//   First visit   -> the only time a loading message is shown.
+// This is why the app feels instant after the first open.
+function boot() {
+  var cached = loadCache();
+  var painted = false;
+  if (cached) {
+    D = cached;
+    render();          // straight to the real UI — nothing to wait for
+    painted = true;
+  }
+
+  function accept(d) {
+    if (d && d.is_admin) {
+      var changed = !painted || JSON.stringify(d) !== JSON.stringify(cached);
+      D = d;
+      saveCache(d);
+      // Skip the repaint entirely when nothing moved, so a background
+      // refresh can never flicker the view the user is reading.
+      if (changed) render();
+    } else if (d && !d.is_admin && PASS) {
+      // A real rejection of a real password: the session is genuinely stale
+      // (someone changed ADMIN_PASSWORD server-side). Guarded on PASS being
+      // non-empty so an anonymous payload can never trigger a logout.
+      doLogout();
+    } else if (!painted) {
+      $('content').innerHTML = '<div class="empty">' + icon('i-warn', 30) +
+        '<p>Tidak dapat memuatkan data. Semak sambungan dan muat semula.</p></div>';
+    }
+    // A failed refresh with a warm cache is deliberately silent: the user
+    // still has usable data, and writes would surface their own errors.
+  }
+
+  // Only reuse the <head> prefetch when it was made with the SAME password
+  // this session is now using. After a fresh login it was anonymous, so it
+  // is discarded and a proper authenticated fetch is issued instead.
+  if (window.__earlyPass === PASS && (window.__early || window.__earlyPending)) {
+    if (window.__early) accept(window.__early);   // already landed
+    else window.__earlyDone = accept;             // still in flight, wait for it
+  } else {
+    window.__earlyDone = null;   // discard any anonymous prefetch
+    refresh(true);               // and fetch properly with this session's password
+  }
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+  var saved = '';
+  try { saved = localStorage.getItem('inv_pass') || ''; } catch (e) {}
+  if (saved) {
+    PASS = saved;
+    $('app').classList.remove('hide');
+    boot();
+  } else {
+    // Everyone else is a requester. The gate is one click away.
+    var cachedPub = null;
+    try { cachedPub = JSON.parse(localStorage.getItem('inv_pub_v1') || 'null'); } catch (e) {}
+    if (cachedPub) PUB = cachedPub;    // instant paint, same as the admin side
+    showPublic();
+  }
+  var th = 'light';
+  try { th = localStorage.getItem('inv_theme') || 'light'; } catch (e) {}
+  setTheme(th);
+  $('gatePass').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+
+  // Ctrl+K global search, Esc closes whatever is open.
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); }
+    if (e.key === 'Escape') {
+      if (!$('palette').classList.contains('hide')) closePalette();
+      else if ($('drawer').classList.contains('open')) closeDrawer();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.rowmenu')) {
+      var m = document.querySelector('.rowmenu-pop');
+      if (m) m.remove();
+    }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+//  ROUTER
+// ══════════════════════════════════════════════════════════════════════
+function go(view) {
+  VIEW = view;
+  // Both the centre pill nav and the left icon rail mark the same view,
+  // so one loop over every [data-view] element keeps them in sync.
+  var nav = document.querySelectorAll('[data-view]');
+  for (var i = 0; i < nav.length; i++) {
+    nav[i].classList.toggle('active', nav[i].dataset.view === view);
+  }
+  window.scrollTo(0, 0);
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  THEME
+//
+//  Applied to <html> before first paint (see the inline script in <head>)
+//  so a dark-mode user never sees a white flash on load.
+// ══════════════════════════════════════════════════════════════════════
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('inv_theme', t); } catch (e) {}
+  var l = $('thLight'), d = $('thDark');
+  if (l) l.classList.toggle('active', t !== 'dark');
+  if (d) d.classList.toggle('active', t === 'dark');
+}
+
+function render() {
+  if (!D) return;
+  renderBadges();
+  var el = $('content');
+  if (VIEW === 'dashboard')      el.innerHTML = viewDashboard();
+  else if (VIEW === 'items')     el.innerHTML = viewItems();
+  else if (VIEW === 'loans')     el.innerHTML = viewLoans();
+  else if (VIEW === 'stock')     el.innerHTML = viewStock();
+  else if (VIEW === 'requests')  el.innerHTML = viewRequests();
+  else if (VIEW === 'ledger')    el.innerHTML = viewLedger();
+  else if (VIEW === 'reports')   el.innerHTML = viewReports();
+  else if (VIEW === 'settings')  el.innerHTML = viewSettings();
+}
+
+function renderBadges() {
+  var a = D.alerts || {};
+  var overdue = (a.overdue || []).length;
+  var low = (a.low_stock || []).length;
+  var pendingReq = (D.requests || []).filter(function (r) { return r.status === 'pending'; }).length;
+  var totalAlerts = overdue + low + pendingReq + (a.inspection || []).length;
+
+  setBadge('bLoans', overdue);
+  setBadge('bStock', low);
+  setBadge('bReq', (D.requests || []).filter(function (r) { return r.status === 'pending'; }).length);
+  var dot = $('bellDot');
+  if (totalAlerts) { dot.textContent = totalAlerts > 99 ? '99+' : totalAlerts; dot.classList.remove('hide'); }
+  else dot.classList.add('hide');
+}
+function setBadge(id, n) {
+  var el = $(id);
+  if (!el) return;
+  if (n > 0) { el.textContent = n; el.classList.remove('hide'); } else el.classList.add('hide');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  VIEW — RINGKASAN (dashboard)
+// ══════════════════════════════════════════════════════════════════════
+function greeting() {
+  var h = new Date().getHours();
+  if (h < 12) return 'Selamat pagi';
+  if (h < 19) return 'Selamat petang';
+  return 'Selamat malam';
+}
+
+// Units flowing in and out per month, straight from the ledger. For a
+// tracking app the meaningful question is "how much moved", not what it
+// was worth — so this counts units, never money.
+function monthlyFlow(months) {
+  var n = months || 8;
+  var buckets = [];
+  var now = new Date();
+  for (var i = n - 1; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({ y: d.getFullYear(), m: d.getMonth(), inV: 0, outV: 0 });
+  }
+  var first = buckets[0];
+  (D.transactions || []).forEach(function (t) {
+    var d = toDate(t.transaction_date);
+    if (!d) return;
+    if (d.getFullYear() < first.y || (d.getFullYear() === first.y && d.getMonth() < first.m)) return;
+    var b = null;
+    for (var i = 0; i < buckets.length; i++) {
+      if (buckets[i].y === d.getFullYear() && buckets[i].m === d.getMonth()) { b = buckets[i]; break; }
+    }
+    if (!b) return;
+    var q = Number(t.quantity || 0);
+    if (q >= 0) b.inV += q; else b.outV += Math.abs(q);
+  });
+  return buckets;
+}
+
+var MONTH_BM = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
+
+function flowChart() {
+  var data = monthlyFlow(8);
+  var max = 0;
+  data.forEach(function (b) { max = Math.max(max, b.inV, b.outV); });
+  if (max <= 0) {
+    return '<div class="empty" style="padding:40px 10px">' + icon('i-chart', 26) +
+      '<p style="margin:0;font-size:12.5px">Belum ada pergerakan untuk dipaparkan.</p></div>';
+  }
+  // Round the axis up to a clean step so the labels read sensibly.
+  var step = Math.pow(10, Math.floor(Math.log(max) / Math.LN10));
+  var top = Math.ceil(max / step) * step;
+
+  var ticks = '';
+  for (var i = 4; i >= 0; i--) ticks += '<div>' + moneyAxis(top * i / 4) + '</div>';
+
+  var lines = '';
+  for (var g = 0; g <= 4; g++) lines += '<div class="grid-line" style="bottom:' + (g * 25) + '%"></div>';
+
+  var bars = data.map(function (b) {
+    var hi = Math.max(2, (b.inV / top) * 100);
+    var ho = Math.max(2, (b.outV / top) * 100);
+    return '<div class="bargroup">' +
+      '<div class="bars">' +
+        '<div class="bar b-in" style="height:' + hi + '%" title="Masuk ' + b.inV + ' unit"></div>' +
+        '<div class="bar b-out" style="height:' + ho + '%" title="Keluar ' + b.outV + ' unit"></div>' +
+      '</div>' +
+      '<div class="mlabel">' + MONTH_BM[b.m] + '</div></div>';
+  }).join('');
+
+  return '<div class="chart"><div class="yaxis">' + ticks + '</div>' +
+         '<div class="plot">' + lines + bars + '</div></div>';
+}
+function moneyAxis(v) {
+  if (v >= 1000) return Math.round(v / 1000) + 'k';
+  return Math.round(v);
+}
+
+// Section divider — the dashboard is split into fixed assets and
+// consumables because the two are measured in different units. A laptop's
+// worth is its depreciated book value; a box of pens is just cost x stock
+// on hand. Averaging them into one "total" number told the user nothing.
+function sectionHead(title, sub, right) {
+  return '<div style="display:flex;align-items:flex-end;gap:12px;margin:26px 0 12px">' +
+    '<div><h3 style="font-size:17px;letter-spacing:-.02em">' + title + '</h3>' +
+    '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted)">' + sub + '</p></div>' +
+    '<div style="flex:1"></div>' + (right || '') + '</div>';
+}
+
+// Consumption per staff member, straight from the ledger. Only possible
+// because a stock issue now records custodian_id.
+function issueStats(sinceDays) {
+  var cutoff = sinceDays ? new Date(Date.now() - sinceDays * 86400000) : null;
+  var byStaff = {}, byItem = {}, totalUnits = 0;
+  (D.transactions || []).forEach(function (t) {
+    if (t.action_type !== 'stock_remove') return;
+    var d = toDate(t.transaction_date);
+    if (cutoff && d && d < cutoff) return;
+    var qty = Math.abs(Number(t.quantity || 0));
+    var it = itemById(t.item_id);
+    totalUnits += qty;
+    if (t.custodian_id) {
+      var k = String(t.custodian_id);
+      if (!byStaff[k]) byStaff[k] = { id: t.custodian_id, units: 0, items: {} };
+      byStaff[k].units += qty;
+      if (it) byStaff[k].items[it.name] = (byStaff[k].items[it.name] || 0) + qty;
+    }
+    if (it) {
+      if (!byItem[it.id]) byItem[it.id] = { item: it, units: 0 };
+      byItem[it.id].units += qty;
+    }
+  });
+  return {
+    staff: Object.keys(byStaff).map(function (k) { return byStaff[k]; })
+             .sort(function (a, b) { return b.units - a.units; }),
+    items: Object.keys(byItem).map(function (k) { return byItem[k]; })
+             .sort(function (a, b) { return b.units - a.units; }),
+    totalUnits: totalUnits
+  };
+}
+
+function viewDashboard() {
+  var a = D.alerts || {};
+  var items = D.items || [];
+  var active = items.filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
+  var assets = active.filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var cons   = active.filter(function (i) { return i.item_type === 'consumable'; });
+  var onLoan = items.filter(function (i) { return i.open_loan; });
+  var overdue = (a.overdue || []).length;
+  var low = (a.low_stock || []).length;
+  var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
+  var issued30 = issueStats(30);
+
+  var h = '<div class="page-head"><div>' +
+    '<h2>' + greeting() + ', admin</h2>' +
+    '<p>Pantau kedudukan aset dan baki stok inventori IMEN.</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn" onclick="runDateCheck(this)">' + icon('i-clock', 15) + ' Semak Tarikh</button>' +
+    '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport</button>' +
+    '</div>';
+
+  // ══════════════ ASET ══════════════
+  h += sectionHead('Aset',
+    'Kerusi, meja, komputer dan alat besar — dijejak seunit mengikut lokasi.',
+    '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'items\')">Lihat semua ' + icon('i-out', 13) + '</button>');
+
+  // Where the assets physically are — the core question this app answers.
+  var byLoc = {};
+  assets.forEach(function (i) {
+    var k = i.open_loan ? '__loan' : locName(i.location_id);
+    if (!byLoc[k]) byLoc[k] = [];
+    byLoc[k].push(i);
+  });
+  var locKeys = Object.keys(byLoc).filter(function (k) { return k !== '__loan'; })
+                  .sort(function (x, y) { return byLoc[y].length - byLoc[x].length; });
+
+  h += '<div class="dash-top">';
+
+  h += '<div class="hero">' +
+    '<div class="lbl">Jumlah Aset</div>' +
+    '<div class="big mono">' + assets.length + '</div>' +
+    '<div class="trend ' + (overdue ? 'down' : 'up') + '">' +
+      (onLoan.length ? onLoan.length + ' sedang dipinjam' : 'Semua berada di lokasi') +
+      ' <span>' + (overdue ? '· ' + overdue + ' lewat dipulangkan' : '') + '</span></div>' +
+    '<div class="hero-actions">' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset</button>' +
+      '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
+    '</div>' +
+    '<div class="substrip"><div class="cap">Kedudukan aset <b>· ' + locKeys.length + ' lokasi</b></div>' +
+    '<div class="chips">' +
+      (locKeys.length ? locKeys.slice(0, 3).map(function (k, n) {
+        return '<div class="chip"><div class="t">' +
+          '<span style="width:7px;height:7px;border-radius:2px;background:' +
+            (n === 0 ? 'var(--accent)' : n === 1 ? 'var(--ink)' : 'var(--muted-2)') + ';display:block"></span>' +
+          esc(k.length > 12 ? k.slice(0, 11) + '…' : k) + '</div>' +
+          '<div class="v mono">' + byLoc[k].length + '</div>' +
+          '<div class="s">aset di sini</div></div>';
+      }).join('') : '<div class="chip"><div class="s">Belum ada aset</div></div>') +
+    '</div></div></div>';
+
+  h += '<div class="tiles">' +
+    tile('i-box', 'Tersedia', assets.filter(function (i) { return !i.open_loan; }).length,
+         'Berada di lokasi', 'items', true,
+         '<div class="trend"><span>sedia untuk dipinjam</span></div>') +
+    tile('i-out', 'Sedang Dipinjam', onLoan.length,
+         overdue ? overdue + ' lewat' : 'Mengikut jadual', 'loans', false,
+         overdue ? '<div class="trend down">↑ ' + overdue + ' <span>lewat dipulangkan</span></div>'
+                 : '<div class="trend up">✓ <span>tiada lewat</span></div>') +
+    tile('i-pin', 'Lokasi', locKeys.length, 'Tempat penyimpanan', 'settings', false,
+         '<div class="trend flat"><span>' + (D.locations || []).length + ' lokasi berdaftar</span></div>') +
+    tile('i-clock', 'Pemeriksaan', (a.inspection || []).length, 'Tertunggak', 'items', false,
+         '<div class="trend flat"><span>' + (a.audit || []).length + ' audit tertunggak</span></div>') +
+    '</div>';
+
+  // Assets currently out, with who holds them.
+  h += '<div class="card"><div class="card-head"><div style="flex:1">' +
+    '<h3>Aset Di Luar Lokasi</h3>' +
+    '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Siapa memegangnya sekarang</p></div>' +
+    '<button class="btn btn-sm btn-ghost" onclick="go(\'loans\')">Semua</button></div><div class="card-body">';
+  if (!onLoan.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:20px 0;margin:0">' +
+         'Semua aset berada di lokasi masing-masing.</p>';
+  } else {
+    h += onLoan.slice(0, 6).map(function (i) {
+      var l = i.open_loan;
+      var d = daysBetween(today(), l.expected_return_date);
+      return '<div class="alert-row" style="cursor:pointer" onclick="openCheckIn(' + i.id + ')">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(i.name) + '</div>' +
+        '<div class="t-sub mono">' + esc(i.asset_tag) + ' · ' + esc(custName(l.custodian_id)) + '</div></div>' +
+        '<div class="spacer"></div>' +
+        (l.is_overdue
+          ? '<span class="pill pill-err"><i></i>' + Math.abs(d) + ' hari lewat</span>'
+          : '<span class="pill pill-info"><i></i>' + d + ' hari lagi</span>') + '</div>';
+    }).join('');
+  }
+  h += '</div></div>';
+
+  h += '</div>';   // /dash-top
+
+  // ══════════════ INVENTORI ══════════════
+  h += sectionHead('Inventori',
+    'Alat tulis, kertas, kartrij — dijejak mengikut baki stok.',
+    '<button class="btn btn-sm" onclick="go(\'stock\')">Urus stok ' + icon('i-out', 13) + '</button>');
+
+  h += '<div class="dash-top">';
+
+  var lowest = cons.slice().sort(function (x, y) {
+    var rx = Number(x.min_stock_alert || 1) ? Number(x.quantity_available || 0) / Number(x.min_stock_alert || 1) : 99;
+    var ry = Number(y.min_stock_alert || 1) ? Number(y.quantity_available || 0) / Number(y.min_stock_alert || 1) : 99;
+    return rx - ry;
+  }).slice(0, 3);
+
+  h += '<div class="hero">' +
+    '<div class="lbl">Unit Dalam Simpanan</div>' +
+    '<div class="big mono">' + stockUnits + '</div>' +
+    '<div class="trend ' + (low ? 'down' : 'up') + '">' +
+      (low ? '↓ ' + low + ' jenis stok rendah' : '✓ semua paras selamat') +
+      ' <span>· ' + cons.length + ' jenis item</span></div>' +
+    '<div class="hero-actions">' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>' +
+      '<button class="btn" onclick="go(\'stock\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
+    '</div>' +
+    '<div class="substrip"><div class="cap">Paling hampir habis <b>· ' + cons.length + ' jenis item</b></div>' +
+    '<div class="chips">' +
+      (lowest.length ? lowest.map(function (i, n) {
+        var isLow = Number(i.quantity_available || 0) <= Number(i.min_stock_alert || 0);
+        return '<div class="chip"><div class="t">' +
+          '<span style="width:7px;height:7px;border-radius:2px;background:' +
+            (isLow ? 'var(--accent)' : 'var(--ok)') + ';display:block"></span>' +
+          esc(i.name.length > 12 ? i.name.slice(0, 11) + '…' : i.name) + '</div>' +
+          '<div class="v mono">' + i.quantity_available + '</div>' +
+          '<div class="s">min ' + (i.min_stock_alert || 0) + '</div></div>';
+      }).join('') : '<div class="chip"><div class="s">Belum ada item</div></div>') +
+    '</div></div></div>';
+
+  h += '<div class="tiles">' +
+    tile('i-layers', 'Jenis Item', cons.length, 'Dalam inventori', 'stock', true,
+         '<div class="trend"><span>' + stockUnits + ' unit di tangan</span></div>') +
+    tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'stock', false,
+         low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
+             : '<div class="trend up">✓ <span>paras selamat</span></div>') +
+    tile('i-out', 'Dikeluarkan (30 hari)', issued30.totalUnits, 'unit', 'ledger', false,
+         '<div class="trend flat"><span>kepada ' + issued30.staff.length + ' staf</span></div>') +
+    tile('i-users', 'Penerima', issued30.staff.length, 'staf dalam 30 hari', 'ledger', false,
+         '<div class="trend flat"><span>' + (issued30.staff.length ? 'tertinggi: ' +
+            esc(custName(issued30.staff[0].id).split(' ')[0]) : 'belum ada rekod') + '</span></div>') +
+    '</div>';
+
+  h += '<div class="card"><div class="card-head"><div style="flex:1">' +
+    '<h3>Pengeluaran Mengikut Staf</h3>' +
+    '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">30 hari terakhir</p></div>' +
+    '<button class="btn btn-sm btn-ghost" onclick="go(\'ledger\')">Log penuh</button></div><div class="card-body">';
+  if (!issued30.staff.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">' +
+         'Belum ada pengeluaran stok direkodkan kepada staf.<br>' +
+         '<span style="font-size:11.5px">Pilih “Diberikan kepada” semasa keluar stok supaya penggunaan boleh dijejaki.</span></p>';
+  } else {
+    var maxU = issued30.staff[0].units || 1;
+    h += issued30.staff.slice(0, 6).map(function (r) {
+      var top = Object.keys(r.items).sort(function (x, y) { return r.items[y] - r.items[x]; }).slice(0, 2);
+      return '<div class="alert-row">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(custName(r.id)) + '</div>' +
+        '<div class="t-sub">' + esc(top.map(function (n) { return n + ' ×' + r.items[n]; }).join(' · ') || '—') + '</div></div>' +
+        '<div class="spacer"></div>' +
+        '<div class="mini-bar"><span style="width:' + ((r.units / maxU) * 100).toFixed(0) + '%;background:var(--accent)"></span></div>' +
+        '<span class="mono" style="font-weight:700;min-width:64px;text-align:right">' + r.units + ' unit</span>' +
+        '</div>';
+    }).join('');
+  }
+  h += '</div></div>';
+
+  h += '</div>';   // /dash-top
+
+  // Monthly movement, in units. Answers "berapa banyak keluar sebulan",
+  // which is what drives reorder timing.
+  h += '<div class="card" style="margin-top:14px">' +
+    '<div class="card-head"><div style="flex:1"><h3>Pergerakan Stok Bulanan</h3>' +
+      '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Unit masuk berbanding keluar, 8 bulan terakhir</p></div>' +
+      '<div class="chart-legend"><span><i style="background:var(--ink)"></i>Masuk</span>' +
+      '<span><i style="background:var(--accent)"></i>Keluar</span></div></div>' +
+    '<div class="card-body">' + flowChart() + '</div></div>';
+
+  // Alerts
+  h += '<div class="grid g-2" style="margin-top:14px">';
+  h += alertCard('Stok Rendah', 'i-layers', 'var(--warn)', (a.low_stock || []).map(function (o) {
+    var pct = o.min_stock_alert ? Math.min(100, (o.quantity_available / o.min_stock_alert) * 100) : 0;
+    return { tag: o.name, name: o.name,
+             right: '<div class="mini-bar"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
+                    '<span class="mono" style="font-size:12px;font-weight:700;min-width:50px;text-align:right">' +
+                    o.quantity_available + '/' + o.min_stock_alert + '</span>',
+             sub: 'baki di bawah paras minimum', id: o.id };
+  }), 'Semua stok berada pada paras selamat.');
+
+  h += '<div class="card"><div class="card-head">' +
+    '<span style="color:var(--muted)">' + icon('i-chart', 16) + '</span><h3>Item Paling Kerap Dikeluarkan</h3>' +
+    '<div class="spacer"></div><span class="pill pill-mute">30 hari</span></div><div class="card-body">';
+  if (!issued30.items.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">Tiada pengeluaran dalam 30 hari.</p>';
+  } else {
+    var maxI = issued30.items[0].units || 1;
+    h += issued30.items.slice(0, 6).map(function (r) {
+      return '<div class="alert-row" style="cursor:pointer" onclick="openHistory(' + r.item.id + ')">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(r.item.name) + '</div>' +
+        '<div class="t-sub">baki ' + r.item.quantity_available + ' unit</div></div>' +
+        '<div class="spacer"></div>' +
+        '<div class="mini-bar"><span style="width:' + ((r.units / maxI) * 100).toFixed(0) + '%;background:var(--ink)"></span></div>' +
+        '<span class="mono" style="font-weight:700;min-width:60px;text-align:right">' + r.units + ' unit</span></div>';
+    }).join('');
+  }
+  h += '</div></div></div>';
+
+  // ══════════════ AKTIVITI ══════════════
+  h += sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
+    '<button class="btn btn-sm" onclick="go(\'ledger\')">Log penuh ' + icon('i-out', 13) + '</button>');
+
+  var recent = (D.transactions || []).slice().sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 8);
+  h += '<div class="card">';
+  if (!recent.length) {
+    h += '<div class="empty">' + icon('i-history', 28) + '<p>Belum ada transaksi direkodkan.</p></div>';
+  } else {
+    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+      '<th style="width:38px"></th><th>ID</th><th>Item</th><th>Penerima / Penjaga</th>' +
+      '<th class="t-num">Kuantiti</th><th>Tindakan</th><th>Tarikh</th><th style="width:38px"></th></tr></thead><tbody>';
+    h += recent.map(function (t) {
+      var it = itemById(t.item_id);
+      var q = Number(t.quantity || 0);
+      var st = ledgerStatus(t);
+      return '<tr>' +
+        '<td><span class="ck" onclick="this.classList.toggle(\'on\');this.closest(\'tr\').classList.toggle(\'sel\')">' +
+          icon('i-check', 11) + '</span></td>' +
+        '<td class="mono" style="font-size:12px;color:var(--muted)">TRX_' + ('00000' + t.id).slice(-6) + '</td>' +
+        '<td><div class="cellflex">' +
+          '<span class="rowicon" style="background:' + st.bg + ';color:' + st.fg + '">' + icon(st.icon, 13) + '</span>' +
+          '<div style="min-width:0"><div class="t-name" style="font-size:13px">' +
+            esc(it ? it.name : 'Item #' + t.item_id) + '</div>' +
+            '<div class="t-sub mono">' + esc(it && it.asset_tag ? it.asset_tag : (it ? TYPE_LABEL[it.item_type] : '—')) + '</div></div></div></td>' +
+        '<td style="font-size:12.5px">' + (t.custodian_id
+            ? esc(custName(t.custodian_id))
+            : '<span style="color:var(--muted-3)">—</span>') + '</td>' +
+        '<td class="t-num mono" style="font-weight:600;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
+          (q > 0 ? '+' : '') + q + '</td>' +
+        '<td><span class="dotstat"><i style="background:' + st.fg + '"></i>' + esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span></td>' +
+        '<td class="mono" style="font-size:12px;color:var(--muted)">' + fmtDateTime(t.transaction_date) + '</td>' +
+        '<td>' + (it ? '<button class="btn btn-sm btn-ghost" onclick="openHistory(' + it.id + ')">' + icon('i-dots', 15) + '</button>' : '') + '</td>' +
+        '</tr>';
+    }).join('');
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+
+  return h;
+}
+
+// Colour + glyph per ledger action, shared by the activity table.
+function ledgerStatus(t) {
+  var map = {
+    stock_add:    { fg: 'var(--ok)',     bg: 'var(--ok-bg)',    icon: 'i-plus' },
+    stock_remove: { fg: 'var(--warn)',   bg: 'var(--warn-bg)',  icon: 'i-layers' },
+    check_out:    { fg: 'var(--info)',   bg: 'var(--info-bg)',  icon: 'i-out' },
+    check_in:     { fg: 'var(--ok)',     bg: 'var(--ok-bg)',    icon: 'i-in' },
+    decommission: { fg: 'var(--err)',    bg: 'var(--err-bg)',   icon: 'i-trash' },
+    audit_adjust: { fg: 'var(--muted)',  bg: 'var(--surface-3)', icon: 'i-check' }
+  };
+  return map[t.action_type] || map.audit_adjust;
+}
+
+function tile(ic, label, val, sub, view, accent, trendHtml) {
+  return '<div class="tile ' + (accent ? 'accent' : '') + '" onclick="go(\'' + view + '\')">' +
+    '<div class="top"><div class="lbl">' + esc(label) + '</div>' +
+    '<div class="ico">' + icon(ic, 14) + '</div></div>' +
+    '<div class="val mono">' + val + '</div>' +
+    '<div class="sub">' + (trendHtml || '<div class="trend flat"><span>' + esc(sub) + '</span></div>') + '</div></div>';
+}
+
+// Stat tile with an explicit icon colour, used by the Stok and Laporan
+// views. Same visual language as tile(), which the dashboard uses.
+function kpi(ic, color, bg, label, val, sub, view) {
+  return '<div class="tile" onclick="go(\'' + view + '\')">' +
+    '<div class="top"><div class="lbl">' + esc(label) + '</div>' +
+    '<div class="ico" style="background:' + bg + ';color:' + color + '">' + icon(ic, 14) + '</div></div>' +
+    '<div class="val mono">' + val + '</div>' +
+    '<div class="sub"><div class="trend flat"><span>' + esc(sub) + '</span></div></div></div>';
+}
+
+function alertCard(title, ic, color, rows, emptyMsg) {
+  var h = '<div class="card"><div class="card-head">' +
+    '<span style="color:' + color + '">' + icon(ic, 16) + '</span><h3>' + title + '</h3>' +
+    '<div class="spacer"></div><span class="pill pill-mute">' + rows.length + '</span></div><div class="card-body">';
+  if (!rows.length) {
+    h += '<p style="color:var(--muted-2);font-size:12.5px;margin:0;text-align:center;padding:12px 0">' + esc(emptyMsg) + '</p>';
+  } else {
+    h += rows.slice(0, 6).map(function (r) {
+      return '<div class="alert-row" style="cursor:pointer" onclick="openHistory(' + r.id + ')">' +
+        '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(r.name) + '</div>' +
+        '<div class="t-sub mono">' + esc(r.tag) + ' · ' + esc(r.sub) + '</div></div>' +
+        '<div class="spacer"></div>' + r.right + '</div>';
+    }).join('');
+    if (rows.length > 6) h += '<p style="margin:10px 0 0;font-size:12px;color:var(--muted-2);text-align:center">…dan ' + (rows.length - 6) + ' lagi</p>';
+  }
+  return h + '</div></div>';
+}
+
+function runDateCheck(btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin" style="border-color:rgba(0,0,0,.2);border-top-color:var(--ink)"></span> Menyemak…';
+  api('RunDateCheck', {}, function (s) {
+    btn.disabled = false;
+    btn.innerHTML = icon('i-clock', 15) + ' Semak Tarikh';
+    var total = s.inspection + s.audit + s.low_stock + s.overdue;
+    toast(total ? total + ' amaran dikesan (lewat ' + s.overdue +
+                  ', stok ' + s.low_stock + ', pemeriksaan ' + s.inspection + ', audit ' + s.audit + ')'
+                : 'Tiada amaran. Semua rekod terkini.', total ? '' : 'ok');
+  }, function (e) {
+    btn.disabled = false;
+    btn.innerHTML = icon('i-clock', 15) + ' Semak Tarikh';
+    toast(e, 'err');
+  });
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  VIEW — INVENTORI (items master)
+// ══════════════════════════════════════════════════════════════════════
+function filteredItems() {
+  var q = FILTER.q.toLowerCase().trim();
+  return (D.items || []).filter(function (i) {
+    if (FILTER.type !== 'all' && i.item_type !== FILTER.type) return false;
+    if (FILTER.status && i.status !== FILTER.status) return false;
+    if (FILTER.category && Number(i.category_id) !== Number(FILTER.category)) return false;
+    if (FILTER.location && Number(i.location_id) !== Number(FILTER.location)) return false;
+    if (!q) return true;
+    return [i.name, i.asset_tag, i.serial_number, i.notes, catName(i.category_id)]
+      .join(' ').toLowerCase().indexOf(q) !== -1;
+  }).sort(function (a, b) {
+    var k = SORT.key, av = a[k], bv = b[k];
+    if (k === 'category_id') { av = catName(a.category_id); bv = catName(b.category_id); }
+    if (k === 'location_id') { av = locName(a.location_id); bv = locName(b.location_id); }
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' || av instanceof Date) return (av > bv ? 1 : av < bv ? -1 : 0) * SORT.dir;
+    return String(av).localeCompare(String(bv)) * SORT.dir;
+  });
+}
+
+function viewItems() {
+  var rows = filteredItems();
+  var h = '<div class="page-head"><div><h2>Inventori</h2>' +
+    '<p>' + rows.length + ' daripada ' + (D.items || []).length + ' item dipaparkan</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button>' +
+    '<button class="btn btn-primary" onclick="openItemDrawer()">' + icon('i-plus', 15) + ' Tambah Item</button></div>';
+
+  h += '<div class="card"><div class="filters">' +
+    '<div class="tabs">' +
+      tabBtn('all', 'Semua') + tabBtn('fixed_asset', 'Aset') + tabBtn('consumable', 'Inventori') +
+    '</div>' +
+    '<input id="fq" placeholder="Cari nama, tag, siri…" value="' + esc(FILTER.q) + '" oninput="FILTER.q=this.value;renderTableOnly()">' +
+    selectFilter('fstatus', 'status', 'Semua Status', (D.meta.item_status || []).map(function (s) {
+      return { v: s, t: (STATUS_META[s] || {}).label || s };
+    })) +
+    selectFilter('fcat', 'category', 'Semua Kategori', (D.categories || []).map(function (c) { return { v: c.id, t: c.name }; })) +
+    selectFilter('floc', 'location', 'Semua Lokasi', (D.locations || []).map(function (l) { return { v: l.id, t: locName(l.id) }; })) +
+    (hasFilter() ? '<button class="btn btn-sm btn-ghost" onclick="clearFilters()">' + icon('i-x', 13) + ' Reset</button>' : '') +
+  '</div><div id="tblHost">' + itemsTable(rows) + '</div></div>';
+  return h;
+}
+
+function tabBtn(v, label) {
+  return '<button class="' + (FILTER.type === v ? 'active' : '') + '" onclick="FILTER.type=\'' + v + '\';render()">' + label + '</button>';
+}
+function selectFilter(id, key, allLabel, opts) {
+  return '<select id="' + id + '" onchange="FILTER.' + key + '=this.value;renderTableOnly()">' +
+    '<option value="">' + allLabel + '</option>' +
+    opts.map(function (o) {
+      return '<option value="' + esc(o.v) + '"' + (String(FILTER[key]) === String(o.v) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
+    }).join('') + '</select>';
+}
+function hasFilter() { return FILTER.q || FILTER.status || FILTER.category || FILTER.location; }
+function clearFilters() { FILTER = { q: '', type: FILTER.type, status: '', category: '', location: '' }; render(); }
+
+// Re-renders only the table body, so typing in the filter box does not
+// steal focus by rebuilding the input underneath the cursor.
+function renderTableOnly() {
+  var host = $('tblHost');
+  if (host) host.innerHTML = itemsTable(filteredItems());
+}
+
+function sortBy(k) {
+  if (SORT.key === k) SORT.dir *= -1; else { SORT.key = k; SORT.dir = 1; }
+  renderTableOnly();
+}
+function th(key, label, extra) {
+  var on = SORT.key === key;
+  return '<th class="sortable ' + (on ? 'sorted' : '') + ' ' + (extra || '') + '" onclick="sortBy(\'' + key + '\')">' +
+    esc(label) + '<span class="arw">' + (on ? (SORT.dir > 0 ? '▲' : '▼') : '▲') + '</span></th>';
+}
+
+function itemsTable(rows) {
+  if (!rows.length) {
+    return '<div class="empty">' + icon('i-box', 30) +
+      '<p>Tiada item sepadan.' + (hasFilter() ? ' Cuba longgarkan penapis.' : ' Klik “Tambah Item” untuk bermula.') + '</p></div>';
+  }
+  var h = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    th('asset_tag', 'Tag Aset') + th('name', 'Nama Item') + th('category_id', 'Kategori') +
+    th('location_id', 'Lokasi') + th('status', 'Status') +
+    th('quantity_available', 'Baki', 't-num') + th('date_acquired', 'Diperoleh') +
+    '<th style="width:40px"></th></tr></thead><tbody>';
+
+  h += rows.map(function (i) {
+    var loan = i.open_loan;
+    var lowFlag = (i.item_type === 'consumable' && Number(i.quantity_available) <= Number(i.min_stock_alert || 0));
+
+    return '<tr class="' + (loan && loan.is_overdue ? 'overdue-row' : '') + '">' +
+      '<td>' + (i.asset_tag
+        ? '<span class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</span>'
+        : '<span class="pill pill-mute">Inventori</span>') + '</td>' +
+      '<td><div class="t-name">' + esc(i.name) + '</div>' +
+        '<div class="t-sub">' + esc(TYPE_LABEL[i.item_type] || i.item_type) +
+        (i.serial_number ? ' · <span class="mono">' + esc(i.serial_number) + '</span>' : '') + '</div></td>' +
+      '<td>' + esc(catName(i.category_id)) + '</td>' +
+      '<td><span style="font-size:12.5px">' + esc(locName(i.location_id)) + '</span></td>' +
+      '<td>' + pill(i.status) +
+        (loan ? '<div class="t-sub" style="margin-top:3px">' + esc(custName(loan.custodian_id)) +
+                (loan.is_overdue ? ' · <b style="color:var(--err)">lewat</b>' : ' · ' + fmtDate(loan.expected_return_date)) + '</div>' : '') +
+      '</td>' +
+      '<td class="t-num mono" style="' + (lowFlag ? 'color:var(--warn);font-weight:700' : '') + '">' +
+        (i.quantity_available == null ? '—' : i.quantity_available) +
+        (i.item_type === 'consumable' ? '<span style="color:var(--muted-3)">/' + (i.quantity_total || 0) + '</span>' : '') + '</td>' +
+      '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + fmtDate(i.date_acquired) + '</td>' +
+      '<td>' + rowMenuBtn(i.id) + '</td></tr>';
+  }).join('');
+
+  return h + '</tbody></table></div>';
+}
+
+function rowMenuBtn(id) {
+  return '<div class="rowmenu"><button class="btn btn-sm btn-ghost" onclick="rowMenu(event,' + id + ')" aria-label="Tindakan">' +
+    icon('i-dots', 15) + '</button></div>';
+}
+
+function rowMenu(ev, id) {
+  ev.stopPropagation();
+  var open = document.querySelector('.rowmenu-pop');
+  if (open) { var wasMine = open.dataset.id == id; open.remove(); if (wasMine) return; }
+
+  var i = itemById(id);
+  if (!i) return;
+  var isGone = i.status === 'decommissioned' || i.status === 'disposed';
+  var pop = document.createElement('div');
+  pop.className = 'rowmenu-pop';
+  pop.dataset.id = id;
+
+  var h = '';
+  if (!isGone) {
+    if (i.open_loan) h += mi('i-in', 'Daftar Masuk', 'openCheckIn(' + id + ')');
+    else h += mi('i-out', 'Daftar Keluar', 'openCheckOut(' + id + ')');
+    if (i.item_type === 'consumable') {
+      h += mi('i-plus', 'Tambah Stok', 'openStock(' + id + ',"StockAdd")');
+      h += mi('i-layers', 'Keluar Stok', 'openStock(' + id + ',"StockRemove")');
+    }
+    h += mi('i-check', 'Rekod Audit', 'openAudit(' + id + ')');
+  }
+  h += '<hr>';
+  h += mi('i-qr', 'Kod QR', 'openQR(' + id + ')');
+  h += mi('i-history', 'Sejarah Item', 'openHistory(' + id + ')');
+  h += mi('i-edit', 'Sunting', 'openItemDrawer(' + id + ')');
+  if (!isGone) { h += '<hr>' + mi('i-trash', 'Lupuskan', 'openDecommission(' + id + ')', true); }
+  pop.innerHTML = h;
+
+  ev.target.closest('.rowmenu').appendChild(pop);
+}
+function mi(ic, label, fn, danger) {
+  return '<button class="' + (danger ? 'danger' : '') + '" onclick="(function(){var m=document.querySelector(\'.rowmenu-pop\');if(m)m.remove();' + fn + ';})()">' +
+    icon(ic, 15) + esc(label) + '</button>';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  VIEW — DAFTAR KELUAR/MASUK
+// ══════════════════════════════════════════════════════════════════════
+function viewLoans() {
+  var loans = (D.items || []).filter(function (i) { return i.open_loan; })
+    .sort(function (a, b) { return toDate(a.open_loan.expected_return_date) - toDate(b.open_loan.expected_return_date); });
+  var overdue = loans.filter(function (i) { return i.open_loan.is_overdue; });
+
+  var h = '<div class="page-head"><div><h2>Daftar Keluar / Masuk</h2>' +
+    '<p>' + loans.length + ' aset sedang dipinjam · ' + overdue.length + ' lewat dipulangkan</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn btn-primary" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button></div>';
+
+  if (!loans.length) {
+    return h + '<div class="card"><div class="empty">' + icon('i-swap', 30) +
+      '<p>Tiada aset sedang dipinjam.</p></div></div>';
+  }
+
+  h += '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    '<th>Tag Aset</th><th>Item</th><th>Penjaga</th><th>Tarikh Keluar</th><th>Jangka Pulang</th><th>Status</th><th style="width:150px"></th>' +
+    '</tr></thead><tbody>';
+
+  h += loans.map(function (i) {
+    var l = i.open_loan;
+    var d = daysBetween(today(), l.expected_return_date);
+    var c = find(D.custodians, l.custodian_id);
+    return '<tr class="' + (l.is_overdue ? 'overdue-row' : '') + '">' +
+      '<td class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</td>' +
+      '<td><div class="t-name">' + esc(i.name) + '</div><div class="t-sub">' + esc(locName(i.location_id)) + '</div></td>' +
+      '<td><div class="t-name" style="font-size:13px">' + esc(custName(l.custodian_id)) + '</div>' +
+        '<div class="t-sub">' + esc(c ? (c.department || c.email) : '') + '</div></td>' +
+      '<td class="mono" style="font-size:12.5px">' + fmtDate(l.transaction_date) + '</td>' +
+      '<td class="mono" style="font-size:12.5px">' + fmtDate(l.expected_return_date) + '</td>' +
+      '<td>' + (l.is_overdue
+        ? '<span class="pill pill-err">' + Math.abs(d) + ' hari lewat</span>'
+        : '<span class="pill ' + (d <= 3 ? 'pill-warn' : 'pill-info') + '">' + d + ' hari lagi</span>') + '</td>' +
+      '<td><button class="btn btn-sm" onclick="openCheckIn(' + i.id + ')">' + icon('i-in', 14) + ' Daftar Masuk</button></td>' +
+      '</tr>';
+  }).join('');
+
+  return h + '</tbody></table></div></div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  VIEW — STOK
+// ══════════════════════════════════════════════════════════════════════
+function viewStock() {
+  var cons = (D.items || []).filter(function (i) {
+    return i.item_type === 'consumable' && i.status !== 'decommissioned' && i.status !== 'disposed';
+  }).sort(function (a, b) {
+    // Most urgent first: lowest ratio of stock to its reorder point.
+    var ra = (a.min_stock_alert || 1) ? a.quantity_available / (a.min_stock_alert || 1) : 99;
+    var rb = (b.min_stock_alert || 1) ? b.quantity_available / (b.min_stock_alert || 1) : 99;
+    return ra - rb;
+  });
+
+  var low = cons.filter(function (i) { return Number(i.quantity_available) <= Number(i.min_stock_alert || 0); });
+  var units = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
+
+  var h = '<div class="page-head"><div><h2>Stok</h2>' +
+    '<p>' + cons.length + ' item inventori · ' + low.length + ' pada paras rendah</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button></div>';
+
+  h += '<div class="grid g-3" style="margin-bottom:16px">' +
+    kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Item', cons.length, 'Dalam inventori', 'stock') +
+    kpi('i-warn', 'var(--warn)', 'var(--warn-bg)', 'Perlu Diisi Semula', low.length, 'Pada atau bawah paras minimum', 'stock') +
+    kpi('i-box', 'var(--ok)', 'var(--ok-bg)', 'Unit Di Tangan', units, 'Jumlah baki semua item', 'stock') +
+    '</div>';
+
+  if (!cons.length) {
+    return h + '<div class="card"><div class="empty">' + icon('i-layers', 30) + '<p>Tiada bahan guna habis didaftarkan.</p></div></div>';
+  }
+
+  h += '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    '<th>Tag</th><th>Item</th><th>Lokasi</th><th class="t-num">Baki</th><th class="t-num">Minimum</th>' +
+    '<th style="width:130px">Paras</th><th style="width:170px"></th></tr></thead><tbody>';
+
+  h += cons.map(function (i) {
+    var min = Number(i.min_stock_alert || 0);
+    var av = Number(i.quantity_available || 0);
+    var isLow = av <= min;
+    // Bar is scaled against 2× the reorder point, so "healthy" reads as
+    // roughly half-full rather than pinned at 100%.
+    var pct = Math.max(3, Math.min(100, (av / Math.max(min * 2, 1)) * 100));
+    return '<tr>' +
+      '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + esc(i.asset_tag || '—') + '</td>' +
+      '<td><div class="t-name">' + esc(i.name) + '</div><div class="t-sub">' + esc(catName(i.category_id)) + '</div></td>' +
+      '<td style="font-size:12.5px">' + esc(locName(i.location_id)) + '</td>' +
+      '<td class="t-num mono" style="font-weight:700;' + (isLow ? 'color:var(--warn)' : '') + '">' + av + '</td>' +
+      '<td class="t-num mono" style="color:var(--muted)">' + min + '</td>' +
+      '<td><div class="mini-bar" style="width:100%"><span style="width:' + pct + '%;background:' +
+        (isLow ? 'var(--warn)' : 'var(--ok)') + '"></span></div></td>' +
+
+      '<td><button class="btn btn-sm" onclick="openStock(' + i.id + ',\'StockAdd\')">' + icon('i-plus', 13) + ' Tambah</button> ' +
+          '<button class="btn btn-sm" onclick="openStock(' + i.id + ',\'StockRemove\')">' + icon('i-layers', 13) + ' Kurang</button></td>' +
+      '</tr>';
+  }).join('');
+
+  return h + '</tbody></table></div></div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  VIEW — LOG AUDIT (the immutable ledger)
+// ══════════════════════════════════════════════════════════════════════
+var LEDGER_FILTER = { action: '', q: '' };
+
+function viewLedger() {
+  var txns = (D.transactions || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
+  var filtered = txns.filter(function (t) {
+    if (LEDGER_FILTER.action && t.action_type !== LEDGER_FILTER.action) return false;
+    if (!LEDGER_FILTER.q) return true;
+    var it = itemById(t.item_id);
+    return [it ? it.name : '', it ? it.asset_tag : '', t.reason_notes, custName(t.custodian_id)]
+      .join(' ').toLowerCase().indexOf(LEDGER_FILTER.q.toLowerCase()) !== -1;
+  });
+
+  var h = '<div class="page-head"><div><h2>Log Audit</h2>' +
+    '<p>Lejar tidak boleh diubah — ' + txns.length + ' transaksi direkodkan</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn" onclick="exportLedgerCSV()">' + icon('i-down', 15) + ' Eksport CSV</button></div>';
+
+  h += '<div class="info-box" style="display:flex;gap:9px;align-items:flex-start">' + icon('i-shield', 16) +
+    '<span>Setiap pergerakan stok dan kitaran hayat direkod sebagai baris baharu. Rekod sedia ada tidak pernah disunting atau dipadam — daftar masuk mencipta rekod baharu, bukan mengubah rekod daftar keluar.</span></div>';
+
+  // Built once and reused by both return paths below, so each path emits
+  // its own self-contained, balanced card element.
+  var filterBar = '<div class="filters">' +
+    '<input placeholder="Cari item, tag, catatan…" value="' + esc(LEDGER_FILTER.q) + '" oninput="LEDGER_FILTER.q=this.value;render()">' +
+    '<select onchange="LEDGER_FILTER.action=this.value;render()"><option value="">Semua Tindakan</option>' +
+    Object.keys(ACTION_LABEL).map(function (k) {
+      return '<option value="' + k + '"' + (LEDGER_FILTER.action === k ? ' selected' : '') + '>' + ACTION_LABEL[k] + '</option>';
+    }).join('') + '</select>' +
+    '<span style="margin-left:auto;font-size:12.5px;color:var(--muted)">' + filtered.length + ' rekod</span>' +
+  '</div>';
+
+  if (!filtered.length) {
+    return h + '<div class="card">' + filterBar +
+      '<div class="empty">' + icon('i-history', 30) + '<p>Tiada transaksi sepadan.</p></div></div>';
+  }
+
+  h += '<div class="card">' + filterBar +
+    '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    '<th>ID</th><th>Tarikh</th><th>Tindakan</th><th>Item</th><th>Penjaga</th>' +
+    '<th class="t-num">Kuantiti</th><th>Catatan</th></tr></thead><tbody>';
+
+  h += filtered.slice(0, 400).map(function (t) {
+    var it = itemById(t.item_id);
+    var q = Number(t.quantity || 0);
+    return '<tr>' +
+      '<td class="mono" style="color:var(--muted-2);font-size:12px">#' + t.id + '</td>' +
+      '<td class="mono" style="font-size:12.5px">' + fmtDateTime(t.transaction_date) + '</td>' +
+      '<td><span class="pill ' + (ACTION_PILL[t.action_type] || 'pill-mute') + '">' +
+        esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span></td>' +
+      '<td>' + (it
+        ? '<div class="t-name" style="font-size:13px">' + esc(it.name) + '</div><div class="t-sub mono">' + esc(it.asset_tag) + '</div>'
+        : '<span style="color:var(--muted-2)">Item #' + t.item_id + '</span>') + '</td>' +
+      '<td style="font-size:12.5px">' + (t.custodian_id ? esc(custName(t.custodian_id)) : '<span style="color:var(--muted-3)">—</span>') + '</td>' +
+      '<td class="t-num mono" style="font-weight:600;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
+        (q > 0 ? '+' : '') + q + '</td>' +
+      '<td style="font-size:12.5px;color:var(--muted);max-width:300px">' + esc(t.reason_notes || '—') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  if (filtered.length > 400) {
+    h += '<tr><td colspan="7" style="text-align:center;color:var(--muted-2);padding:14px">' +
+      'Memaparkan 400 terkini daripada ' + filtered.length + '. Gunakan penapis atau eksport CSV untuk selebihnya.</td></tr>';
+  }
+  return h + '</tbody></table></div></div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  VIEW — LAPORAN
+// ══════════════════════════════════════════════════════════════════════
+function viewReports() {
+  var items = (D.items || []).filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
+  var assets = items.filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var cons   = items.filter(function (i) { return i.item_type === 'consumable'; });
+  var onLoan = items.filter(function (i) { return i.open_loan; });
+  var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
+  var issued = issueStats(90);
+
+  var h = '<div class="page-head"><div><h2>Laporan</h2>' +
+    '<p>Taburan aset mengikut lokasi dan penggunaan inventori</p></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn" onclick="window.print()">' + icon('i-chart', 15) + ' Cetak</button>' +
+    '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button></div>';
+
+  h += '<div class="grid g-4" style="margin-bottom:16px">' +
+    kpi('i-box', 'var(--accent)', 'var(--accent-soft)', 'Jumlah Aset', assets.length, 'Belum dilupuskan', 'items') +
+    kpi('i-out', 'var(--info)', 'var(--info-bg)', 'Sedang Dipinjam', onLoan.length, 'Di luar lokasi', 'loans') +
+    kpi('i-layers', 'var(--ok)', 'var(--ok-bg)', 'Unit Inventori', stockUnits, cons.length + ' jenis item', 'stock') +
+    kpi('i-users', 'var(--muted)', 'var(--surface-3)', 'Pengeluaran 90 hari', issued.totalUnits, 'unit kepada staf', 'ledger') +
+    '</div>';
+
+  h += '<div class="grid g-2">';
+
+  // Assets by location — the register's main question.
+  var byLoc = {};
+  assets.forEach(function (i) {
+    var k = i.open_loan ? 'Sedang dipinjam' : locName(i.location_id);
+    byLoc[k] = (byLoc[k] || 0) + 1;
+  });
+  var locKeys = Object.keys(byLoc).sort(function (a, b) { return byLoc[b] - byLoc[a]; });
+  var maxLoc = locKeys.length ? byLoc[locKeys[0]] : 1;
+
+  h += '<div class="card"><div class="card-head"><h3>Aset Mengikut Lokasi</h3></div><div class="card-body">';
+  if (!locKeys.length) h += '<p style="color:var(--muted-2);text-align:center;margin:0">Tiada aset.</p>';
+  else h += locKeys.map(function (k) {
+    return '<div style="margin-bottom:13px">' +
+      '<div style="display:flex;gap:10px;font-size:13px;margin-bottom:5px">' +
+        '<span style="font-weight:600">' + esc(k) + '</span>' +
+        '<span style="margin-left:auto" class="mono">' + byLoc[k] + ' aset</span></div>' +
+      '<div class="mini-bar" style="width:100%"><span style="width:' + ((byLoc[k] / maxLoc) * 100).toFixed(1) +
+        '%;background:' + (k === 'Sedang dipinjam' ? 'var(--accent)' : 'var(--ink)') + '"></span></div></div>';
+  }).join('');
+  h += '</div></div>';
+
+  // Status spread.
+  var byStatus = {};
+  (D.items || []).forEach(function (i) { byStatus[i.status] = (byStatus[i.status] || 0) + 1; });
+  var total = (D.items || []).length || 1;
+  h += '<div class="card"><div class="card-head"><h3>Status Item</h3></div><div class="card-body">';
+  h += Object.keys(STATUS_META).map(function (st) {
+    var n = byStatus[st] || 0;
+    return '<div class="alert-row">' + pill(st) + '<div class="spacer"></div>' +
+      '<div class="mini-bar"><span style="width:' + ((n / total) * 100).toFixed(1) + '%;background:var(--ink-3)"></span></div>' +
+      '<span class="mono" style="font-weight:600;min-width:34px;text-align:right">' + n + '</span></div>';
+  }).join('');
+  h += '</div></div>';
+
+  h += '</div>';
+
+  // Consumption per staff, 90 days.
+  h += '<div class="card" style="margin-top:16px"><div class="card-head"><div style="flex:1">' +
+    '<h3>Pengeluaran Inventori Mengikut Staf</h3>' +
+    '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">90 hari terakhir</p></div></div>';
+  if (!issued.staff.length) {
+    h += '<div class="empty" style="padding:30px">' + icon('i-users', 26) +
+      '<p style="margin:0;font-size:12.5px">Tiada pengeluaran direkodkan kepada staf.</p></div>';
+  } else {
+    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Staf</th><th>Jabatan</th>' +
+      '<th>Item Diambil</th><th class="t-num">Jumlah Unit</th></tr></thead><tbody>';
+    h += issued.staff.map(function (r) {
+      var c = find(D.custodians, r.id);
+      var detail = Object.keys(r.items).sort(function (x, y) { return r.items[y] - r.items[x]; })
+        .map(function (n) { return n + ' ×' + r.items[n]; }).join(', ');
+      return '<tr><td class="t-name">' + esc(custName(r.id)) + '</td>' +
+        '<td style="font-size:12.5px;color:var(--muted)">' + esc(c ? (c.department || '—') : '—') + '</td>' +
+        '<td style="font-size:12.5px">' + esc(detail) + '</td>' +
+        '<td class="t-num mono" style="font-weight:700">' + r.units + '</td></tr>';
+    }).join('');
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+
+  // Most-consumed items.
+  if (issued.items.length) {
+    h += '<div class="card" style="margin-top:16px"><div class="card-head">' +
+      '<h3>Item Paling Banyak Digunakan</h3><div class="spacer"></div>' +
+      '<span class="t-sub">90 hari</span></div>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Kategori</th>' +
+      '<th class="t-num">Dikeluarkan</th><th class="t-num">Baki Kini</th><th class="t-num">Minimum</th></tr></thead><tbody>';
+    h += issued.items.slice(0, 20).map(function (r) {
+      var low = Number(r.item.quantity_available || 0) <= Number(r.item.min_stock_alert || 0);
+      return '<tr><td class="t-name">' + esc(r.item.name) + '</td>' +
+        '<td style="font-size:12.5px;color:var(--muted)">' + esc(catName(r.item.category_id)) + '</td>' +
+        '<td class="t-num mono" style="font-weight:700">' + r.units + '</td>' +
+        '<td class="t-num mono" style="' + (low ? 'color:var(--warn);font-weight:700' : '') + '">' +
+          r.item.quantity_available + '</td>' +
+        '<td class="t-num mono" style="color:var(--muted)">' + (r.item.min_stock_alert || 0) + '</td></tr>';
+    }).join('');
+    h += '</tbody></table></div></div>';
+  }
+  return h;
+}
+
+function viewSettings() {
+  var h = '<div class="page-head"><div><h2>Tetapan</h2><p>Data rujukan: kategori, lokasi dan penjaga aset</p></div></div>';
+  h += '<div class="grid g-3">';
+
+  h += refCard('Kategori', 'i-tag', D.categories || [], function (c) {
+    return { title: c.name, sub: TYPE_LABEL[c.type] || c.type };
+  }, 'Category');
+
+  h += refCard('Lokasi', 'i-pin', D.locations || [], function (l) {
+    return { title: l.building, sub: [l.floor, l.room_number].filter(Boolean).join(' · ') || '—' };
+  }, 'Location');
+
+  h += refCard('Penjaga Aset', 'i-users', D.custodians || [], function (c) {
+    return { title: c.name, sub: c.employee_id + ' · ' + (c.department || c.email) };
+  }, 'Custodian');
+
+  h += '</div>';
+
+  h += '<div class="card" style="margin-top:16px"><div class="card-head">' + icon('i-shield', 16) +
+    '<h3>Keselamatan &amp; Automasi</h3></div><div class="card-body">' +
+    '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Kata laluan admin</div>' +
+    '<div class="t-sub">Disimpan dalam Script Properties Apps Script, bukan dalam kod sumber.</div></div>' +
+    '<div class="spacer"></div><span class="pill pill-ok"><i></i>Aktif</span></div>' +
+    '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Semakan tarikh harian</div>' +
+    '<div class="t-sub">Trigger Apps Script 07:00 — waranti, pinjaman lewat, pemeriksaan, audit, stok rendah.</div></div>' +
+    '<div class="spacer"></div><button class="btn btn-sm" onclick="runDateCheck(this)">Jalankan Sekarang</button></div>' +
+    '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Lejar tidak boleh diubah</div>' +
+    '<div class="t-sub">' + (D.transactions || []).length + ' transaksi. Tiada laluan kod menyunting atau memadam rekod lejar.</div></div>' +
+    '<div class="spacer"></div><button class="btn btn-sm" onclick="go(\'ledger\')">Lihat Log</button></div>' +
+    '</div></div>';
+  return h;
+}
+
+function refCard(title, ic, rows, fmt, kind) {
+  var h = '<div class="card"><div class="card-head">' + icon(ic, 16) + '<h3>' + esc(title) + '</h3>' +
+    '<div class="spacer"></div><button class="btn btn-sm" onclick="openRef(\'' + kind + '\')">' + icon('i-plus', 13) + '</button></div>' +
+    '<div class="card-body" style="padding:8px 18px 14px">';
+  if (!rows.length) h += '<p style="color:var(--muted-2);font-size:13px;text-align:center;padding:14px 0;margin:0">Belum ada rekod.</p>';
+  else h += rows.map(function (r) {
+    var f = fmt(r);
+    return '<div class="alert-row"><div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(f.title) + '</div>' +
+      '<div class="t-sub">' + esc(f.sub) + '</div></div><div class="spacer"></div>' +
+      '<button class="btn btn-sm btn-ghost" onclick="openRef(\'' + kind + '\',' + r.id + ')">' + icon('i-edit', 14) + '</button>' +
+      '<button class="btn btn-sm btn-ghost" style="color:var(--err)" onclick="delRef(\'' + kind + '\',' + r.id + ')">' + icon('i-trash', 14) + '</button>' +
+      '</div>';
+  }).join('');
+  return h + '</div></div>';
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  SLIDE-OVER DRAWER
+//
+//  One drawer element reused by every form. Editing here rather than on
+//  a separate page keeps the table visible behind, so the user does not
+//  lose their place in a long list.
+// ══════════════════════════════════════════════════════════════════════
+function openDrawer(title, sub, bodyHtml, footHtml) {
+  $('drTitle').textContent = title;
+  $('drSub').textContent = sub || '';
+  $('drBody').innerHTML = bodyHtml;
+  $('drFoot').innerHTML = footHtml || '<button class="btn" onclick="closeDrawer()">Tutup</button>';
+  $('scrim').classList.remove('hide');
+  $('drawer').classList.add('open');
+  requestAnimationFrame(function () { $('scrim').classList.add('open'); });
+  var first = $('drBody').querySelector('input,select,textarea');
+  if (first) setTimeout(function () { first.focus(); }, 240);
+}
+function closeDrawer() {
+  $('drawer').classList.remove('open');
+  $('scrim').classList.remove('open');
+  stopScanner();
+  setTimeout(function () { $('scrim').classList.add('hide'); }, 220);
+}
+
+function field(label, inner, hint, required) {
+  return '<div class="field"><label>' + esc(label) + (required ? ' <span class="req">*</span>' : '') + '</label>' +
+    inner + (hint ? '<div class="hint">' + esc(hint) + '</div>' : '') + '</div>';
+}
+function input(id, type, value, attrs) {
+  return '<input id="' + id + '" type="' + (type || 'text') + '" value="' + esc(value == null ? '' : value) + '" ' + (attrs || '') + '>';
+}
+function select(id, opts, value, attrs) {
+  return '<select id="' + id + '" ' + (attrs || '') + '>' + opts.map(function (o) {
+    return '<option value="' + esc(o.v) + '"' + (String(value) === String(o.v) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
+  }).join('') + '</select>';
+}
+function val(id) { var el = $(id); return el ? el.value.trim() : ''; }
+function num(id) { var v = val(id); return v === '' ? '' : Number(v); }
+function drawerErr(msg) {
+  var b = $('drBody');
+  var old = b.querySelector('.err-box');
+  if (old) old.remove();
+  var d = document.createElement('div');
+  d.className = 'err-box';
+  d.textContent = msg;
+  b.insertBefore(d, b.firstChild);
+  b.scrollTop = 0;
+}
+function busy(btn, label) {
+  btn.disabled = true;
+  btn.dataset.old = btn.innerHTML;
+  btn.innerHTML = '<span class="spin"></span> ' + (label || 'Menyimpan…');
+}
+function unbusy(btn) {
+  btn.disabled = false;
+  if (btn.dataset.old) btn.innerHTML = btn.dataset.old;
+}
+// Every write follows the same shape: submit, refresh, toast, close.
+function submitAction(btn, action, payload, okMsg) {
+  busy(btn);
+  api(action, payload, function () {
+    refresh(function () {
+      unbusy(btn);
+      closeDrawer();
+      toast(okMsg, 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
+}
+
+// ── Item form (add / edit) ────────────────────────────────────────────
+var UPLOADS = { photo_url: '', receipt_url: '' };
+
+function openItemDrawer(id, presetType) {
+  var it = id ? itemById(id) : null;
+  UPLOADS = { photo_url: it ? (it.photo_url || '') : '', receipt_url: it ? (it.receipt_url || '') : '' };
+  var type = it ? it.item_type : (presetType || 'fixed_asset');
+
+  var catOpts = (D.categories || []).map(function (c) { return { v: c.id, t: c.name + ' (' + (TYPE_LABEL[c.type] || c.type) + ')' }; });
+  var locOpts = (D.locations || []).map(function (l) { return { v: l.id, t: locName(l.id) }; });
+
+  if (!catOpts.length || !locOpts.length) {
+    openDrawer('Data rujukan diperlukan', '',
+      '<div class="err-box">Sila tambah sekurang-kurangnya satu kategori dan satu lokasi di Tetapan sebelum mendaftar item.</div>',
+      '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+      '<button class="btn btn-primary" onclick="closeDrawer();go(\'settings\')">Buka Tetapan</button>');
+    return;
+  }
+
+  var b = '';
+  b += '<fieldset class="fs"><legend>Maklumat Asas</legend>' +
+    field('Nama Item', input('fName', 'text', it ? it.name : '', 'placeholder="cth. Komputer Riba Dell Latitude"'), null, true) +
+    '<div class="row-2">' +
+      field('Jenis Item', select('fType', [
+        { v: 'fixed_asset', t: TYPE_LABEL.fixed_asset }, { v: 'consumable', t: TYPE_LABEL.consumable }
+      ], type, 'onchange="toggleItemType()"'), null, true) +
+      field('Nombor Siri', input('fSerial', 'text', it ? it.serial_number : '')) +
+    '</div>' +
+    '<div class="row-2">' +
+      field('Kategori', select('fCat', catOpts, it ? it.category_id : ''), null, true) +
+      field('Lokasi', select('fLoc', locOpts, it ? it.location_id : ''), null, true) +
+    '</div>';
+  if (it && it.asset_tag) b += '<div class="info-box">Tag aset <b class="mono">' + esc(it.asset_tag) + '</b> — dijana automatik dan kekal.</div>';
+  else if (!it) b += '<div class="info-box">Aset menerima tag (<span class="mono">AST-TAHUN-NNNN</span>) secara automatik. Item inventori tidak bertag — ia dikenali melalui nama.</div>';
+  b += '</fieldset>';
+
+  b += '<fieldset class="fs"><legend>Kuantiti &amp; Pergerakan</legend>' +
+    '<div class="row-2" id="qtyRow">' +
+      field('Kuantiti' + (it ? ' (dikunci)' : ''),
+        input('fQty', 'number', it ? it.quantity_total : 1, 'min="0" step="1"' + (it ? ' disabled' : '')),
+        it ? 'Ubah kuantiti melalui Tambah/Keluar Stok supaya lejar kekal tepat.' : null) +
+      field('Amaran Stok Minimum', input('fMin', 'number', it ? it.min_stock_alert : 5, 'min="0" step="1"'), 'Amaran dicetuskan pada paras ini') +
+    '</div>' +
+    '<div id="portableRow" class="field"><label>Aset Mudah Alih</label>' +
+      select('fPortable', [
+        { v: 'TRUE',  t: 'Ya — boleh didaftar keluar kepada individu' },
+        { v: 'FALSE', t: 'Tidak — kekal di lokasi (cth. meja, kerusi)' }
+      ], (it && String(it.is_portable) === 'FALSE') ? 'FALSE' : 'TRUE', '') +
+      '<div class="hint">Hanya aset mudah alih boleh dipinjamkan</div></div>' +
+    '</fieldset>';
+
+  b += '<fieldset class="fs"><legend>Tarikh Kitaran Hayat</legend>' +
+    '<div class="row-2">' +
+      field('Tarikh Perolehan', input('fAcq', 'date', it ? inputDate(it.date_acquired) : inputDate(new Date())), null, true) +
+      field('Pemeriksaan Seterusnya', input('fInspect', 'date', it ? inputDate(it.date_next_inspection) : '')) +
+      field('Penyelenggaraan Terakhir', input('fMaint', 'date', it ? inputDate(it.date_last_maintained) : '')) +
+    '</div>' +
+    field('Audit Terakhir', input('fAudit', 'date', it ? inputDate(it.date_last_audited) : '')) +
+    '</fieldset>';
+
+  b += '<fieldset class="fs"><legend>Lampiran</legend>' +
+    '<div class="row-2">' +
+      '<div class="field"><label>Foto Aset</label>' + dropZone('photo_url') + '</div>' +
+      '<div class="field"><label>Resit / Invois</label>' + dropZone('receipt_url') + '</div>' +
+    '</div></fieldset>';
+
+  b += field('Catatan', '<textarea id="fNotes" placeholder="Maklumat tambahan…">' + esc(it ? it.notes : '') + '</textarea>');
+
+  var foot = '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-primary" onclick="saveItem(this,' + (id || 'null') + ')">' + icon('i-check', 15) + ' Simpan</button>';
+
+  openDrawer(it ? 'Sunting Item' : 'Tambah Item Baharu',
+             it ? ((it.asset_tag ? it.asset_tag + ' · ' : '') + it.name) : 'Daftar aset atau item inventori',
+             b, foot);
+  toggleItemType();
+}
+
+function toggleItemType() {
+  var t = val('fType');
+  // "Mudah alih" is an asset concept; stock quantity is an inventory one.
+  var pr = $('portableRow');
+  if (pr) pr.style.display = (t === 'fixed_asset') ? '' : 'none';
+  var row = $('qtyRow');
+  if (!row) return;
+  // A fixed asset is one physical thing; the quantity fields only make
+  // sense for consumables.
+  row.style.display = (t === 'consumable') ? '' : 'none';
+}
+
+function saveItem(btn, id) {
+  var type = val('fType');
+  var p = {
+    id: id || undefined,
+    name: val('fName'),
+    item_type: type,
+    serial_number: val('fSerial'),
+    category_id: num('fCat'),
+    location_id: num('fLoc'),
+    quantity_total: type === 'consumable' ? num('fQty') : 1,
+    min_stock_alert: num('fMin') || 0,
+    date_acquired: val('fAcq'),
+    date_next_inspection: val('fInspect'),
+    date_last_maintained: val('fMaint'),
+    date_last_audited: val('fAudit'),
+    is_portable: (type === 'fixed_asset') ? val('fPortable') : 'TRUE',
+    photo_url: UPLOADS.photo_url,
+    receipt_url: UPLOADS.receipt_url,
+    notes: val('fNotes')
+  };
+  submitAction(btn, id ? 'UpdateItem' : 'AddItem', p, id ? 'Item dikemas kini.' : 'Item didaftarkan.');
+}
+
+// ── Check-out ─────────────────────────────────────────────────────────
+function openCheckOut(id) {
+  // Only movable ASSETS are loanable. Fixed furniture is marked
+  // is_portable FALSE, and inventory (pens, paper) leaves through "Keluar
+  // Stok" instead — it is issued, not borrowed, and never comes back.
+  // The server enforces both rules; this keeps them out of the list so the
+  // admin is never offered a choice that will be rejected.
+  var avail = (D.items || []).filter(function (i) {
+    return i.item_type === 'fixed_asset' &&
+           String(i.is_portable) !== 'FALSE' &&
+           !i.open_loan &&
+           i.status !== 'decommissioned' && i.status !== 'disposed' &&
+           Number(i.quantity_available) > 0;
+  });
+  if (!avail.length) {
+    openDrawer('Daftar Keluar', 'Tiada aset mudah alih tersedia',
+      '<div class="info-box" style="margin-bottom:0">Tiada aset mudah alih yang tersedia untuk dipinjam sekarang.<br><br>' +
+      'Sebab lazim: semua sudah dipinjam, atau aset ditanda <b>bukan mudah alih</b> (meja, kerusi).<br><br>' +
+      'Untuk alat tulis dan kertas, gunakan <b>Keluar Stok</b> di bahagian Inventori — ia dikeluarkan, bukan dipinjam.</div>',
+      '<button class="btn" onclick="closeDrawer()">Tutup</button>' +
+      '<button class="btn btn-primary" onclick="closeDrawer();go(\'stock\')">Buka Stok</button>');
+    return;
+  }
+  var due = new Date(); due.setDate(due.getDate() + 14);
+  var hasPeople = (D.custodians || []).length > 0;
+
+  var b = field('Aset', select('cItem', avail.map(function (i) {
+      return { v: i.id, t: i.asset_tag + ' — ' + i.name + ' (baki ' + i.quantity_available + ')' };
+    }), id || '', 'onchange="coQtyToggle()"'), null, true);
+
+  // Two ways to name the recipient. Typing a name + email is the default
+  // when nobody is registered yet, so a handover never blocks on setting up
+  // reference data first — the person is created behind the scenes.
+  b += '<fieldset class="fs"><legend>Penerima</legend>' +
+    '<div class="tabs" style="margin-bottom:12px">' +
+      '<button type="button" id="coTabNew" class="' + (hasPeople ? '' : 'active') + '" onclick="coMode(\'new\')">Nama &amp; emel baharu</button>' +
+      '<button type="button" id="coTabPick" class="' + (hasPeople ? 'active' : '') + '" onclick="coMode(\'pick\')">Pilih sedia ada</button>' +
+    '</div>' +
+    '<div id="coPick" class="' + (hasPeople ? '' : 'hide') + '">' +
+      (hasPeople
+        ? field('Penerima', select('cCust', (D.custodians || []).map(function (c) {
+            return { v: c.id, t: c.name + ' — ' + c.email + (c.department ? ' · ' + c.department : '') };
+          }), '', ''))
+        : '<p style="font-size:12.5px;color:var(--muted-2);margin:0">Belum ada penerima berdaftar.</p>') +
+    '</div>' +
+    '<div id="coNew" class="' + (hasPeople ? 'hide' : '') + '">' +
+      field('Nama Penuh', input('cName', 'text', '', 'placeholder="cth. Zulkifli bin Omar"'), null, true) +
+      field('Emel', input('cEmail', 'email', '', 'placeholder="nama@ukm.edu.my"'),
+        'Emel pemberitahuan akan dihantar ke alamat ini', true) +
+      field('Jabatan', input('cDept', 'text', '', 'placeholder="cth. Pentadbiran"')) +
+    '</div>' +
+    '</fieldset>';
+
+  b += '<div id="coQty"></div>' +
+    field('Tarikh Jangka Pulang', input('cDue', 'date', inputDate(due), 'min="' + inputDate(new Date()) + '"'),
+      'Pinjaman lewat akan disenaraikan sebagai amaran', true) +
+    field('Catatan', '<textarea id="cNote" placeholder="Tujuan peminjaman…"></textarea>') +
+    '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
+      ' Penerima akan menerima emel pengesahan serta-merta — lengkap dengan tag aset, ' +
+      'tarikh &amp; masa, dan tarikh jangka pulang.</div>';
+
+  openDrawer('Daftar Keluar Aset', 'Serahkan aset kepada individu', b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-primary" onclick="doCheckOut(this)">' + icon('i-out', 15) + ' Daftar Keluar</button>');
+  CO_MODE = hasPeople ? 'pick' : 'new';
+  coQtyToggle();
+}
+function coQtyToggle() {
+  var it = itemById(num('cItem'));
+  var host = $('coQty');
+  if (!host) return;
+  host.innerHTML = (it && it.item_type === 'consumable')
+    ? field('Kuantiti', input('cQty', 'number', 1, 'min="1" max="' + it.quantity_available + '" step="1"'),
+        'Baki tersedia: ' + it.quantity_available)
+    : '';
+}
+// Which recipient mode the check-out form is currently in.
+var CO_MODE = 'new';
+function coMode(m) {
+  CO_MODE = m;
+  $('coPick').classList.toggle('hide', m !== 'pick');
+  $('coNew').classList.toggle('hide', m !== 'new');
+  $('coTabPick').classList.toggle('active', m === 'pick');
+  $('coTabNew').classList.toggle('active', m === 'new');
+}
+
+function doCheckOut(btn) {
+  var p = {
+    id: num('cItem'),
+    expected_return_date: val('cDue'),
+    quantity: $('cQty') ? num('cQty') : 1,
+    reason_notes: val('cNote')
+  };
+  if (CO_MODE === 'pick' && $('cCust') && val('cCust')) {
+    p.custodian_id = num('cCust');
+  } else {
+    p.recipient_name = val('cName');
+    p.recipient_email = val('cEmail');
+    p.recipient_department = val('cDept');
+  }
+  // The server reports whether the notification actually left, so the toast
+  // never claims an email was sent when the mail quota rejected it.
+  busy(btn);
+  api('CheckOut', p, function (res) {
+    refresh(function () {
+      unbusy(btn); closeDrawer();
+      toast(res && res.mailed === false
+        ? 'Aset didaftar keluar — tetapi emel gagal dihantar.'
+        : 'Aset didaftar keluar. Emel dihantar kepada ' + ((res && res.custodian_email) || 'penerima') + '.',
+        res && res.mailed === false ? 'err' : 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
+}
+
+// ── Check-in ──────────────────────────────────────────────────────────
+function openCheckIn(id) {
+  var it = itemById(id);
+  if (!it || !it.open_loan) { toast('Tiada pinjaman terbuka untuk item ini.', 'err'); return; }
+  var l = it.open_loan;
+  var late = l.is_overdue;
+  var d = daysBetween(today(), l.expected_return_date);
+
+  var b = '<div class="' + (late ? 'err-box' : 'info-box') + '">' +
+    '<b>' + esc(it.asset_tag) + '</b> — ' + esc(it.name) + '<br>' +
+    'Dipinjam oleh ' + esc(custName(l.custodian_id)) + ' sejak ' + fmtDate(l.transaction_date) + '<br>' +
+    (late ? 'Lewat ' + Math.abs(d) + ' hari (sepatutnya ' + fmtDate(l.expected_return_date) + ')'
+          : 'Jangka pulang ' + fmtDate(l.expected_return_date)) + '</div>' +
+    field('Tarikh Pulang Sebenar', input('kDate', 'date', inputDate(new Date()))) +
+    field('Catatan / Keadaan Aset', '<textarea id="kNote" placeholder="cth. keadaan baik, tiada kerosakan"></textarea>') +
+    '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
+      ' ' + esc(custName(l.custodian_id)) + ' akan menerima emel pengesahan pemulangan, ' +
+      'lengkap dengan tarikh &amp; masa dan tempoh pinjaman.</div>';
+
+  openDrawer('Daftar Masuk Aset', 'Terima pemulangan dan bebaskan aset', b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-primary" onclick="doCheckIn(this,' + id + ')">' + icon('i-in', 15) + ' Daftar Masuk</button>');
+}
+function doCheckIn(btn, id) {
+  busy(btn);
+  api('CheckIn', { id: id, actual_return_date: val('kDate'), reason_notes: val('kNote') },
+    function (res) {
+      refresh(function () {
+        unbusy(btn); closeDrawer();
+        toast(res && res.mailed === false
+          ? 'Pemulangan direkod — tetapi emel gagal dihantar.'
+          : 'Pemulangan direkod. Emel pengesahan dihantar kepada ' + ((res && res.custodian_name) || 'penerima') + '.',
+          res && res.mailed === false ? 'err' : 'ok');
+      });
+    }, function (e) { unbusy(btn); drawerErr(e); });
+}
+
+// ── Stock add / remove ────────────────────────────────────────────────
+function openStock(id, action) {
+  var it = itemById(id);
+  if (!it) return;
+  var isAdd = action === 'StockAdd';
+  var b = '<div class="info-box"><b class="mono">' + esc(it.asset_tag) + '</b> — ' + esc(it.name) +
+    '<br>Baki semasa: <b class="mono">' + it.quantity_available + '</b>' +
+    (it.min_stock_alert ? ' · minimum ' + it.min_stock_alert : '') + '</div>' +
+    field('Kuantiti', input('sQty', 'number', 1, 'min="1" step="1"' + (isAdd ? '' : ' max="' + it.quantity_available + '"')), null, true);
+
+  // Recipient only applies to an issue. Optional, because stock also leaves
+  // for damage or loss — but recording it is what makes per-staff usage
+  // reportable instead of buried in free text.
+  if (!isAdd) {
+    b += field('Diberikan kepada',
+      select('sCust', [{ v: '', t: '— Tiada (rosak / hilang / pelupusan) —' }].concat(
+        (D.custodians || []).map(function (c) {
+          return { v: c.id, t: c.name + (c.department ? ' · ' + c.department : '') };
+        })), '', ''),
+      'Pilih staf supaya penggunaan boleh dijejaki per orang');
+  }
+
+  b += field('Sebab', '<textarea id="sNote" placeholder="' +
+      (isAdd ? 'cth. pembelian baharu, pemulangan stok' : 'cth. bekalan pejabat bulanan, rosak') + '"></textarea>',
+      'Direkod dalam lejar audit', true);
+
+  openDrawer(isAdd ? 'Tambah Stok' : 'Keluarkan Stok', it.name, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-primary" onclick="doStock(this,' + id + ',\'' + action + '\')">' +
+      icon(isAdd ? 'i-plus' : 'i-layers', 15) + ' ' + (isAdd ? 'Tambah' : 'Keluarkan') + '</button>');
+}
+function doStock(btn, id, action) {
+  var p = { id: id, quantity: num('sQty'), reason_notes: val('sNote') };
+  if ($('sCust') && val('sCust')) p.custodian_id = num('sCust');
+  submitAction(btn, action, p, 'Stok dikemas kini.');
+}
+
+// ── Decommission ──────────────────────────────────────────────────────
+function openDecommission(id) {
+  var it = itemById(id);
+  if (!it) return;
+  var b = '<div class="err-box">Tindakan ini menandakan aset sebagai dilupuskan dan tidak boleh dipinjam lagi. ' +
+    'Rekod dan sejarahnya kekal dalam lejar audit.</div>' +
+    '<div class="info-box"><b class="mono">' + esc(it.asset_tag || it.name) + '</b>' +
+    (it.asset_tag ? ' — ' + esc(it.name) : '') +
+    '<br>' + esc(catName(it.category_id)) + ' · ' + esc(locName(it.location_id)) + '</div>' +
+    field('Sebab Pelupusan', select('dReason', (D.meta.removal_reasons || []).map(function (r) {
+      return { v: r, t: r };
+    }), '', ''), null, true) +
+    '<div class="row-2">' +
+      field('Tarikh Pelupusan', input('dDate', 'date', inputDate(new Date())), null, true) +
+      field('Status Akhir', select('dStatus', [
+        { v: 'decommissioned', t: 'Dilupuskan' }, { v: 'disposed', t: 'Dibuang' }
+      ], 'decommissioned', '')) +
+    '</div>' +
+    field('Catatan', '<textarea id="dNote" placeholder="Butiran tambahan…"></textarea>');
+
+  openDrawer('Lupuskan Item', (it.asset_tag ? it.asset_tag + ' · ' : '') + it.name, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-danger" onclick="doDecom(this,' + id + ')">' + icon('i-trash', 15) + ' Sahkan Pelupusan</button>');
+}
+function doDecom(btn, id) {
+  submitAction(btn, 'Decommission', {
+    id: id, reason: val('dReason'), date_decommissioned: val('dDate'),
+    status: val('dStatus'), reason_notes: val('dNote')
+  }, 'Aset telah dilupuskan.');
+}
+
+// ── Audit ─────────────────────────────────────────────────────────────
+function openAudit(id) {
+  var it = itemById(id);
+  if (!it) return;
+  var b = '<div class="info-box"><b class="mono">' + esc(it.asset_tag) + '</b> — ' + esc(it.name) +
+    '<br>Sistem merekodkan <b class="mono">' + it.quantity_available + '</b> unit tersedia' +
+    (it.date_last_audited ? '<br>Audit terakhir: ' + fmtDate(it.date_last_audited) : '<br>Item ini belum pernah diaudit.') + '</div>' +
+    field('Kuantiti Sebenar Dikira', input('aCount', 'number', it.quantity_available, 'min="0" step="1"'),
+      'Jika berbeza, varians akan direkod dalam lejar', true) +
+    field('Tarikh Audit', input('aDate', 'date', inputDate(new Date()))) +
+    field('Catatan', '<textarea id="aNote" placeholder="cth. lokasi disahkan, keadaan baik"></textarea>');
+
+  openDrawer('Rekod Audit', it.asset_tag, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-primary" onclick="doAudit(this,' + id + ')">' + icon('i-check', 15) + ' Rekod Audit</button>');
+}
+function doAudit(btn, id) {
+  submitAction(btn, 'AuditAdjust', {
+    id: id, counted: num('aCount'), date_audited: val('aDate'), reason_notes: val('aNote')
+  }, 'Audit direkodkan.');
+}
+
+// ── Reference data forms ──────────────────────────────────────────────
+function openRef(kind, id) {
+  var tab = { Category: 'categories', Location: 'locations', Custodian: 'custodians' }[kind];
+  var r = id ? find(D[tab], id) : null;
+  var b = '', title = '';
+
+  if (kind === 'Category') {
+    title = 'Kategori';
+    b = field('Nama Kategori', input('rName', 'text', r ? r.name : '', 'placeholder="cth. Komputer Riba"'), null, true) +
+        field('Jenis', select('rType', [
+          { v: 'fixed_asset', t: TYPE_LABEL.fixed_asset }, { v: 'consumable', t: TYPE_LABEL.consumable }
+        ], r ? r.type : 'fixed_asset', ''), null, true);
+  } else if (kind === 'Location') {
+    title = 'Lokasi';
+    b = field('Bangunan', input('rBuilding', 'text', r ? r.building : '', 'placeholder="cth. IMEN"'), null, true) +
+        '<div class="row-2">' +
+          field('Tingkat', input('rFloor', 'text', r ? r.floor : '', 'placeholder="cth. Aras 2"')) +
+          field('Nombor Bilik', input('rRoom', 'text', r ? r.room_number : '', 'placeholder="cth. Makmal 1"')) +
+        '</div>';
+  } else {
+    title = 'Penjaga Aset';
+    b = '<div class="row-2">' +
+          field('ID Pekerja', input('rEmp', 'text', r ? r.employee_id : '', 'placeholder="cth. E001"'), null, true) +
+          field('Jabatan', input('rDept', 'text', r ? r.department : '')) +
+        '</div>' +
+        field('Nama Penuh', input('rName', 'text', r ? r.name : ''), null, true) +
+        field('Emel', input('rEmail', 'email', r ? r.email : '', 'placeholder="nama@ukm.edu.my"'),
+          'Pemberitahuan daftar keluar dihantar ke alamat ini', true);
+  }
+
+  openDrawer((r ? 'Sunting ' : 'Tambah ') + title, '', b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-primary" onclick="saveRef(this,\'' + kind + '\',' + (id || 'null') + ')">' + icon('i-check', 15) + ' Simpan</button>');
+}
+function saveRef(btn, kind, id) {
+  var p = { id: id || undefined };
+  if (kind === 'Category') { p.name = val('rName'); p.type = val('rType'); }
+  else if (kind === 'Location') { p.building = val('rBuilding'); p.floor = val('rFloor'); p.room_number = val('rRoom'); }
+  else { p.employee_id = val('rEmp'); p.name = val('rName'); p.email = val('rEmail'); p.department = val('rDept'); }
+  submitAction(btn, 'Save' + kind, p, 'Rekod disimpan.');
+}
+function delRef(kind, id) {
+  if (!confirm('Padam rekod ini? Tindakan ini tidak boleh dibatalkan.')) return;
+  api('Delete' + kind, { id: id }, function () {
+    refresh(function () { toast('Rekod dipadam.', 'ok'); });
+  });
+}
+
+// ── Item history (audit trail for one item) ───────────────────────────
+function openHistory(id) {
+  var it = itemById(id);
+  if (!it) return;
+  openDrawer('Sejarah Item', it.asset_tag + ' · ' + it.name, '<div id="histBody"><p style="color:var(--muted)">Memuatkan…</p></div>',
+    '<button class="btn" onclick="closeDrawer()">Tutup</button>' +
+    '<button class="btn btn-primary" onclick="openItemDrawer(' + id + ')">' + icon('i-edit', 15) + ' Sunting Item</button>');
+
+  google.script.run
+    .withSuccessHandler(function (txns) { renderHistory(it, txns || []); })
+    .withFailureHandler(function (e) { $('histBody').innerHTML = '<div class="err-box">' + esc(String(e && e.message || e)) + '</div>'; })
+    .getItemHistory(id, PASS);
+}
+
+function renderHistory(it, txns) {
+  var host = $('histBody');
+  if (!host) return;
+  var h = '<fieldset class="fs"><legend>Ringkasan</legend>' +
+    kvRow('Status', pill(it.status)) +
+    kvRow('Jenis', esc(TYPE_LABEL[it.item_type] || it.item_type)) +
+    kvRow('Kategori', esc(catName(it.category_id))) +
+    kvRow('Lokasi', esc(locName(it.location_id))) +
+    (it.serial_number ? kvRow('Nombor Siri', '<span class="mono">' + esc(it.serial_number) + '</span>') : '') +
+    kvRow('Baki / Jumlah', '<span class="mono">' + it.quantity_available + ' / ' + it.quantity_total + '</span>') +
+    (it.item_type === 'fixed_asset'
+      ? kvRow('Mudah Alih', String(it.is_portable) === 'FALSE' ? 'Tidak — kekal di lokasi' : 'Ya — boleh dipinjam')
+      : '') +
+    '</fieldset>';
+
+  h += '<fieldset class="fs"><legend>Tarikh Kitaran Hayat</legend>' +
+    kvRow('Diperoleh', fmtDate(it.date_acquired)) +
+    kvRow('Pemeriksaan Seterusnya', fmtDate(it.date_next_inspection)) +
+    kvRow('Penyelenggaraan Terakhir', fmtDate(it.date_last_maintained)) +
+    kvRow('Audit Terakhir', fmtDate(it.date_last_audited)) +
+    (it.date_decommissioned ? kvRow('Dilupuskan', fmtDate(it.date_decommissioned)) : '') +
+    '</fieldset>';
+
+  if (it.photo_url || it.receipt_url) {
+    h += '<fieldset class="fs"><legend>Lampiran</legend>' +
+      (it.photo_url ? '<a class="btn btn-sm" href="' + esc(it.photo_url) + '" target="_blank" rel="noopener">Foto Aset</a> ' : '') +
+      (it.receipt_url ? '<a class="btn btn-sm" href="' + esc(it.receipt_url) + '" target="_blank" rel="noopener">Resit / Invois</a>' : '') +
+      '</fieldset>';
+  }
+
+  h += '<fieldset class="fs"><legend>Lejar (' + txns.length + ' rekod)</legend>';
+  if (!txns.length) h += '<p style="color:var(--muted-2);margin:0">Tiada transaksi.</p>';
+  else h += txns.map(function (t) {
+    var q = Number(t.quantity || 0);
+    return '<div class="alert-row"><div style="min-width:0">' +
+      '<span class="pill ' + (ACTION_PILL[t.action_type] || 'pill-mute') + '">' + esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span>' +
+      '<div class="t-sub" style="margin-top:4px">' + fmtDateTime(t.transaction_date) +
+        (t.custodian_id ? ' · ' + esc(custName(t.custodian_id)) : '') + '</div>' +
+      (t.reason_notes ? '<div class="t-sub" style="color:var(--muted)">' + esc(t.reason_notes) + '</div>' : '') +
+      '</div><div class="spacer"></div>' +
+      '<span class="mono" style="font-weight:700;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
+        (q > 0 ? '+' : '') + q + '</span></div>';
+  }).join('');
+  h += '</fieldset>';
+
+  host.innerHTML = h;
+}
+function kvRow(k, v) {
+  return '<div style="display:flex;gap:12px;padding:5px 0;font-size:13px">' +
+    '<span style="color:var(--muted);min-width:150px">' + esc(k) + '</span><span style="font-weight:500">' + v + '</span></div>';
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  QR — generate and scan
+//
+//  Both libraries are lazy-loaded on first use, never at boot. They are
+//  ~90KB combined and most sessions never open a QR view, so loading
+//  them up front would slow every page load to serve a minority path.
+//  (Same treatment i-nstrumen gives pdfmake.)
+// ══════════════════════════════════════════════════════════════════════
+var LIBS = {};
+function loadLib(key, url, check, cb, onErr) {
+  if (check()) { cb(); return; }
+  if (LIBS[key]) { LIBS[key].push(cb); return; }
+  LIBS[key] = [cb];
+  var s = document.createElement('script');
+  s.src = url;
+  s.onload = function () { LIBS[key].forEach(function (f) { f(); }); LIBS[key] = null; };
+  s.onerror = function () {
+    LIBS[key] = null;
+    if (onErr) onErr();
+  };
+  document.head.appendChild(s);
+}
+
+// The QR encodes the deep link, so scanning with any phone camera opens
+// the item — not just this app's own scanner.
+function itemUrl(it) {
+  return location.origin + location.pathname + '?item=' + encodeURIComponent(it.asset_tag);
+}
+
+function openQR(id) {
+  var it = itemById(id);
+  if (!it) return;
+  openDrawer('Kod QR', it.asset_tag + ' · ' + it.name,
+    '<div id="qrbox"><p style="color:var(--muted)">Menjana kod QR…</p></div>',
+    '<button class="btn" onclick="closeDrawer()">Tutup</button>' +
+    '<button class="btn btn-primary" onclick="printQR(' + id + ')">' + icon('i-qr', 15) + ' Cetak Label</button>');
+
+  loadLib('qr', 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+    function () { return !!window.QRCode; },
+    function () {
+      var box = $('qrbox');
+      if (!box) return;
+      box.innerHTML = '<div id="qrcanvas"></div>' +
+        '<div style="text-align:center"><div class="mono" style="font-weight:700;font-size:15px">' + esc(it.asset_tag) + '</div>' +
+        '<div style="font-size:13px;color:var(--muted);margin-top:2px">' + esc(it.name) + '</div>' +
+        '<div class="t-sub" style="margin-top:6px">' + esc(locName(it.location_id)) + '</div></div>';
+      new QRCode($('qrcanvas'), { text: itemUrl(it), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+    },
+    function () {
+      var box = $('qrbox');
+      if (box) box.innerHTML = '<div class="err-box">Tidak dapat memuatkan penjana QR. Semak sambungan internet.</div>';
+    });
+}
+
+function printQR(id) {
+  var it = itemById(id);
+  var canvas = document.querySelector('#qrcanvas canvas, #qrcanvas img');
+  if (!it || !canvas) { toast('Kod QR belum siap dijana.', 'err'); return; }
+  var src = canvas.tagName === 'IMG' ? canvas.src : canvas.toDataURL();
+  var w = window.open('', '_blank', 'width=420,height=520');
+  if (!w) { toast('Sekatan pop-up menghalang cetakan.', 'err'); return; }
+  w.document.write(
+    '<!DOCTYPE html><html><head><title>' + esc(it.asset_tag) + '</title><style>' +
+    'body{font-family:system-ui,sans-serif;text-align:center;padding:26px;margin:0}' +
+    'img{width:210px;height:210px}' +
+    '.tag{font-family:ui-monospace,monospace;font-weight:700;font-size:17px;margin-top:10px}' +
+    '.nm{font-size:13px;color:#475569;margin-top:3px}.lc{font-size:11px;color:#94a3b8;margin-top:5px}' +
+    '</style></head><body onload="window.print()">' +
+    '<img src="' + src + '"><div class="tag">' + esc(it.asset_tag) + '</div>' +
+    '<div class="nm">' + esc(it.name) + '</div><div class="lc">' + esc(locName(it.location_id)) + '</div>' +
+    '</body></html>');
+  w.document.close();
+}
+
+// ── Scanner ───────────────────────────────────────────────────────────
+var SCANNER = null;
+
+function openScanner() {
+  openDrawer('Imbas Kod QR', 'Halakan kamera ke label aset',
+    '<div id="scanHost"><p style="color:var(--muted)">Memuatkan pengimbas…</p></div>' +
+    '<div class="field" style="margin-top:14px"><label>Atau masukkan tag aset secara manual</label>' +
+    '<div style="display:flex;gap:8px">' + input('scanManual', 'text', '', 'placeholder="AST-2026-0001"') +
+    '<button class="btn btn-primary" onclick="lookupTag(val(\'scanManual\'))">Cari</button></div></div>',
+    '<button class="btn" onclick="closeDrawer()">Tutup</button>');
+
+  loadLib('scan', 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
+    function () { return !!window.Html5Qrcode; },
+    function () {
+      var host = $('scanHost');
+      if (!host) return;
+      host.innerHTML = '<div id="scanner"></div>';
+      try {
+        SCANNER = new Html5Qrcode('scanner');
+        SCANNER.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 230, height: 230 } },
+          function (text) { stopScanner(); lookupTag(text); },
+          function () { /* per-frame decode misses are normal, ignore */ }
+        ).catch(function (e) {
+          host.innerHTML = '<div class="err-box">Tidak dapat mengakses kamera: ' + esc(String(e)) +
+            '<br>Gunakan kemasukan manual di bawah.</div>';
+        });
+      } catch (e) {
+        host.innerHTML = '<div class="err-box">Pengimbas tidak disokong pada pelayar ini. Gunakan kemasukan manual.</div>';
+      }
+    },
+    function () {
+      var host = $('scanHost');
+      if (host) host.innerHTML = '<div class="err-box">Tidak dapat memuatkan pengimbas. Gunakan kemasukan manual di bawah.</div>';
+    });
+}
+
+function stopScanner() {
+  if (!SCANNER) return;
+  try { SCANNER.stop().catch(function () {}); } catch (e) {}
+  SCANNER = null;
+}
+
+// Accepts a bare tag or a full deep link.
+function lookupTag(text) {
+  if (!text) return;
+  var tag = String(text).trim();
+  var m = /[?&]item=([^&]+)/.exec(tag);
+  if (m) tag = decodeURIComponent(m[1]);
+
+  var it = (D.items || []).filter(function (i) {
+    return String(i.asset_tag).toUpperCase() === tag.toUpperCase();
+  })[0];
+
+  if (!it) { toast('Tag aset tidak dijumpai: ' + tag, 'err'); return; }
+  closeDrawer();
+  setTimeout(function () { openHistory(it.id); }, 260);
+}
+
+// Deep link support: ?item=AST-2026-0001 opens that item once data lands.
+function handleDeepLink() {
+  var m = /[?&]item=([^&]+)/.exec(location.search);
+  if (m && D) lookupTag(decodeURIComponent(m[1]));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  DRIVE UPLOAD
+//
+//  The bytes never pass through Apps Script: the server opens a Drive
+//  resumable session and the browser PUTs the file straight to Google.
+// ══════════════════════════════════════════════════════════════════════
+function dropZone(key) {
+  var has = UPLOADS[key];
+  return '<div class="drop ' + (has ? 'done' : '') + '" id="drop_' + key + '" onclick="document.getElementById(\'file_' + key + '\').click()">' +
+    (has ? icon('i-check', 16) + ' Fail dimuat naik' : icon('i-down', 16) + ' Klik untuk pilih fail') +
+    '</div><div class="prog hide" id="prog_' + key + '"><span></span></div>' +
+    '<input type="file" id="file_' + key + '" class="hide" accept="image/*,application/pdf" onchange="doUpload(\'' + key + '\',this)">';
+}
+
+function doUpload(key, inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { toast('Fail terlalu besar (maks 25MB).', 'err'); return; }
+
+  var drop = $('drop_' + key), prog = $('prog_' + key);
+  drop.classList.remove('done');
+  drop.innerHTML = '<span class="spin" style="border-color:rgba(0,0,0,.15);border-top-color:var(--accent)"></span> Memuat naik…';
+  prog.classList.remove('hide');
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || !r.ok) { uploadFailed(key, (r && r.error) || 'Gagal memulakan muat naik'); return; }
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', r.sessionUri, true);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) prog.firstChild.style.width = ((e.loaded / e.total) * 100) + '%';
+      };
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          var id = '';
+          try { id = JSON.parse(xhr.responseText).id || ''; } catch (e) {}
+          UPLOADS[key] = id ? 'https://drive.google.com/file/d/' + id + '/view' : '';
+          drop.classList.add('done');
+          drop.innerHTML = icon('i-check', 16) + ' ' + esc(file.name);
+          prog.classList.add('hide');
+        } else uploadFailed(key, 'HTTP ' + xhr.status);
+      };
+      xhr.onerror = function () { uploadFailed(key, 'Sambungan terputus'); };
+      xhr.send(file);
+    })
+    .withFailureHandler(function (e) { uploadFailed(key, (e && e.message) || String(e)); })
+    .startResumableUpload(file.name, file.type, location.origin, PASS);
+}
+
+function uploadFailed(key, msg) {
+  var drop = $('drop_' + key);
+  drop.classList.remove('done');
+  drop.innerHTML = icon('i-warn', 16) + ' Gagal — klik untuk cuba lagi';
+  $('prog_' + key).classList.add('hide');
+  toast('Muat naik gagal: ' + msg, 'err');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Ctrl+K COMMAND PALETTE
+// ══════════════════════════════════════════════════════════════════════
+var PAL_SEL = 0;
+
+function openPalette() {
+  $('palette').classList.remove('hide');
+  $('palInput').value = '';
+  PAL_SEL = 0;
+  renderPalette();
+  setTimeout(function () { $('palInput').focus(); }, 30);
+}
+function closePalette() {
+  $('palette').classList.add('hide');
+}
+
+function palResults() {
+  var q = $('palInput').value.toLowerCase().trim();
+  if (!q) return (D.items || []).slice(0, 8);
+  return (D.items || []).filter(function (i) {
+    return [i.name, i.asset_tag, i.serial_number, catName(i.category_id), locName(i.location_id)]
+      .join(' ').toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 25);
+}
+
+function renderPalette() {
+  var rows = palResults();
+  if (PAL_SEL >= rows.length) PAL_SEL = Math.max(0, rows.length - 1);
+  var host = $('palList');
+  if (!rows.length) {
+    host.innerHTML = '<div style="padding:26px;text-align:center;color:var(--muted-2)">Tiada padanan.</div>';
+    return;
+  }
+  host.innerHTML = rows.map(function (i, n) {
+    return '<div class="pal-item ' + (n === PAL_SEL ? 'sel' : '') + '" onclick="palPick(' + i.id + ')">' +
+      '<span style="color:var(--muted-2)">' + icon('i-box', 16) + '</span>' +
+      '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(i.name) + '</div>' +
+      '<div class="t-sub mono">' + esc(i.asset_tag) + ' · ' + esc(locName(i.location_id)) + '</div></div>' +
+      '<div class="t-sub">' + pill(i.status) + '</div></div>';
+  }).join('');
+}
+
+function palKey(e) {
+  var rows = palResults();
+  if (e.key === 'ArrowDown') { e.preventDefault(); PAL_SEL = Math.min(PAL_SEL + 1, rows.length - 1); renderPalette(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); PAL_SEL = Math.max(PAL_SEL - 1, 0); renderPalette(); }
+  else if (e.key === 'Enter' && rows[PAL_SEL]) { e.preventDefault(); palPick(rows[PAL_SEL].id); }
+  else if (e.key === 'Escape') closePalette();
+}
+function palPick(id) {
+  closePalette();
+  openHistory(id);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  PUBLIC PAGE — PEMOHON
+//
+//  What a member of staff sees when they open the link. No password, and
+//  deliberately no access to the admin payload: it calls getPublicCatalog,
+//  which carries availability and location but never the name of whoever
+//  is holding something.
+// ══════════════════════════════════════════════════════════════════════
+var PUB = null;                       // the catalog
+var PUB_FILTER = { q: '', type: 'all' };
+
+function showPublic() {
+  $('gate').classList.add('hide');
+  $('app').classList.add('hide');
+  $('public').classList.remove('hide');
+  loadCatalog();
+}
+
+function loadCatalog() {
+  var host = $('pubBody');
+  if (!PUB) host.innerHTML = '<div id="loading">Memuatkan senarai…</div>';
+  google.script.run
+    .withSuccessHandler(function (d) {
+      PUB = d || { items: [] };
+      try { localStorage.setItem('inv_pub_v1', JSON.stringify(PUB)); } catch (e) {}
+      renderCatalog();
+    })
+    .withFailureHandler(function (e) {
+      if (PUB) return;               // a warm cache is better than an error
+      var msg = (e && e.message) || String(e || '');
+      // "Unknown API function" means the page is newer than the deployed
+      // backend — by far the most common cause, and the old generic
+      // "sila muat semula" sent people reloading forever instead of
+      // redeploying. Name the actual fix.
+      var stale = /Unknown API function/i.test(msg);
+      host.innerHTML = '<div class="empty">' + icon('i-warn', 30) +
+        (stale
+          ? '<p><b>Backend belum dikemas kini.</b><br>' +
+            'Sila paste <span class="mono">Code.gs</span> ke Apps Script, kemudian ' +
+            'Deploy &rarr; Manage deployments &rarr; Edit &rarr; New version &rarr; Deploy.</p>'
+          : '<p>Tidak dapat memuatkan senarai.<br>' +
+            '<span style="font-size:11.5px">' + esc(msg.slice(0, 160)) + '</span></p>') +
+        '<button class="btn" style="margin-top:12px" onclick="loadCatalog()">Cuba lagi</button></div>';
+    })
+    .getPublicCatalog();
+}
+
+function renderCatalog() {
+  var host = $('pubBody');
+  if (!host || !PUB) return;
+  var q = PUB_FILTER.q.toLowerCase().trim();
+  var rows = (PUB.items || []).filter(function (i) {
+    if (PUB_FILTER.type !== 'all' && i.item_type !== PUB_FILTER.type) return false;
+    if (!q) return true;
+    return [i.name, i.asset_tag, i.category, i.location].join(' ').toLowerCase().indexOf(q) !== -1;
+  });
+
+  var assets = (PUB.items || []).filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var avail  = assets.filter(function (i) { return i.available; }).length;
+
+  var h = '<div class="pub-stats">' +
+    pubStat(avail, 'Aset tersedia') +
+    pubStat(assets.length - avail, 'Sedang dipinjam') +
+    pubStat((PUB.items || []).filter(function (i) { return i.item_type === 'consumable' && i.available; }).length,
+            'Item inventori ada stok') +
+    '</div>';
+
+  h += '<div class="pub-filters">' +
+    '<div class="tabs">' +
+      pubTab('all', 'Semua') + pubTab('fixed_asset', 'Aset') + pubTab('consumable', 'Inventori') +
+    '</div>' +
+    '<div class="searchbox" style="flex:1;max-width:320px">' +
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>' +
+      '<input id="pubQ" placeholder="Cari nama, kategori, lokasi…" value="' + esc(PUB_FILTER.q) + '" oninput="PUB_FILTER.q=this.value;renderCatalog()">' +
+    '</div></div>';
+
+  if (!rows.length) {
+    h += '<div class="empty">' + icon('i-box', 30) + '<p>Tiada item sepadan.</p></div>';
+    host.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="pub-grid">' + rows.map(function (i) {
+    var isAsset = i.item_type === 'fixed_asset';
+    var badge = i.available
+      ? '<span class="pill pill-ok"><i></i>Tersedia</span>'
+      : (isAsset
+          ? '<span class="pill pill-warn"><i></i>Sedang dipinjam</span>'
+          : '<span class="pill pill-err"><i></i>Kehabisan stok</span>');
+
+    // An unavailable asset shows WHEN it comes back — never WHO has it.
+    var note = '';
+    if (!i.available && isAsset) {
+      note = i.expected_return_date
+        ? '<div class="pub-note">' + icon('i-clock', 13) + ' Dijangka pulang ' + fmtDate(i.expected_return_date) +
+          (i.is_overdue ? ' <b style="color:var(--err)">(sudah lewat)</b>' : '') + '</div>'
+        : '<div class="pub-note">' + icon('i-clock', 13) + ' Tarikh pulang belum ditetapkan</div>';
+    }
+
+    return '<div class="pub-card">' +
+      '<div class="pub-card-top">' +
+        '<span class="rowicon" style="background:' + (isAsset ? 'var(--accent-soft)' : 'var(--surface-3)') +
+          ';color:' + (isAsset ? 'var(--accent)' : 'var(--ink-2)') + '">' +
+          icon(isAsset ? 'i-box' : 'i-layers', 14) + '</span>' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="pub-name">' + esc(i.name) + '</div>' +
+          '<div class="t-sub">' + esc(i.category || TYPE_LABEL[i.item_type]) +
+            (i.asset_tag ? ' · <span class="mono">' + esc(i.asset_tag) + '</span>' : '') + '</div>' +
+        '</div>' + badge +
+      '</div>' +
+      '<div class="pub-meta">' + icon('i-pin', 13) + ' ' + esc(i.location || '—') + '</div>' +
+      (!isAsset ? '<div class="pub-meta">' + icon('i-layers', 13) + ' Baki <b class="mono">' + i.quantity_available + '</b> unit</div>' : '') +
+      note +
+      '<button class="btn ' + (i.available ? 'btn-accent' : '') + ' btn-block" style="margin-top:12px"' +
+        (i.available ? ' onclick="openRequest(' + i.id + ')"' : ' disabled') + '>' +
+        (i.available
+          ? icon('i-check', 14) + ' Mohon'
+          : (isAsset ? 'Tunggu dipulangkan' : 'Tiada stok')) + '</button>' +
+      '</div>';
+  }).join('') + '</div>';
+
+  host.innerHTML = h;
+}
+
+function pubStat(n, label) {
+  return '<div class="pub-stat"><div class="v mono">' + n + '</div><div class="l">' + esc(label) + '</div></div>';
+}
+function pubTab(v, label) {
+  return '<button class="' + (PUB_FILTER.type === v ? 'active' : '') + '" onclick="PUB_FILTER.type=\'' + v + '\';renderCatalog()">' + label + '</button>';
+}
+
+// ── Request form ──────────────────────────────────────────────────────
+function openRequest(id) {
+  var i = (PUB.items || []).filter(function (x) { return Number(x.id) === Number(id); })[0];
+  if (!i) return;
+  var isAsset = i.item_type === 'fixed_asset';
+
+  // Remember the requester so they do not retype it every time.
+  var me = {};
+  try { me = JSON.parse(localStorage.getItem('inv_me') || '{}'); } catch (e) {}
+
+  var need = new Date(); need.setDate(need.getDate() + 3);
+
+  var b = '<div class="info-box"><b>' + esc(i.name) + '</b>' +
+    (i.asset_tag ? ' · <span class="mono">' + esc(i.asset_tag) + '</span>' : '') +
+    '<br>' + esc(i.category || '') + ' · ' + esc(i.location || '') +
+    (isAsset ? '' : '<br>Baki tersedia: <b class="mono">' + i.quantity_available + '</b> unit') + '</div>';
+
+  b += '<fieldset class="fs"><legend>Maklumat Pemohon</legend>' +
+    field('Nama Penuh', input('qName', 'text', me.name || '', 'placeholder="cth. Farah binti Ali"'), null, true) +
+    field('Emel', input('qEmail', 'email', me.email || '', 'placeholder="nama@ukm.edu.my"'),
+      'Kemas kini permohonan akan dihantar ke sini', true) +
+    field('Jabatan', input('qDept', 'text', me.dept || '', 'placeholder="cth. Akademik"')) +
+    '</fieldset>';
+
+  b += '<fieldset class="fs"><legend>Butiran Permohonan</legend>' +
+    (isAsset ? '' : field('Kuantiti', input('qQty', 'number', 1, 'min="1" max="' + i.quantity_available + '" step="1"'),
+      'Maksimum ' + i.quantity_available + ' unit', true)) +
+    field('Tujuan', '<textarea id="qPurpose" placeholder="cth. Bengkel pelajar pada 20 Ogos"></textarea>',
+      'Bantu admin membuat keputusan', true) +
+    field('Tarikh Diperlukan', input('qNeed', 'date', inputDate(need), 'min="' + inputDate(new Date()) + '"')) +
+    '</fieldset>';
+
+  b += '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
+    ' Permohonan anda akan dihantar kepada admin untuk kelulusan. Anda akan menerima emel ' +
+    'pengesahan sekarang, dan satu lagi apabila keputusan dibuat.</div>';
+
+  openDrawer('Mohon ' + (isAsset ? 'Aset' : 'Item'), i.name, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn btn-accent" onclick="submitRequest(this,' + id + ')">' +
+      icon('i-check', 15) + ' Hantar Permohonan</button>');
+}
+
+function submitRequest(btn, id) {
+  var p = {
+    item_id: id,
+    requester_name: val('qName'),
+    requester_email: val('qEmail'),
+    requester_department: val('qDept'),
+    quantity: $('qQty') ? num('qQty') : 1,
+    purpose: val('qPurpose'),
+    needed_date: val('qNeed')
+  };
+  busy(btn, 'Menghantar…');
+  // No password: SubmitRequest is a public action.
+  google.script.run
+    .withSuccessHandler(function (res) {
+      unbusy(btn);
+      if (!res || !res.success) { drawerErr((res && res.error) || 'Ralat tidak diketahui'); return; }
+      try {
+        localStorage.setItem('inv_me', JSON.stringify({
+          name: p.requester_name, email: p.requester_email, dept: p.requester_department
+        }));
+      } catch (e) {}
+      closeDrawer();
+      loadCatalog();
+      requestSent(res.result);
+    })
+    .withFailureHandler(function (e) { unbusy(btn); drawerErr((e && e.message) || String(e)); })
+    .handleAction('SubmitRequest', p);
+}
+
+function requestSent(r) {
+  openDrawer('Permohonan Dihantar', 'Rujukan REQ_' + ('00000' + (r && r.id)).slice(-6),
+    '<div style="text-align:center;padding:26px 10px">' +
+      '<div style="width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok);' +
+        'display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' + icon('i-check', 26) + '</div>' +
+      '<h3 style="font-size:17px;margin-bottom:6px">Terima kasih!</h3>' +
+      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Permohonan anda sedang menunggu kelulusan admin.</p>' +
+      (r && r.mailed === false
+        ? '<div class="err-box">Permohonan direkod, tetapi emel pengesahan gagal dihantar.</div>'
+        : '<div class="info-box">Emel pengesahan telah dihantar. Anda akan dimaklumkan apabila keputusan dibuat.</div>') +
+    '</div>',
+    '<button class="btn btn-primary" onclick="closeDrawer()">Selesai</button>');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  ADMIN — PERMOHONAN QUEUE
+// ══════════════════════════════════════════════════════════════════════
+var REQ_FILTER = 'pending';
+
+var REQ_STATUS_META = {
+  pending:  { cls: 'pill-warn', label: 'Menunggu' },
+  approved: { cls: 'pill-ok',   label: 'Diluluskan' },
+  rejected: { cls: 'pill-err',  label: 'Ditolak' },
+  cancelled:{ cls: 'pill-mute', label: 'Dibatalkan' }
+};
+
+function viewRequests() {
+  var all = D.requests || [];
+  var rows = all.filter(function (r) { return REQ_FILTER === 'all' || r.status === REQ_FILTER; });
+  var pending = all.filter(function (r) { return r.status === 'pending'; }).length;
+
+  var h = '<div class="page-head"><div><h2>Permohonan</h2>' +
+    '<p>' + pending + ' menunggu kelulusan · ' + all.length + ' keseluruhan</p></div></div>';
+
+  // Built once so each return path below emits its own complete, balanced
+  // card element rather than relying on the other branch to close it.
+  var filterBar = '<div class="filters">' +
+    '<div class="tabs">' +
+      reqTab('pending', 'Menunggu', pending) +
+      reqTab('approved', 'Diluluskan', all.filter(function (r) { return r.status === 'approved'; }).length) +
+      reqTab('rejected', 'Ditolak', all.filter(function (r) { return r.status === 'rejected'; }).length) +
+      reqTab('all', 'Semua', all.length) +
+    '</div></div>';
+
+  if (!rows.length) {
+    return h + '<div class="card">' + filterBar + '<div class="empty">' + icon('i-check', 30) +
+      '<p>' + (REQ_FILTER === 'pending' ? 'Tiada permohonan menunggu. Semuanya selesai.' : 'Tiada rekod.') + '</p></div></div>';
+  }
+
+  h += '<div class="card">' + filterBar +
+    '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    '<th>Rujukan</th><th>Pemohon</th><th>Item</th><th class="t-num">Kuantiti</th>' +
+    '<th>Tujuan</th><th>Diperlukan</th><th>Status</th><th style="width:180px"></th>' +
+    '</tr></thead><tbody>';
+
+  h += rows.map(function (r) {
+    var it = itemById(r.item_id);
+    var m = REQ_STATUS_META[r.status] || REQ_STATUS_META.cancelled;
+    return '<tr>' +
+      '<td class="mono" style="font-size:12px;color:var(--muted)">REQ_' + ('00000' + r.id).slice(-6) + '</td>' +
+      '<td><div class="t-name" style="font-size:13px">' + esc(r.requester_name) + '</div>' +
+        '<div class="t-sub">' + esc(r.requester_email) + (r.requester_department ? ' · ' + esc(r.requester_department) : '') + '</div></td>' +
+      '<td><div class="t-name" style="font-size:13px">' + esc(it ? it.name : 'Item #' + r.item_id) + '</div>' +
+        '<div class="t-sub">' + esc(r.request_type === 'asset' ? 'Aset' : 'Inventori') + '</div></td>' +
+      '<td class="t-num mono">' + (r.quantity || 1) + '</td>' +
+      '<td style="font-size:12.5px;color:var(--muted);max-width:220px">' + esc(r.purpose || '—') + '</td>' +
+      '<td class="mono" style="font-size:12.5px">' + fmtDate(r.needed_date) + '</td>' +
+      '<td><span class="pill ' + m.cls + '"><i></i>' + m.label + '</span>' +
+        (r.actioned_at ? '<div class="t-sub" style="margin-top:3px">' + fmtDate(r.actioned_at) + '</div>' : '') + '</td>' +
+      '<td>' + (r.status === 'pending'
+        ? '<button class="btn btn-sm btn-accent" onclick="openDecide(' + r.id + ',true)">' + icon('i-check', 13) + ' Lulus</button> ' +
+          '<button class="btn btn-sm" onclick="openDecide(' + r.id + ',false)">' + icon('i-x', 13) + ' Tolak</button>'
+        : (r.admin_notes ? '<span class="t-sub">' + esc(r.admin_notes) + '</span>' : '')) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  return h + '</tbody></table></div></div>';
+}
+
+function reqTab(v, label, n) {
+  return '<button class="' + (REQ_FILTER === v ? 'active' : '') + '" onclick="REQ_FILTER=\'' + v + '\';render()">' +
+    label + (n ? ' (' + n + ')' : '') + '</button>';
+}
+
+function openDecide(id, approve) {
+  var r = find(D.requests, id);
+  if (!r) return;
+  var it = itemById(r.item_id);
+  var isAsset = r.request_type === 'asset';
+  var due = new Date(); due.setDate(due.getDate() + 14);
+
+  var b = '<div class="info-box">' +
+    '<b>' + esc(r.requester_name) + '</b> · ' + esc(r.requester_email) +
+    (r.requester_department ? ' · ' + esc(r.requester_department) : '') +
+    '<br>Memohon <b>' + esc(it ? it.name : 'Item #' + r.item_id) + '</b>' +
+    (isAsset ? '' : ' × ' + (r.quantity || 1) + ' unit') +
+    '<br>Tujuan: ' + esc(r.purpose || '—') +
+    (r.needed_date ? '<br>Diperlukan menjelang ' + fmtDate(r.needed_date) : '') + '</div>';
+
+  if (approve && isAsset) {
+    b += field('Tarikh Jangka Pulang', input('dcDue', 'date', inputDate(due), 'min="' + inputDate(new Date()) + '"'),
+      'Aset akan terus didaftar keluar kepada pemohon', true);
+  }
+  if (approve && !isAsset) {
+    b += '<div class="info-box">Meluluskan akan mengeluarkan <b>' + (r.quantity || 1) +
+      ' unit</b> daripada stok dan merekodkannya atas nama pemohon.</div>';
+  }
+  b += field('Catatan Admin', '<textarea id="dcNote" placeholder="' +
+    (approve ? 'cth. sila ambil di pejabat' : 'cth. stok perlu disimpan untuk keperluan lain') + '"></textarea>',
+    'Disertakan dalam emel kepada pemohon');
+
+  openDrawer(approve ? 'Luluskan Permohonan' : 'Tolak Permohonan',
+    'REQ_' + ('00000' + r.id).slice(-6), b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn ' + (approve ? 'btn-accent' : 'btn-danger') + '" onclick="doDecide(this,' + id + ',' + approve + ')">' +
+      icon(approve ? 'i-check' : 'i-x', 15) + ' ' + (approve ? 'Luluskan' : 'Tolak') + '</button>');
+}
+
+function doDecide(btn, id, approve) {
+  var p = { id: id, admin_notes: val('dcNote') };
+  if ($('dcDue')) p.expected_return_date = val('dcDue');
+  busy(btn);
+  api(approve ? 'ApproveRequest' : 'RejectRequest', p, function (res) {
+    refresh(function () {
+      unbusy(btn); closeDrawer();
+      toast(res && res.mailed === false
+        ? 'Keputusan direkod — tetapi emel gagal dihantar.'
+        : (approve ? 'Permohonan diluluskan dan pemohon dimaklumkan.' : 'Permohonan ditolak dan pemohon dimaklumkan.'),
+        res && res.mailed === false ? 'err' : 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  CSV EXPORT
+// ══════════════════════════════════════════════════════════════════════
+function csvCell(v) {
+  var s = (v == null) ? '' : String(v);
+  // A leading =, +, - or @ makes Excel treat the cell as a formula, so
+  // prefix those with a quote — a spreadsheet-injection guard.
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+function downloadCSV(filename, rows) {
+  // BOM so Excel opens UTF-8 (accented names) correctly.
+  var blob = new Blob(['﻿' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n')],
+    { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  toast('Fail CSV dimuat turun.', 'ok');
+}
+
+function exportCSV() {
+  var rows = [[
+    'Tag Aset', 'Nama', 'Jenis', 'Kategori', 'Lokasi', 'Nombor Siri', 'Status',
+    'Mudah Alih', 'Baki', 'Jumlah', 'Min Stok',
+    'Diperoleh', 'Penyelenggaraan Terakhir', 'Pemeriksaan Seterusnya',
+    'Audit Terakhir', 'Dilupuskan', 'Penjaga Semasa', 'Catatan'
+  ]];
+  filteredItems().forEach(function (i) {
+    rows.push([
+      i.asset_tag, i.name, TYPE_LABEL[i.item_type] || i.item_type, catName(i.category_id), locName(i.location_id),
+      i.serial_number, (STATUS_META[i.status] || {}).label || i.status,
+      i.item_type === 'fixed_asset' ? (String(i.is_portable) === 'FALSE' ? 'Tidak' : 'Ya') : '',
+      i.quantity_available, i.quantity_total, i.min_stock_alert,
+      fmtDate(i.date_acquired), fmtDate(i.date_last_maintained),
+      fmtDate(i.date_next_inspection), fmtDate(i.date_last_audited), fmtDate(i.date_decommissioned),
+      i.open_loan ? custName(i.open_loan.custodian_id) : '', i.notes
+    ]);
+  });
+  downloadCSV('i-nventori_' + inputDate(new Date()) + '.csv', rows);
+}
+
+function exportLedgerCSV() {
+  var rows = [['ID', 'Tarikh', 'Tindakan', 'Tag Aset', 'Item', 'Penjaga', 'Kuantiti',
+               'Jangka Pulang', 'Tarikh Pulang', 'Catatan']];
+  (D.transactions || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); }).forEach(function (t) {
+    var it = itemById(t.item_id);
+    rows.push([
+      t.id, fmtDateTime(t.transaction_date), ACTION_LABEL[t.action_type] || t.action_type,
+      it ? it.asset_tag : '', it ? it.name : ('Item #' + t.item_id),
+      t.custodian_id ? custName(t.custodian_id) : '', t.quantity,
+      fmtDate(t.expected_return_date), fmtDate(t.actual_return_date), t.reason_notes
+    ]);
+  });
+  downloadCSV('i-nventori_lejar_' + inputDate(new Date()) + '.csv', rows);
+}
+</script>
+</body>
+</html>

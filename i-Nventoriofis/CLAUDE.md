@@ -1,4 +1,4 @@
-# i-Nventori — project context for a fresh session
+# i-Nventori Ofis — project context for a fresh session
 
 Read this before doing anything else in this folder. It exists because the useful
 context — why this is not a Laravel app, what deploys how, where the secret lives — is
@@ -19,7 +19,7 @@ transaction ledger, and a dashboard split by Aset vs Inventori.
   `Categories`, `Locations`, `Custodians`, `Transactions`). Deployed as a web app.
 - **Frontend**: `index.html` — one self-contained file (hand-written CSS, vanilla JS,
   no framework, no build step). Served two ways simultaneously, same as i-nstrumen:
-  GitHub Pages at `https://imenhub-portal.github.io/i-Nventori/`, and Apps Script's own
+  GitHub Pages at `https://imenhub-portal.github.io/i-Nventoriofis/`, and Apps Script's own
   `doGet`, which fetches this same file live from `raw.githubusercontent.com` on every
   request (single source of truth), falling back to a stub if GitHub is unreachable.
 - **Database**: the Google Sheet, read/written only through `Code.gs`.
@@ -52,15 +52,15 @@ equivalent, and the names were kept so the code stays reviewable against the spe
 
 ## Sync model — read this before assuming a file is "in the repo"
 
-Run `git ls-files i-Nventori/` to see exactly what syncs. As of this writing:
+Run `git ls-files i-Nventoriofis/` to see exactly what syncs. As of this writing:
 
 ```
-i-Nventori/CLAUDE.md          (this file)
-i-Nventori/Code.gs
-i-Nventori/appsscript.json
-i-Nventori/index.html
-i-Nventori/tests/test_backend.js
-i-Nventori/tests/check_html.js
+i-Nventoriofis/CLAUDE.md      (this file)
+i-Nventoriofis/Code.gs
+i-Nventoriofis/appsscript.json
+i-Nventoriofis/index.html
+i-Nventoriofis/tests/test_backend.js
+i-Nventoriofis/tests/check_html.js
 ```
 
 `.claude/` is **excluded from git** via `.git/info/exclude` at the repo root (along with
@@ -89,6 +89,18 @@ pull` on another PC fetches the latest, you edit it locally, then **manually pas
 into the Apps Script editor** to deploy. `git push` does *not* deploy the backend. This
 is only safe because the file contains no literal secrets.
 
+## Naming and the URL rename
+
+The system is **i-Nventori Ofis**. It lived at `/i-Nventori/` until the owner renamed it;
+the folder is now `i-Nventoriofis/` and the live link is
+`https://imenhub-portal.github.io/i-Nventoriofis/`.
+
+`i-Nventori/index.html` is kept as a **redirect stub** so links shared before the rename
+still land somewhere sensible instead of a bare 404. It can be deleted once nobody uses
+the old address. Note that renaming the folder also changes `UI_RAW_URL` in `Code.gs`,
+which means the backend **must be redeployed** — otherwise `doGet` fetches a path that no
+longer exists and serves its fallback stub.
+
 ## Live deployment
 
 Already wired in — do not re-enter these:
@@ -104,7 +116,7 @@ Already wired in — do not re-enter these:
 
 - `https://script.google.com/macros/s/AKfycbyY2fSJbt6…/exec` — the **API**, from the
   Apps Script deployment. The page calls this for data.
-- `https://imenhub-portal.github.io/i-Nventori/` — the **link people open**, from GitHub
+- `https://imenhub-portal.github.io/i-Nventoriofis/` — the **link people open**, from GitHub
   Pages. This is what you share.
 
 Remaining one-time steps in the Apps Script editor:
@@ -284,7 +296,7 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   vs. value out per month by joining the ledger against each item's `unit_cost` — the
   asset-register analogue of a profit/loss chart.
 - This is a shared monorepo with independent sessions working on other apps. Always
-  `git pull --rebase` before pushing, and keep commits scoped to `i-Nventori/`.
+  `git pull --rebase` before pushing, and keep commits scoped to `i-Nventoriofis/`.
 
 ## How to verify a change before considering it done
 
