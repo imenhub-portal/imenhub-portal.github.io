@@ -1,62 +1,117 @@
-# i-Nventori Ofis — project context for a fresh session
+# i-Nventori Ofis — read this first
 
-Read this before doing anything else in this folder. It exists because the useful
-context — why this is not a Laravel app, what deploys how, where the secret lives — is
-otherwise scattered across a chat history on one machine, or sitting in files that
-**do not sync** to a fresh `git pull` (see "Sync model"). This file does sync — keep it
-updated whenever you make a change worth a future session knowing about.
+Everything a fresh session needs is in this file. It exists because the useful context —
+why this is not a Laravel app, what deploys how, where the secret lives, and which
+"obvious improvements" are actually decisions already taken — is otherwise scattered across
+a long chat history on one machine, or sitting in files that **do not sync** to a fresh
+`git pull` (see [Sync model](#sync-model)).
 
-## What this is
+Keep it updated. If you change behaviour worth a future session knowing, edit this file in
+the same commit — and when you retire a feature, **delete the paragraph describing it**
+rather than adding a newer one beside it. This document was once patched incrementally
+until it claimed both that `is_portable` had been added and that it had been removed.
 
-A Google Apps Script backend + GitHub Pages frontend + Google Sheets database, for
-tracking IMEN's office **Alat Tulis** (kertas, pen, dakwat) and **Aset Alih** (laptop,
-projektor, mikrofon). It answers two questions and only two: **where is each asset**, and
-**how much stock is left**. It is deliberately NOT an
-accounting system — there is no cost, no depreciation, no book value and no warranty
-tracking anywhere in it. Check-out/check-in with email notification, an immutable
-transaction ledger, and a dashboard split by Aset vs Inventori.
+---
 
-- **Backend**: `Code.gs` — Apps Script bound to a Google Sheet (tabs: `Items`,
-  `Categories`, `Locations`, `Custodians`, `Transactions`). Deployed as a web app.
-- **Frontend**: `index.html` — one self-contained file (hand-written CSS, vanilla JS,
-  no framework, no build step). Served two ways simultaneously, same as i-nstrumen:
-  GitHub Pages at `https://imenhub-portal.github.io/i-Nventoriofis/`, and Apps Script's own
-  `doGet`, which fetches this same file live from `raw.githubusercontent.com` on every
-  request (single source of truth), falling back to a stub if GitHub is unreachable.
-- **Database**: the Google Sheet, read/written only through `Code.gs`.
+## 1. What this is
+
+A Google Apps Script backend + GitHub Pages frontend + Google Sheets database for tracking
+IMEN's office supplies and portable equipment. **Two categories, and only two:**
+
+| Category | Enum key | Nature |
+|---|---|---|
+| **Alat Tulis** | `consumable` | Kertas, pen, dakwat. A quantity of interchangeable units. Runs out, gets topped up. **Issued, never returned.** No asset tag. |
+| **Aset Alih** | `fixed_asset` | Laptop, projektor, mikrofon, penunjuk laser. One physical thing each. **Borrowed and returned.** Carries an asset tag. |
+
+It answers two questions and only two: **where is each asset**, and **how much stock is
+left**. It is deliberately **not** an accounting system — there is no cost, no
+depreciation, no book value, no warranty tracking anywhere in it.
+
+Two audiences, one HTML file:
+
+- **Pemohon (public, no password)** — browses availability and submits requests.
+- **Admin (one shared password)** — approves requests and manages everything.
+
+### Pieces
+
+- **Backend**: `Code.gs` — Apps Script bound to a Google Sheet. Deployed as a web app.
+- **Frontend**: `index.html` — one self-contained file: hand-written CSS, vanilla JS, no
+  framework, no build step. Served two ways at once, same as i-nstrumen: GitHub Pages, and
+  Apps Script's own `doGet` which fetches this same file live from
+  `raw.githubusercontent.com` on every request (single source of truth), falling back to a
+  stub if GitHub is unreachable.
+- **Database**: the Google Sheet, read and written only through `Code.gs`.
 
 Part of the `imenhub` monorepo (remote: `imenhub-portal/imenhub-portal.github.io`, a
-**public** GitHub Pages repo). **Because the repo is public, no real secret value may
-ever appear in a committed file** — see Secrets below.
+**public** GitHub Pages repo). **Because the repo is public, no real secret value may ever
+appear in a committed file** — see [Secrets](#secrets).
 
-## Why this is not Laravel
+---
 
-The original specification asked for Laravel 11 + MySQL. That cannot run here: GitHub
-Pages serves static files only and has no PHP runtime, and the whole monorepo (10 sibling
-apps) is built on the Apps Script + Sheets pattern. **This was raised with the project
-owner, who chose to build the full specification on the imenhub stack rather than change
-hosting.** Nothing in the spec was dropped — every Laravel construct has a direct
-equivalent, and the names were kept so the code stays reviewable against the spec:
+## 2. Why this is not Laravel
+
+The original specification asked for Laravel 11 + MySQL. That cannot run here: GitHub Pages
+serves static files only and has no PHP runtime, and the whole monorepo is built on the
+Apps Script + Sheets pattern. **This was raised with the owner, who chose to build on the
+imenhub stack rather than change hosting.** The Laravel names were kept where they map, so
+the code stays reviewable against the original spec:
 
 | Spec (Laravel) | Here (`Code.gs`) |
 |---|---|
 | Migrations | `ensureSheets_()` — idempotent, with header auto-heal |
 | Eloquent model + `$casts` | `_readTable_()` |
-| `scopeOverdue()` etc. | the `SCOPES` object |
+| Query scopes | the `SCOPES` object |
 | `DB::transaction()` | `_txn_()` (LockService) |
-| `StoreItemRequest` etc. | `_validate_(schema, payload)` |
+| FormRequest validation | `_validate_(schema, payload)` |
 | Routes + `auth` middleware | `doPost` switch + `ACTIONS_ADMIN` |
-| `InventoryService` | the `svc*` functions |
-| Scheduler `inventory:check-dates` | `checkDates()` + `installTriggers()` |
-| `<x-table>` / `<x-badge>` / `<x-slide-over>` | `itemsTable()` / `pill()` / `openDrawer()` |
+| `InventoryService` | the `svc*` functions (16 of them) |
+| Scheduler | `checkDates()` + `installTriggers()` |
+| Blade components | `itemsTable()` / `pill()` / `openDrawer()` |
 | SoftDeletes | the `deleted_at` column, filtered on every read |
 
-## Sync model — read this before assuming a file is "in the repo"
+---
+
+## 3. Live deployment
+
+Already wired in — do not re-enter these:
+
+| Constant | Value | Where |
+|---|---|---|
+| `SPREADSHEET_ID` | `1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E` | `Code.gs` |
+| `FOLDER_ID` | `1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7` | `Code.gs` |
+| `ADMIN_EMAIL` | `imenmakmal@gmail.com` | `Code.gs` — **fallback only**, see §6 |
+| `API_URL` (`/exec`) | deployment `AKfycbyY2fSJbt6…` | `index.html`, in the shim |
+
+**Two different URLs, endlessly confused:**
+
+- `https://script.google.com/macros/s/AKfycbyY2fSJbt6…/exec` — the **API**, from the Apps
+  Script deployment. The page calls this for data.
+- `https://imenhub-portal.github.io/i-Nventoriofis/` — the **link people open**. This is
+  what gets shared.
+
+### Naming and the URL rename
+
+The system is **i-Nventori Ofis**. It lived at `/i-Nventori/` until the owner renamed it;
+the folder is now `i-Nventoriofis/`. `i-Nventori/index.html` is kept as a **redirect stub**
+so links shared before the rename still land somewhere sensible instead of a bare 404. It
+can be deleted once nobody uses the old address.
+
+### <a name="secrets"></a>Secrets
+
+| Property | Used by | Effect if missing |
+|---|---|---|
+| `ADMIN_PASSWORD` | `_adminPassword_()` | **Fails closed** — nobody can log in and every gated action is denied. Deliberate: a missing property must never mean "no password required". The login names this specific cause rather than saying "wrong password". |
+
+Current value is `hazde`, set by the owner in **Project Settings → Script Properties**.
+
+---
+
+## 4. <a name="sync-model"></a>Sync model — read before assuming a file is "in the repo"
 
 Run `git ls-files i-Nventoriofis/` to see exactly what syncs. As of this writing:
 
 ```
-i-Nventoriofis/CLAUDE.md      (this file)
+i-Nventoriofis/CLAUDE.md          (this file)
 i-Nventoriofis/Code.gs
 i-Nventoriofis/appsscript.json
 i-Nventoriofis/index.html
@@ -64,10 +119,9 @@ i-Nventoriofis/tests/test_backend.js
 i-Nventoriofis/tests/check_html.js
 ```
 
-`.claude/` is **excluded from git** via `.git/info/exclude` at the repo root (along with
-`_local/` and `_backend/`). Note that rule: **do not put anything you want to keep in a
-folder named `_backend/`** — that is why the tests live in `tests/` and not `_backend/`
-like i-print's do.
+`.claude/` is **excluded from git** via `.git/info/exclude` at the repo root, along with
+`_local/` and `_backend/`. Note that last rule: **do not put anything you want to keep in a
+folder named `_backend/`** — that is why the tests live in `tests/`.
 
 To recreate the local dev-server config on a fresh machine (`.claude/launch.json`):
 
@@ -85,318 +139,338 @@ To recreate the local dev-server config on a fresh machine (`.claude/launch.json
 }
 ```
 
-**Why `Code.gs` is tracked**: committing it is how work moves between machines — `git
-pull` on another PC fetches the latest, you edit it locally, then **manually paste it
-into the Apps Script editor** to deploy. `git push` does *not* deploy the backend. This
-is only safe because the file contains no literal secrets.
+**Why `Code.gs` is tracked**: committing it is how work moves between machines — `git pull`
+on another PC fetches the latest, you edit it locally, then **paste it into the Apps Script
+editor** to deploy. `git push` does *not* deploy the backend. This is only safe because the
+file contains no literal secrets.
 
-## Naming and the URL rename
+---
 
-The system is **i-Nventori Ofis**. It lived at `/i-Nventori/` until the owner renamed it;
-the folder is now `i-Nventoriofis/` and the live link is
-`https://imenhub-portal.github.io/i-Nventoriofis/`.
+## 5. Deploying a change
 
-`i-Nventori/index.html` is kept as a **redirect stub** so links shared before the rename
-still land somewhere sensible instead of a bare 404. It can be deleted once nobody uses
-the old address. Note that renaming the folder also changes `UI_RAW_URL` in `Code.gs`,
-which means the backend **must be redeployed** — otherwise `doGet` fetches a path that no
-longer exists and serves its fallback stub.
+Frontend and backend deploy completely differently. Mixing them up wastes an hour, and has.
 
-## Live deployment
+1. **`index.html`** — commit + push. GitHub Pages publishes it automatically, and Apps
+   Script's `doGet` picks it up on the next request. **No redeploy needed.**
+2. **`Code.gs`** — push does **nothing** to the live backend. Paste the file into the Apps
+   Script editor, then **Deploy → Manage deployments → ✏️ Edit existing deployment →
+   Version: New version → Deploy**. ⚠️ **Never "New deployment"** — that mints a *new*
+   `/exec` URL and `API_URL` in `index.html` must keep matching it.
 
-Already wired in — do not re-enter these:
+New sheet tabs and columns appear by themselves on the next request; `ensureSheets_()`
+creates and header-heals but **never deletes**.
 
-| Constant | Value | Where |
-|---|---|---|
-| `SPREADSHEET_ID` | `1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E` | `Code.gs:25` |
-| `FOLDER_ID` | `1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7` | `Code.gs:26` |
-| `ADMIN_EMAIL` | `imenmakmal@gmail.com` | `Code.gs:27` |
-| `API_URL` (`/exec`) | deployment `AKfycbyY2fSJbt6…` | `index.html`, in the shim |
+**The most common support question** is "the page says it cannot load the list". That is
+almost always `index.html` (published instantly) being newer than the deployed `Code.gs`.
+The page detects `Unknown API function` specifically and says so, naming the redeploy
+steps — do not replace that with a generic "please reload".
 
-**Two different URLs, easy to confuse:**
+---
 
-- `https://script.google.com/macros/s/AKfycbyY2fSJbt6…/exec` — the **API**, from the
-  Apps Script deployment. The page calls this for data.
-- `https://imenhub-portal.github.io/i-Nventoriofis/` — the **link people open**, from GitHub
-  Pages. This is what you share.
+## 6. Architecture
 
-Remaining one-time steps in the Apps Script editor:
-
-1. Paste `Code.gs` into the bound project.
-2. **Project Settings → Script Properties → add `ADMIN_PASSWORD`.** Never put this in a
-   file — the repo is public.
-3. Run `setup()` once. It creates the sheet tabs, seeds starter categories/locations, and
-   installs the daily 07:00 trigger.
-4. Deploy → Manage deployments → Edit → New version → Deploy.
-
-## Secrets
-
-| Property | Used by | Effect if missing |
-|---|---|---|
-| `ADMIN_PASSWORD` | `_adminPassword_()` | **Fails closed** — nobody can log in and every gated action is denied. This is deliberate: a missing property must never mean "no password required". |
-
-## Deploying a change
-
-Frontend and backend deploy completely differently — mixing them up wastes an hour:
-
-1. **Frontend (`index.html`)**: commit + push. GitHub Pages publishes it automatically,
-   and Apps Script's `doGet` picks it up on the next request (no redeploy needed).
-2. **Backend (`Code.gs`)**: push does **nothing** to the live backend. Paste the file
-   into the Apps Script editor, then **Deploy → Manage deployments → ✏️ Edit existing
-   deployment → Version: New version → Deploy**. ⚠️ **Never click "New deployment"** —
-   that mints a *new* `/exec` URL, and `API_URL` in `index.html` must keep matching it.
-
-Either order is safe mid-rollout as long as the JSON contract does not change
-(`doPost`'s `{fn, args}` request shape, `{ok, result}` / `{ok:false, error}` response).
-
-## Architecture summary
+### HTTP entry points
 
 **`doGet(e)`** — `?format=json` returns the raw payload; otherwise fetches and serves
 `index.html` from GitHub.
 
-**`doPost(e)`** — the JSON API. Six entry points, explicitly allowlisted; anything else
-is rejected: `getInitialData`, `getPublicCatalog`, `handleAction`, `adminLogin`,
-`getItemHistory`, `startResumableUpload`.
+**`doPost(e)`** — the JSON API. Dispatch is an explicit `switch`; **eight** entry points are
+reachable and nothing else:
 
-**Two audiences, one file.** Opening the link with no stored password lands on the
-**public Pemohon page** (`#public`), which browses `getPublicCatalog` and can submit a
-request. "Log Masuk Admin" reveals the gate; a stored password boots straight into the
-admin shell. There is no second HTML file to keep in sync.
+| Function | Auth |
+|---|---|
+| `getInitialData(pass)` | admin payload; anonymous callers get a stripped version |
+| `getPublicCatalog()` | **none** — see the privacy note below |
+| `getReturnContext(token)` | **token** |
+| `startReturnUpload(token, …)` | **token** |
+| `handleAction(action, payload)` | per-action, see below |
+| `adminLogin(pass)` | none (it *is* the login) |
+| `getItemHistory(id, pass)` | admin |
+| `startResumableUpload(…, pass)` | admin |
 
-**`handleAction(actionType, payload)`** — the single dispatch point. Authorization is
-enforced *before* the switch, so no individual handler can forget it. Every write is
-wrapped in `_txn_` and appends exactly one `Transactions` row.
+**`handleAction(actionType, payload)`** is the single dispatch point for writes.
+Authorization is enforced *before* the switch, so no individual handler can forget it.
 
-**Authorization** — one shared admin password, checked **server-side on every gated
-action**. A client-side boolean is never trusted, because `doPost` is callable
-anonymously from anywhere. Anonymous callers can read inventory but receive **no
-custodian records and no ledger** — custodian names/emails are personal data (this is
-the `GetAllIMenianUsers` lesson from i-nstrumen, applied up front).
+- `ACTIONS_PUBLIC` — `Ping`, `SubmitRequest`, `SubmitReturnProof`. These create pending
+  rows only; nothing moves without an admin.
+- `ACTIONS_ADMIN` — everything else, checked against `_adminPassword_()` server-side on
+  every call. A client-side boolean is never trusted, because `doPost` is callable
+  anonymously from anywhere.
 
-**Data model** — see `SCHEMA` at the top of `Code.gs`. The spec's financial columns
-(`unit_cost`, `salvage_value`, `useful_life_years`, `date_warranty_expiry`) were
-**removed at the owner's request** — this is a location/stock tracker, not an asset
-register for accounting. `is_portable` was added instead. If those columns still exist
-in an older sheet they are simply ignored; `ensureSheets_()` never deletes a column.
+Every write is wrapped in `_txn_` (LockService) and appends exactly one `Transactions` row.
 
-**The ledger is genuinely immutable, not just by convention.** `_update_()` throws if
-handed the `Transactions` tab, so there is no code path that can edit or delete a ledger
-row. A check-in appends a **new** `check_in` row; it does not touch the original
-`check_out` row. Open loans are *derived* by replaying the ledger (`_openLoans_`) rather
-than stored, so the two can never drift apart. A test asserts this mechanically.
+### The sheet
 
-**Date engine** — `checkDates()` runs daily at 07:00 via a time-driven trigger and emails
-one digest. It uses the same `SCOPES` predicates the dashboard badges use, so the email
-and the UI can never disagree about what is overdue. A test asserts they match.
+| Tab | Purpose |
+|---|---|
+| `Items` | Both categories, distinguished by `item_type` |
+| `Transactions` | **Immutable ledger** |
+| `Requests` | One row per requested **line**, grouped by `group_id` |
+| `Custodians` | Auto-built directory of anyone who borrowed or received something |
+| `Locations` | Storage places |
+| `Config` | Key/value settings (the Pentadbir Inventori) |
+| `Categories` | **Legacy, unused.** Kept because `ensureSheets_()` never deletes |
 
-## Gotchas / things not to "fix" without asking first
+Retired columns that remain in the sheet, harmless and no longer read: `unit_cost`,
+`salvage_value`, `useful_life_years`, `date_warranty_expiry`, `is_portable`, `category_id`,
+`requester_department`.
 
-- **`bookValue()` in `index.html` deliberately mirrors `_bookValue_()` in `Code.gs`.**
-  The duplication is intentional — it powers the live "nilai buku" preview in the item
-  drawer before anything is saved. If you change one, change both.
-- **Quantity is not editable on the item edit form**, by design. Stock only moves through
-  the ledgered actions (Tambah/Kurang Stok, check-out/in, audit), so the item row can
-  never disagree with the ledger. Making the field editable would reintroduce that drift.
-- **A fixed asset's open-loan check runs before its stock check** in `svcCheckOut`. An
-  asset out on loan also has `quantity_available: 0`, and "stok tidak mencukupi" is a
-  true but useless answer to "why can't I borrow this?". Order matters; a test covers it.
+### The Pentadbir Inventori
+
+The officer who approves requests and receives every notification. Held in `Config`
+(`admin_name`, `admin_email`, `admin_cc`) so changing the officer needs **no redeploy** —
+it is edited in Tetapan. `_adminEmail_()` / `_adminName_()` / `_adminCc_()` resolve from
+there, falling back to the `ADMIN_EMAIL` constant so mail never silently goes nowhere on a
+sheet that predates this.
+
+Note this is **unrelated** to `Custodians`. Custodians are the people who *borrow and
+receive*; they approve nothing.
+
+### Admin UI
+
+Nav: **Permohonan · Alat Tulis · Aset Alih · Ringkasan · Laporan · Tetapan**, mirrored in
+the icon rail. Login lands on **Permohonan** — pending requests are what need acting on.
+
+Alat Tulis and Aset Alih are the two top-level sections, and that is the organising idea.
+Everything applying to only one lives inside it as a sub-tab:
+
+- **Alat Tulis** → Senarai | Stok | Log
+- **Aset Alih** → Senarai | Pinjaman | Log
+
+`viewSection()` owns the shell; `viewItems` / `viewStock` / `viewLoans` / `viewLedger` each
+take an `embed` flag so they render without their own page header when a section supplies
+one. Tetapan holds **Lokasi · Pentadbir Inventori**.
+
+---
+
+## 7. Decisions already taken — do not "fix" these without asking
+
+Each of these looks like an oversight and is not.
+
+### Model and terminology
+
+- **There is no money in this app.** No unit cost, depreciation, book value or warranty.
+  Removed at the owner's request: it is a location/stock tracker, not an asset register for
+  accounting. Do not reintroduce a "total value" figure — for stationery it was meaningless
+  anyway.
+- **There are exactly two categories, and they *are* the item type.** The user-managed
+  `Categories` table and the `is_portable` flag were both removed: a second classification
+  had nothing left to hold, and every asset is movable by definition now. `catName()`
+  survives only so the CSV keeps exporting whatever legacy rows already carry.
+- **Only Aset Alih carries an `asset_tag`.** A tag names one physical thing you can stick a
+  label on. Alat Tulis is a quantity of interchangeable units, so `svcAddItem` leaves its
+  tag blank and the UI shows an "Alat Tulis" pill in that column instead. Alat Tulis
+  therefore does not consume numbers in the `AST-YYYY-NNNN` sequence.
 - **Asset tags widen past 9999** (`AST-2026-10000`) rather than wrapping, which would
   collide with `AST-2026-0001`. Soft-deleted items keep their tag reserved.
-- **CDN libraries are lazy-loaded on first use, never at boot** (`qrcodejs`,
-  `html5-qrcode`). `tests/check_html.js` fails the build if a `<script src>` appears in
-  the document. Keeping boot dependency-free is why the page loads instantly.
-- **No Tailwind.** i-nstrumen flags its Tailwind CDN as a known anti-pattern; this app
-  uses hand-written CSS custom properties instead, so the "single self-contained file,
-  paste to deploy" workflow keeps working.
-- **The instant-load behaviour is a deliberate contract, not an accident.** On a repeat
-  visit `boot()` paints straight from the `localStorage` cache — measured at ~5 ms, with
-  no spinner and no "stale data" banner — then refreshes in the background. The refresh
-  **compares the new payload against the cached one and skips the repaint entirely if
-  nothing changed**, so a background fetch can never flicker the view someone is reading.
-  A failed background refresh is silent by design (`refresh(true)`), because the user
-  still has usable data and any *write* would surface its own error. Do not "fix" this by
-  adding a loading state to the cached path.
-- **The `<head>` prefetch is tagged with the password it used (`__earlyPass`),
-  and `boot()` must only consume it when that matches the current session.**
-  This is not defensive coding — it is a shipped bug that got fixed. On a first
-  visit the prefetch runs anonymously, so the server correctly answers
-  `is_admin:false`; `boot()` then read that stale anonymous payload *after* a
-  successful login, concluded the session was expired, and bounced the user
-  straight back to the login screen ("blinks in, then returns to login").
-  `__earlyPending` covers the case where the prefetch was never issued at all,
-  which would otherwise leave `boot()` waiting on a result that never arrives.
-  The logout branch is also guarded on `PASS` being non-empty, so an anonymous
-  payload can never trigger a logout. Five scenarios are covered by the browser
-  walk-through in "How to verify" — re-run them if you touch boot/login.
-- **Every colour is a CSS custom property**, which is what makes the dark theme a pure
-  token swap under `[data-theme="dark"]` with no duplicated layout rules. If you add a
-  hard-coded hex anywhere, dark mode silently breaks for that element. The theme is
-  applied by a tiny inline script in `<head>` **before first paint**, so dark-mode users
-  never see a white flash.
-- **The dashboard is split into Aset Tetap and Inventori Guna Habis on
-  purpose — do not merge them back into one summary.** The two are measured
-  in different units: an asset's worth is its depreciated *book value*, while
-  a box of pens is simply *unit cost x quantity on hand* (consumables have
-  `useful_life_years: 0`, so `_bookValue_` correctly returns cost unchanged).
-  Averaging them produced a headline number that meant nothing for either,
-  which is what prompted the split.
-- **`getPublicCatalog` is a deliberately separate, narrower payload — do not "simplify"
-  it by reusing `getInitialData`.** It is reachable without any password, so it carries
-  availability and location but **never** the name or email of whoever holds an asset,
-  never the ledger, and never the custodian directory. An unavailable asset reports its
-  expected return date and nothing more. Tests assert the serialised payload contains no
-  "@" and no custodian reference.
-- **Approving a request runs the real handover path.** `svcDecideRequest` calls
-  `svcCheckOut` (assets) or `svcStockChange` (inventory) rather than reimplementing
-  them, so the ledger row, the recipient resolution and the emails are identical to an
-  admin-initiated handover. There is no second implementation to drift out of step.
-- **`SubmitRequest` is the only public write action.** It is in `ACTIONS_PUBLIC`, so it
-  needs no password — but it only ever creates a *pending* row. Nothing moves until an
-  admin approves. Availability is re-checked server-side at submit AND again at approve,
-  because the browser's copy of the catalog can be minutes stale.
-- **Inventori and Aset are the two top-level sections, and that is the whole
-  organising idea — do not flatten them back into one item list.** They are
-  different kinds of thing (see the terminology note below), so everything that
-  only applies to one lives inside it as a sub-tab: Stok under Inventori,
-  Pinjaman under Aset, and each half of the audit log under its own section.
-  Ringkasan stays as the single combined dashboard across both.
-  `viewSection()` owns the shell; `viewItems/viewStock/viewLoans/viewLedger`
-  each take an `embed` flag so they can render without their own page header.
-- **The section log defaults to its own type but can widen to `Semua rekod`
-  (`LEDGER_SCOPE`).** Splitting the ledger by section is good for daily use, but
-  an audit trail you cannot read end to end is not an audit trail — so the full
-  combined view stays one click away, and CSV export is always the whole ledger.
-- **There are exactly two categories, and they are the item type.** `Alat Tulis`
-  (`consumable`) and `Aset Alih` (`fixed_asset`). The user-managed `Categories` table and
-  the `is_portable` flag were both removed: a second classification had nothing left to
-  hold, and every asset is movable by definition now. `catName()` survives only so the
-  CSV keeps exporting whatever legacy rows already carry. Do not reintroduce either.
-- **A topup records when it arrived and where it came from; a withdrawal records
-  neither.** `svcStockChange` takes `received_date` and `source` on `stock_add` only, and
-  **throws** if either appears on a `stock_remove` — an issue happens at the counter in
-  the moment, so allowing them would let a withdrawal be quietly backdated or attributed
-  to a supplier. Backdating a *delivery* is normal (stock often arrives days before anyone
-  records it) but a **future** date is rejected: the stock is not physically there, so
-  counting it would make the balance a lie. `source` is free text with a `<datalist>` of
-  values already used, built client-side from `D.transactions` — no Suppliers table to
-  maintain, and the second delivery from the same shop is one keystroke.
+
+### The ledger
+
+- **`Transactions` is immutable mechanically, not by convention.** `_update_()` **throws**
+  if handed that tab, so no code path can edit or delete a row. A check-in appends a *new*
+  row; it never touches the original `check_out`. Open loans are **derived** by replaying
+  the ledger (`_openLoans_`) rather than stored, so the two cannot drift. A test asserts
+  no ledger mutation ever occurs.
+- **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
+  so whose evidence a `check_in` row holds is never ambiguous.
+
+### Stock movements
+
+- **A stock issue records `custodian_id`, and that is the whole point of it.** Before this,
+  "who took the pens" could only be free text — unsearchable and impossible to total. The
+  field is *optional* because stock also leaves for damage or loss; those units count
+  toward total issuance but are excluded from per-staff figures.
+- **A topup records when it arrived and where it came from; a withdrawal records neither.**
+  `svcStockChange` takes `received_date` and `source` on `stock_add` only and **throws** if
+  either appears on a `stock_remove` — an issue happens at the counter in the moment, so
+  allowing them would let a withdrawal be quietly backdated or attributed to a supplier.
+  Backdating a *delivery* is normal; a **future** date is rejected because the stock is not
+  physically there and counting it would make the balance a lie. `source` is free text with
+  a `<datalist>` of values already used, built from `D.transactions` — no Suppliers table
+  to maintain.
+- **Quantity is not editable on the item edit form.** Stock only moves through ledgered
+  actions, so the item row can never disagree with the ledger.
+- **A fixed asset's open-loan check runs *before* its stock check** in `svcCheckOut`. An
+  asset on loan also has `quantity_available: 0`, and "stok tidak mencukupi" is a true but
+  useless answer to "why can't I borrow this?".
+
+### Requests
+
 - **A request carries many items.** `Requests` holds one row per line with a shared
   `group_id`, rather than a header/detail pair of tabs — that keeps `svcDecideRequest`
-  working per row, makes partial approval natural, and needs no join.
-  `svcSubmitRequest` validates **every** line before writing anything, so "2 rim kertas
-  and 4 pen" where the pens are short is rejected whole rather than half-recorded. And it
-  sends **one** acknowledgement listing all lines: four pens must not mean four emails.
-  `svcDecideGroup` loops the group and delegates to `svcDecideRequest`, so there is no
-  second handover implementation to drift.
+  working per row, makes partial approval natural, and adds no join.
+- **`svcSubmitRequest` validates every line before writing anything**, so "2 rim kertas and
+  4 pen" where the pens are short is rejected **whole** rather than half-recorded. It sends
+  **one** acknowledgement listing all lines: four pens must not mean four emails.
+- **`svcDecideGroup` delegates to `svcDecideRequest`**, which calls the real `svcCheckOut` /
+  `svcStockChange`. There is deliberately no second handover implementation to drift.
+- **Availability is re-checked server-side at submit *and* at approve**, because the
+  browser's catalog can be minutes stale.
 - **The public page is two big buttons, then a form.** Choosing Alat Tulis or Aset Alih
   first lets each form be shaped for its kind — quantities and stock for stationery,
-  availability and return dates for equipment — instead of one form hedging for both.
-  Availability is baked into each dropdown option, so a requester never looks it up
-  elsewhere. There is no Jabatan field.
-- **Return proof is gated by a capability token, not a password.** `startResumableUpload`
-  requires admin; for a borrower to upload, that gate has to open, and an unauthenticated
-  upload endpoint lets anyone with the URL fill the Drive folder. So the check-out email
-  carries `?pulang=<token>` granting exactly three things scoped to one loan: read that
-  item's public details, one Drive upload, attach a photo URL. `_itemByReturnToken_` is
-  the single place that rule lives. The token is minted at check-out, stored on the
-  `Items` row, and **cleared at check-in** — closing the loan is what expires the link.
-  Submitting proof deliberately does **not** close the loan; the admin still confirms
-  physical receipt.
-- **`capture="environment"` on the file input IS the camera feature.** One attribute makes
-  a phone open the camera instead of a file picker. No getUserMedia, no extra library.
+  availability and return dates for equipment. Availability is baked into each dropdown
+  option so a requester never looks it up elsewhere. **There is no Jabatan field.**
+
+### Privacy
+
+- **`getPublicCatalog` is a deliberately separate, narrower payload — do not "simplify" it
+  by reusing `getInitialData`.** It is reachable without any password, so it carries
+  availability and location but **never** the name or email of whoever holds an asset,
+  never the ledger, never the custodian directory. An unavailable asset reports its
+  expected return date and nothing more. Tests assert the serialised payload contains no
+  `@` and no custodian reference. The same assertion covers `getReturnContext`.
+- **`config` is blanked for anonymous callers** — the officer's address is contact detail,
+  not public data.
+
+### Return proof
+
+- **The borrower's link carries a capability token, not a password.**
+  `startResumableUpload` requires admin; for a borrower to upload, that gate must open, and
+  an unauthenticated upload endpoint lets anyone with the URL fill the Drive folder. So the
+  check-out email carries `?pulang=<token>` granting exactly three things scoped to one
+  loan: read that item's public details, one Drive upload, attach a photo URL.
+  `_itemByReturnToken_` is the single place that rule lives. The token is minted at
+  check-out, stored on the `Items` row, and **cleared at check-in** — closing the loan is
+  what expires the link.
+- **Submitting proof deliberately does not close the loan.** The admin still confirms
+  physical receipt, and the officer's email says so explicitly.
+- **`capture="environment"` on the file input *is* the camera feature.** One attribute makes
+  a phone open the camera instead of a file picker — no getUserMedia, no extra library.
   `dropZone(key, camera, label)` takes it as a flag; `doUpload()` routes through
   `startReturnUpload` when `RETURN_TOKEN` is set and `startResumableUpload` otherwise.
-- **`Transactions` has `photo_borrower` and `photo_admin` as separate columns**, not one
-  shared photo field, so whose evidence a `check_in` row holds is never ambiguous.
+
+### Frontend mechanics
+
+- **Instant load is a contract, not an accident.** On a repeat visit `boot()` paints
+  straight from the `localStorage` cache — measured at ~5 ms, no spinner, no "stale data"
+  banner — then refreshes in the background and **skips the repaint entirely if nothing
+  changed**, so a background fetch can never flicker the view someone is reading. A failed
+  background refresh is silent by design. Do not add a loading state to the cached path.
+- **The `<head>` prefetch is tagged with the password it used (`__earlyPass`), and `boot()`
+  only consumes it when that matches the current session.** This is a shipped bug that got
+  fixed: on a first visit the prefetch runs anonymously, so the server correctly answers
+  `is_admin:false`; `boot()` then read that stale payload *after* a successful login,
+  concluded the session had expired, and bounced the user back to the login screen. On a
+  public visit the prefetch is skipped entirely. `__earlyPending` distinguishes "in flight"
+  from "never issued", so a prefetch that failed to start cannot leave `boot()` waiting
+  forever.
 - **`_readTable_` keys blank-row detection off `id`, falling back to the first column.**
   `Config` is key/value with no `id`; without that fallback every row in such a tab is
-  silently discarded — which is exactly what happened when Config was first added, making
-  the officer setting appear to save and then vanish.
-- **There is no money in this app, by decision.** No unit cost, no depreciation, no
-  book value, no warranty. It tracks *where things are* and *how many are left*. Do not
-  reintroduce a "total value" figure — it was removed because it answered a question
-  nobody here was asking, and for stationery it was meaningless anyway.
-- **Only assets carry an `asset_tag`.** A tag names one physical thing you can stick a
-  label on. Inventory is a quantity of interchangeable units, so `svcAddItem` leaves
-  its tag blank and the UI shows an "Inventori" pill in that column instead. Inventory
-  therefore does not consume numbers in the AST-YYYY-NNNN sequence.
-- **Terminology is the owner's, and the two words are not interchangeable.**
-  *Aset* = kerusi, meja, komputer, alat besar — tracked one by one, depreciated,
-  and loanable if movable. *Inventori* = alat tulis, kertas, kartrij — tracked
-  by quantity, issued not borrowed, never depreciated. The DB enum stays
-  `fixed_asset`/`consumable`; only the labels changed. Do not reintroduce
-  "Aset Tetap" or "Bahan Guna Habis".
-- **`is_portable` gates who can be handed an asset.** Blank counts as movable
-  so rows predating the column keep working; only an explicit `FALSE` (meja,
-  kerusi) blocks check-out. Enforced server-side in `svcCheckOut`, and the
-  check-out list filters to movable assets only so the admin is never offered
-  a choice the server will reject. Inventory is excluded from that list
-  entirely — pens are issued through Keluar Stok and never come back.
-- **A handover can name a recipient who does not exist yet.** Typing a name +
-  email in the check-out form creates (or matches by lowercased email) a real
-  Custodian row, so the ledger keeps a genuine foreign key and the person is
-  reusable — rather than the name living as loose text. `_resolveRecipient_`
-  owns this.
-- **Both ends of a handover send email**, each carrying a TRX reference, full
-  timestamps, and — on return — the duration held and whether it was late.
-  Sending is best-effort and wrapped in try/catch: the ledger row is already
-  written, and a mail-quota failure must never roll back a handover that
-  physically happened. Both actions return `mailed:true|false` so the toast
-  reports honestly instead of claiming an email that never left.
-- **A stock issue records `custodian_id`, and that is the whole point of it.**
-  Before this, "who took the pens" could only be free text in `reason_notes`
-  — unsearchable and impossible to total per person. The field is *optional*
-  because stock also leaves for damage or loss with no recipient; those units
-  count toward total issuance but are excluded from per-staff figures.
-  `issueStats()` in `index.html` derives all per-staff and per-item
-  consumption from the ledger alone, so it can never drift from it. A
-  recipient on a stock *addition* is rejected — nobody receives a restock.
-- **The dashboard chart is real data, not decoration.** `monthlyFlow()` derives value in
-  vs. value out per month by joining the ledger against each item's `unit_cost` — the
-  asset-register analogue of a profit/loss chart.
+  silently discarded — which is exactly what happened when `Config` was added, making the
+  officer setting appear to save and then vanish.
+- **Every colour is a CSS custom property.** That is what makes the dark theme a pure token
+  swap under `[data-theme="dark"]`. A hard-coded hex silently breaks dark mode for that
+  element. The theme is applied by a tiny inline script in `<head>` **before first paint**,
+  so dark-mode users never see a white flash.
+- **Icons need `viewBox="0 0 24 24"`.** The sprite is drawn on a 24×24 grid; without a
+  viewBox the browser maps one unit to one pixel and clips every icon below 24px to its
+  top-left corner. This shipped once. `tests/check_html.js` now fails the build if any
+  sprite `<svg>` lacks it.
+- **No Tailwind.** i-nstrumen flags its CDN JIT as a known anti-pattern, and it conflicts
+  with the single-self-contained-file, paste-to-deploy workflow.
+- **CDN libraries are lazy-loaded on first use, never at boot** (`qrcodejs`,
+  `html5-qrcode`). `tests/check_html.js` fails the build if a `<script src>` appears in the
+  document.
+
+### Repo hygiene
+
 - This is a shared monorepo with independent sessions working on other apps. Always
   `git pull --rebase` before pushing, and keep commits scoped to `i-Nventoriofis/`.
 
-## How to verify a change before considering it done
+---
 
-There is no local Apps Script emulator, so verification uses three techniques:
+## 8. How to verify a change before considering it done
 
-1. **Node unit tests — run these before any deploy.**
-   ```bash
-   node tests/test_backend.js
-   ```
-   Loads `Code.gs` into a `vm` context with hand-written mocks for `SpreadsheetApp`,
-   `LockService`, `PropertiesService`, `CacheService` and `MailApp`, backed by an
-   in-memory spreadsheet, then drives the **real** service functions. 125 assertions
-   covering depreciation edge cases, asset-tag generation, stock round-trips, all
-   `SCOPES` boundaries (29/30/31 days, 364/365/366 days), authorization (including
-   fail-closed with no password set), header auto-heal, and ledger immutability.
-   *Note: values created inside the vm are from another realm, so `x instanceof Date` is
-   false in the test file — use the `isDate()` helper.*
+There is no local Apps Script emulator, so verification uses three techniques.
 
-2. **Frontend static checks.**
-   ```bash
-   node tests/check_html.js
-   ```
-   Parses every inline `<script>`, checks tag balance (the "page won't load" bug class
-   that has bitten i-print before), verifies every `on*=` handler resolves to a defined
-   function, every icon reference exists in the sprite, and no CDN script loads at boot.
-   *Watch out: the tag-balance check counts literal `<div` text in comments too — do not
-   write example markup in a comment.*
+### 1. Backend unit tests — run before any deploy
 
-3. **Live browser testing.** Start the static server (`.claude/launch.json` above) and
-   drive the UI with the Browser preview tools. Because there is no local backend, the
-   productive technique is to **replace `window.google` with a mock** exposing
-   `getInitialData` / `handleAction` / `adminLogin` / `getItemHistory`, feed it a
-   synthetic payload, then call `boot()`. That exercises every render path for real. Note
-   the shim defines `google.script.run` as a *non-configurable* getter, so you must
-   replace the whole `window.google` object rather than redefine the property.
-   ⚠️ **When the Browser pane is not displayed the page does not composite frames, so CSS
-   transitions never advance** and `getComputedStyle` returns the transition's first
-   frame. Anything with a `transition` — the active nav pill's background, the drawer's
-   slide, the mobile rail — will measure as its *starting* value and look broken when it
-   is not. Inject `*{transition:none !important}` before measuring animated properties.
+```bash
+node tests/test_backend.js
+```
+
+**277 assertions.** Loads `Code.gs` into a `vm` context with hand-written mocks for
+`SpreadsheetApp`, `LockService`, `PropertiesService`, `CacheService`, `MailApp`,
+`UrlFetchApp` and `ScriptApp`, backed by an in-memory spreadsheet, then drives the **real**
+service functions. It covers asset-tag generation, stock round-trips, `SCOPES` boundaries
+(29/30/31 days, 364/365/366 days), authorization including fail-closed with no password,
+header auto-heal, ledger immutability, the grouped request lifecycle, the Config fallback,
+and the return-token lifecycle.
+
+Two harness quirks worth knowing:
+
+- Values created inside the vm come from **another realm**, so `x instanceof Date` is false
+  in the test file. Use the `isDate()` helper.
+- Dates the server stores are **local-day**; `iso()` renders UTC. Use `fmtISO()` when
+  comparing a stored date against an expected calendar day, or the timezone offset shifts
+  the expectation across midnight.
+
+### 2. Frontend static checks
+
+```bash
+node tests/check_html.js
+```
+
+**21 checks.** Parses every inline `<script>`, verifies tag balance (the "page won't load"
+bug class that has bitten i-print), that every `on*=` handler resolves to a defined
+function, that every icon reference exists in the sprite **and declares a viewBox**, and
+that no CDN script loads at boot.
+
+Two things to watch:
+
+- The tag-balance check counts literal `<div` text **in comments too** — never write
+  example markup in a comment.
+- It counts both branches of a conditional return, so a function whose early-return path
+  closes a card the main path also closes will read as unbalanced. Build the shared markup
+  into a variable and have **each** return path emit its own complete element. `viewLedger`,
+  `viewRequests` and `renderRequestForm` all had to be restructured this way.
+
+### 3. Live browser testing
+
+Start the static server (`.claude/launch.json` above) and drive the UI with the Browser
+preview tools. There is no local backend, so the productive technique is to **replace
+`window.google` with a mock** exposing `getInitialData` / `getPublicCatalog` /
+`getReturnContext` / `handleAction` / `adminLogin`, feed it a synthetic payload, then call
+`boot()` or `showPublic()`. That exercises every render path for real.
+
+The shim defines `google.script.run` as a **non-configurable getter**, so replace the whole
+`window.google` object rather than trying to redefine the property.
+
+⚠️ **When the Browser pane is not displayed the page does not composite frames, so CSS
+transitions never advance** and `getComputedStyle` returns the transition's *first* frame.
+Anything with a `transition` — the active nav pill's background, the drawer slide, the
+mobile rail — will measure as its starting value and look broken when it is not. Inject
+`*{transition:none !important}` before measuring animated properties.
+
+### 4. Live probe after deploying the backend
+
+```bash
+curl -s -L -H 'Content-Type: text/plain;charset=utf-8' \
+  -d '{"fn":"getPublicCatalog","args":[]}' \
+  'https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec'
+```
+
+Re-assert the payload contains no `@`. This is the cheapest way to confirm a deploy landed
+and that the privacy boundary survived it. `{"fn":"getReturnContext","args":["bad-token"]}`
+should error rather than leak anything.
 
 Always syntax-check both files before considering an edit done — `Code.gs` with plain
-`vm.Script`, and each inline `<script>` block of `index.html` (that is what
+`vm.Script`, and each inline `<script>` block of `index.html` (which is what
 `tests/check_html.js` does).
+
+---
+
+## 9. What has not been proven
+
+Honest gaps, so nobody assumes otherwise:
+
+- **Email delivery** is tested against a mock, never against real Gmail. Structure,
+  recipients, escaping and failure handling are all verified; actual delivery is not. Mail
+  sending is best-effort and wrapped in `try/catch` everywhere — a quota failure must never
+  roll back a handover that physically happened, and every action returns
+  `mailed: true|false` so the UI reports honestly instead of claiming an email that never
+  left.
+- **The phone camera** is verified only as far as the `capture="environment"` attribute
+  being present. Whether a given handset opens the camera is untested.
+- **Drive uploads** run against a mocked `UrlFetchApp`. The resumable-session logic is
+  exercised; a real file has never been PUT through it from this test suite.
