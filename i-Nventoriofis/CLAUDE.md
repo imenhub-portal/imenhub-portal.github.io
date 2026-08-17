@@ -9,8 +9,9 @@ updated whenever you make a change worth a future session knowing about.
 ## What this is
 
 A Google Apps Script backend + GitHub Pages frontend + Google Sheets database, for
-tracking IMEN's office assets and inventory. It answers two questions and only two:
-**where is each asset**, and **how much stock is left**. It is deliberately NOT an
+tracking IMEN's office **Alat Tulis** (kertas, pen, dakwat) and **Aset Alih** (laptop,
+projektor, mikrofon). It answers two questions and only two: **where is each asset**, and
+**how much stock is left**. It is deliberately NOT an
 accounting system — there is no cost, no depreciation, no book value and no warranty
 tracking anywhere in it. Check-out/check-in with email notification, an immutable
 transaction ledger, and a dashboard split by Aset vs Inventori.
@@ -265,6 +266,43 @@ and the UI can never disagree about what is overdue. A test asserts they match.
   (`LEDGER_SCOPE`).** Splitting the ledger by section is good for daily use, but
   an audit trail you cannot read end to end is not an audit trail — so the full
   combined view stays one click away, and CSV export is always the whole ledger.
+- **There are exactly two categories, and they are the item type.** `Alat Tulis`
+  (`consumable`) and `Aset Alih` (`fixed_asset`). The user-managed `Categories` table and
+  the `is_portable` flag were both removed: a second classification had nothing left to
+  hold, and every asset is movable by definition now. `catName()` survives only so the
+  CSV keeps exporting whatever legacy rows already carry. Do not reintroduce either.
+- **A request carries many items.** `Requests` holds one row per line with a shared
+  `group_id`, rather than a header/detail pair of tabs — that keeps `svcDecideRequest`
+  working per row, makes partial approval natural, and needs no join.
+  `svcSubmitRequest` validates **every** line before writing anything, so "2 rim kertas
+  and 4 pen" where the pens are short is rejected whole rather than half-recorded. And it
+  sends **one** acknowledgement listing all lines: four pens must not mean four emails.
+  `svcDecideGroup` loops the group and delegates to `svcDecideRequest`, so there is no
+  second handover implementation to drift.
+- **The public page is two big buttons, then a form.** Choosing Alat Tulis or Aset Alih
+  first lets each form be shaped for its kind — quantities and stock for stationery,
+  availability and return dates for equipment — instead of one form hedging for both.
+  Availability is baked into each dropdown option, so a requester never looks it up
+  elsewhere. There is no Jabatan field.
+- **Return proof is gated by a capability token, not a password.** `startResumableUpload`
+  requires admin; for a borrower to upload, that gate has to open, and an unauthenticated
+  upload endpoint lets anyone with the URL fill the Drive folder. So the check-out email
+  carries `?pulang=<token>` granting exactly three things scoped to one loan: read that
+  item's public details, one Drive upload, attach a photo URL. `_itemByReturnToken_` is
+  the single place that rule lives. The token is minted at check-out, stored on the
+  `Items` row, and **cleared at check-in** — closing the loan is what expires the link.
+  Submitting proof deliberately does **not** close the loan; the admin still confirms
+  physical receipt.
+- **`capture="environment"` on the file input IS the camera feature.** One attribute makes
+  a phone open the camera instead of a file picker. No getUserMedia, no extra library.
+  `dropZone(key, camera, label)` takes it as a flag; `doUpload()` routes through
+  `startReturnUpload` when `RETURN_TOKEN` is set and `startResumableUpload` otherwise.
+- **`Transactions` has `photo_borrower` and `photo_admin` as separate columns**, not one
+  shared photo field, so whose evidence a `check_in` row holds is never ambiguous.
+- **`_readTable_` keys blank-row detection off `id`, falling back to the first column.**
+  `Config` is key/value with no `id`; without that fallback every row in such a tab is
+  silently discarded — which is exactly what happened when Config was first added, making
+  the officer setting appear to save and then vanish.
 - **There is no money in this app, by decision.** No unit cost, no depreciation, no
   book value, no warranty. It tracks *where things are* and *how many are left*. Do not
   reintroduce a "total value" figure — it was removed because it answered a question

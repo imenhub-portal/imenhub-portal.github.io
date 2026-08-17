@@ -1,5 +1,12 @@
 // ============================================================
-//  i-NVENTORI OFIS — Sistem Inventori & Pengurusan Aset Pejabat
+//  i-NVENTORI OFIS — Alat Tulis & Aset Alih, IMEN
+//
+//  Two categories, and only two:
+//    Alat Tulis (consumable) — kertas, pen, dakwat. Tracked by quantity.
+//    Aset Alih  (fixed_asset) — laptop, projektor, mikrofon. Tracked one by
+//                               one, borrowed and returned.
+//  The enum keys stay `consumable` / `fixed_asset` because they are internal
+//  and live rows already carry them; only the labels are Malay.
 //  Backend: Google Apps Script + Google Sheets
 //
 //  Paste this ENTIRE file into the bound Apps Script project's Code.gs,
@@ -38,6 +45,43 @@ function _adminPassword_() {
   return PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD') || '';
 }
 
+// The Pentadbir Inventori: the person who approves requests and receives
+// every notification. Held in the Config sheet so it can be changed from
+// Tetapan without a redeploy. ADMIN_EMAIL above is the FALLBACK only — if
+// Config is empty (a sheet predating this, or a fresh deployment) mail must
+// still reach somebody rather than silently vanish.
+const CONFIG_DEFAULTS = {
+  admin_name:  'Pentadbir Inventori',
+  admin_email: 'hazde@ukm.edu.my',
+  admin_cc:    ''
+};
+
+function _config_() {
+  try {
+    const rows = _readTable_('Config');
+    const out = {};
+    Object.keys(CONFIG_DEFAULTS).forEach(function (k) { out[k] = CONFIG_DEFAULTS[k]; });
+    rows.forEach(function (r) {
+      if (r.key && String(r.value || '') !== '') out[String(r.key)] = String(r.value);
+    });
+    return out;
+  } catch (e) {
+    return CONFIG_DEFAULTS;   // sheet missing entirely — never throw here
+  }
+}
+
+function _adminName_()  { return _config_().admin_name || 'Pentadbir Inventori'; }
+function _adminEmail_() { return _config_().admin_email || ADMIN_EMAIL; }
+
+// Extra addresses, comma or semicolon separated. Returns '' when unset so it
+// can be handed straight to MailApp without a conditional.
+function _adminCc_() {
+  const raw = String(_config_().admin_cc || '').trim();
+  if (!raw) return '';
+  return raw.split(/[,;]+/).map(function (x) { return x.trim(); })
+            .filter(Boolean).join(',');
+}
+
 // ============================================================
 //  SCHEMA  ("migrations")
 //
@@ -51,6 +95,10 @@ const SCHEMA = {
 
   Locations: ['id', 'building', 'floor', 'room_number', 'created_at', 'updated_at'],
 
+  // Key/value rather than one row of columns, so a future setting never
+  // needs a migration — the same shape i-print's Config sheet uses.
+  Config: ['key', 'value', 'updated_at'],
+
   Custodians: ['id', 'employee_id', 'name', 'email', 'department', 'created_at', 'updated_at'],
 
   Items: [
@@ -59,17 +107,23 @@ const SCHEMA = {
     'status',
     'date_acquired', 'date_last_maintained',
     'date_next_inspection', 'date_last_audited', 'date_decommissioned',
-    'is_portable',
     'custodian_id', 'photo_url', 'receipt_url', 'notes',
+    // Return-proof state for the CURRENT loan only. All three are cleared at
+    // check-in, which is what kills the token.
+    'return_token', 'return_photo_url', 'return_claimed_at',
     'created_at', 'updated_at', 'deleted_at'
   ],
 
   // Requests raised by staff from the public page. Unlike Transactions
   // this IS mutable — a request moves through pending -> approved/rejected
   // — but the resulting handover still lands in the immutable ledger.
+  // One row per requested LINE, with group_id shared across the lines of a
+  // single submission. A header/detail pair of tabs would be more normalised,
+  // but this keeps svcDecideRequest working per row, makes partial approval
+  // natural, and needs no join.
   Requests: [
-    'id', 'item_id', 'request_type', 'requester_name', 'requester_email',
-    'requester_department', 'quantity', 'purpose', 'needed_date',
+    'id', 'group_id', 'item_id', 'request_type', 'requester_name', 'requester_email',
+    'quantity', 'purpose', 'needed_date',
     'status', 'admin_notes', 'custodian_id',
     'created_at', 'actioned_at'
   ],
@@ -80,6 +134,9 @@ const SCHEMA = {
   Transactions: [
     'id', 'item_id', 'user_id', 'custodian_id', 'action_type', 'quantity',
     'transaction_date', 'expected_return_date', 'actual_return_date',
+    // Two named columns rather than one shared 'photo' field, so whose
+    // evidence a row holds is never ambiguous. Only check_in rows use them.
+    'photo_borrower', 'photo_admin',
     'reason_notes', 'created_at'
   ]
 };
@@ -88,7 +145,7 @@ const SCHEMA = {
 // except these, which are spelled out.
 const DATE_COLS = {
   transaction_date: 1, expected_return_date: 1, actual_return_date: 1,
-  needed_date: 1, actioned_at: 1,
+  needed_date: 1, actioned_at: 1, return_claimed_at: 1,
   created_at: 1, updated_at: 1, deleted_at: 1
 };
 const NUM_COLS = {
@@ -174,11 +231,16 @@ function _readTable_(name, withTrashed) {
   if (sh.getLastRow() < 2) return [];
   const idx  = _headerIndex_(sh);
   const cols = Object.keys(idx);
+  // Blank-row detection keys off `id` where there is one. Config is
+  // key/value and has no id column, so fall back to the first column —
+  // otherwise every row in such a tab is silently treated as blank and
+  // discarded, which is exactly what happened when Config was added.
+  const presence = (idx.id !== undefined) ? idx.id : idx[cols[0]];
   const vals = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues();
   const out  = [];
   for (var r = 0; r < vals.length; r++) {
     var row = vals[r];
-    if (String(row[idx.id] === undefined ? '' : row[idx.id]).trim() === '') continue; // blank row
+    if (String(row[presence] === undefined ? '' : row[presence]).trim() === '') continue; // blank row
     var o = { _row: r + 2 };
     for (var c = 0; c < cols.length; c++) o[cols[c]] = _cast_(cols[c], row[idx[cols[c]]]);
     if (!withTrashed && o.deleted_at) continue;
@@ -444,6 +506,7 @@ function getInitialData(adminPass) {
     payload.custodians   = [];
     payload.transactions = [];
     payload.requests     = [];
+    payload.config       = {};   // the officer's address is contact detail, not public
     payload.alerts       = { overdue: [], inspection: [], audit: [], low_stock: [] };
   }
   payload.is_admin  = isAdmin;
@@ -483,6 +546,7 @@ function _buildPayload_() {
     custodians:   custs,
     transactions: txns,
     requests: reqs.slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); }),
+    config: _config_(),
     alerts: {
       inspection: items.filter(function (i) { return SCOPES.inspectionDue(i, today); }).map(_alertRef_),
       audit:      items.filter(function (i) { return SCOPES.auditDue(i, today); }).map(_alertRef_),
@@ -547,15 +611,12 @@ function getPublicCatalog() {
   ensureSheets_();
   const today = _today_();
   const items = _readTable_('Items');
-  const cats  = _readTable_('Categories');
   const locs  = _readTable_('Locations');
   const loans = _openLoans_(_readTable_('Transactions'));
 
   const loanByItem = {};
   loans.forEach(function (l) { loanByItem[l.item_id] = l; });
 
-  const catName = {};
-  cats.forEach(function (c) { catName[c.id] = c.name; });
   const locName = {};
   locs.forEach(function (l) {
     locName[l.id] = [l.building, l.floor, l.room_number].filter(String).join(' · ');
@@ -566,15 +627,13 @@ function getPublicCatalog() {
     if (i.status === 'decommissioned' || i.status === 'disposed') return;
     var loan = loanByItem[i.id];
     var isAsset = i.item_type === 'fixed_asset';
-    // Fixed furniture is not loanable, so it is not offered at all.
-    if (isAsset && String(i.is_portable) === 'FALSE') return;
 
     out.push({
       id: i.id,
       asset_tag: i.asset_tag || '',
       name: i.name,
       item_type: i.item_type,
-      category: catName[i.category_id] || '',
+      category: isAsset ? 'Aset Alih' : 'Alat Tulis',
       location: locName[i.location_id] || '',
       quantity_available: Number(i.quantity_available || 0),
       available: isAsset ? (!loan && Number(i.quantity_available || 0) > 0)
@@ -592,72 +651,128 @@ function getPublicCatalog() {
   return { items: out, server_ts: new Date().toISOString() };
 }
 
-// Public. Rate-limited only by Apps Script itself; creates nothing but a
-// pending row, so the worst case is an admin rejecting some noise.
+// Public. Creates nothing but pending rows, so the worst case is an admin
+// rejecting some noise.
+//
+// Every line is validated BEFORE anything is written: a request for "2 rim
+// kertas and 4 pen" where the pens are out of stock is rejected whole rather
+// than half-recorded, which would leave the requester thinking they asked for
+// both and the admin seeing only one.
 function svcSubmitRequest(p) {
   const v = _validate_({
-    item_id:              { required: true, type: 'number', label: 'Item' },
-    requester_name:       { required: true, max: 120, label: 'Nama' },
-    requester_email:      { required: true, type: 'email', max: 120, label: 'Emel' },
-    requester_department: { max: 80, label: 'Jabatan' },
-    quantity:             { type: 'number', min: 1, def: 1, label: 'Kuantiti' },
-    purpose:              { required: true, max: 500, label: 'Tujuan' },
-    needed_date:          { type: 'date', label: 'Tarikh diperlukan' }
+    requester_name:  { required: true, max: 120, label: 'Nama' },
+    requester_email: { required: true, type: 'email', max: 120, label: 'Emel' },
+    purpose:         { required: true, max: 500, label: 'Tujuan' },
+    needed_date:     { type: 'date', label: 'Tarikh diperlukan' }
   }, p);
 
-  const item = _findById_(_readTable_('Items'), v.item_id);
-  if (!item) throw new Error('Item tidak dijumpai.');
-  if (item.status === 'decommissioned' || item.status === 'disposed') {
-    throw new Error('Item ini telah dilupuskan.');
-  }
-  const isAsset = item.item_type === 'fixed_asset';
-  if (isAsset && String(item.is_portable) === 'FALSE') {
-    throw new Error('Aset ini bukan mudah alih dan tidak boleh dipohon.');
-  }
+  const rawLines = (p && p.lines) || [];
+  if (!rawLines.length) throw new Error('Sila pilih sekurang-kurangnya satu barang.');
+  if (rawLines.length > 20) throw new Error('Terlalu banyak barang dalam satu permohonan (maks 20).');
 
-  // Availability is re-checked here, not trusted from the browser.
-  if (isAsset) {
-    var open = _openLoans_(_readTable_('Transactions')).filter(function (l) {
-      return Number(l.item_id) === Number(item.id);
-    });
-    if (open.length) {
-      throw new Error('Aset ini sedang dipinjam. Sila cuba semula selepas ia dipulangkan.');
+  const items   = _readTable_('Items');
+  const loans   = _openLoans_(_readTable_('Transactions'));
+  const pending = _readTable_('Requests').filter(function (r) { return r.status === 'pending'; });
+  const email   = String(v.requester_email).toLowerCase();
+
+  const seen  = {};
+  const lines = [];
+
+  rawLines.forEach(function (raw) {
+    var itemId = Number(raw && raw.item_id);
+    var qty    = Math.max(1, Number((raw && raw.quantity) || 1));
+
+    var item = _findById_(items, itemId);
+    if (!item) throw new Error('Barang tidak dijumpai (#' + itemId + ').');
+    if (item.status === 'decommissioned' || item.status === 'disposed') {
+      throw new Error(item.name + ' telah dilupuskan.');
     }
-  } else if (Number(item.quantity_available || 0) < v.quantity) {
-    throw new Error('Baki tidak mencukupi. Baki semasa: ' + item.quantity_available + '.');
-  }
+    if (seen[itemId]) throw new Error(item.name + ' dimasukkan lebih daripada sekali.');
+    seen[itemId] = true;
 
-  // One pending request per person per item — stops double-tapping the
-  // button from filling the admin queue with duplicates.
-  const dup = _readTable_('Requests').filter(function (r) {
-    return r.status === 'pending' &&
-           Number(r.item_id) === Number(item.id) &&
-           String(r.requester_email).toLowerCase() === v.requester_email.toLowerCase();
-  });
-  if (dup.length) throw new Error('Anda sudah menghantar permohonan untuk item ini dan ia masih menunggu kelulusan.');
+    var isAsset = item.item_type === 'fixed_asset';
 
-  const now = new Date();
-  const id  = _nextId_('Requests');
-  _insert_('Requests', {
-    id: id,
-    item_id: item.id,
-    request_type: isAsset ? 'asset' : 'inventory',
-    requester_name: v.requester_name,
-    requester_email: String(v.requester_email).toLowerCase(),
-    requester_department: v.requester_department || '',
-    quantity: isAsset ? 1 : v.quantity,
-    purpose: v.purpose,
-    needed_date: v.needed_date,
-    status: 'pending',
-    admin_notes: '',
-    custodian_id: null,
-    created_at: now,
-    actioned_at: null
+    // Availability is re-checked here, never trusted from the browser — the
+    // catalog it chose from can be minutes stale.
+    if (isAsset) {
+      var open = loans.filter(function (l) { return Number(l.item_id) === Number(item.id); });
+      if (open.length) {
+        throw new Error(item.name + ' sedang dipinjam. Sila cuba semula selepas ia dipulangkan.');
+      }
+      qty = 1;   // one physical thing
+    } else if (Number(item.quantity_available || 0) < qty) {
+      throw new Error(item.name + ': baki tidak mencukupi (baki ' + item.quantity_available + ').');
+    }
+
+    // One pending line per person per item — stops a double-tapped button
+    // filling the queue with duplicates.
+    var dup = pending.filter(function (r) {
+      return Number(r.item_id) === Number(item.id) &&
+             String(r.requester_email).toLowerCase() === email;
+    });
+    if (dup.length) {
+      throw new Error('Anda sudah memohon ' + item.name + ' dan ia masih menunggu kelulusan.');
+    }
+
+    lines.push({ item: item, quantity: qty, isAsset: isAsset });
   });
 
+  // Everything validated — now write.
+  const now     = new Date();
+  const groupId = 'REQ-' + now.getTime() + '-' + Math.floor(Math.random() * 1000);
+  const ids     = [];
+  var nextId    = _nextId_('Requests');
+
+  lines.forEach(function (ln) {
+    _insert_('Requests', {
+      id: nextId,
+      group_id: groupId,
+      item_id: ln.item.id,
+      request_type: ln.isAsset ? 'asset' : 'inventory',
+      requester_name: v.requester_name,
+      requester_email: email,
+      quantity: ln.quantity,
+      purpose: v.purpose,
+      needed_date: v.needed_date,
+      status: 'pending',
+      admin_notes: '',
+      custodian_id: null,
+      created_at: now,
+      actioned_at: null
+    });
+    ids.push(nextId);
+    nextId++;
+  });
+
+  // ONE acknowledgement listing every line — four pens must not mean four
+  // emails.
   var mailed = true;
-  try { _mailRequestReceived_(item, v, id); } catch (e) { mailed = false; }
-  return { id: id, status: 'pending', mailed: mailed };
+  try { _mailRequestReceived_(lines, v, groupId); } catch (e) { mailed = false; }
+  return { group_id: groupId, ids: ids, count: ids.length, status: 'pending', mailed: mailed };
+}
+
+// Decides every pending line of one submission in a single transaction.
+// Delegates each line to svcDecideRequest so the ledger row, recipient
+// resolution and handover emails are identical to an admin-initiated
+// handover — there is no second implementation to drift.
+function svcDecideGroup(p, decision) {
+  const groupId = String((p && p.group_id) || '').trim();
+  if (!groupId) throw new Error('Kumpulan permohonan tidak dinyatakan.');
+
+  const rows = _readTable_('Requests').filter(function (r) {
+    return String(r.group_id) === groupId && r.status === 'pending';
+  });
+  if (!rows.length) throw new Error('Tiada permohonan menunggu dalam kumpulan ini.');
+
+  const out = [];
+  rows.forEach(function (r) {
+    out.push(svcDecideRequest({
+      id: r.id,
+      admin_notes: p.admin_notes,
+      expected_return_date: p.expected_return_date
+    }, decision));
+  });
+  return { group_id: groupId, decided: out.length, status: decision, lines: out };
 }
 
 // Admin decision. Approving an ASSET hands it over for real: the same
@@ -701,7 +816,6 @@ function svcDecideRequest(p, decision) {
       id: item.id,
       recipient_name: req.requester_name,
       recipient_email: req.requester_email,
-      recipient_department: req.requester_department,
       expected_return_date: v.expected_return_date,
       reason_notes: 'Permohonan #' + req.id + ': ' + (req.purpose || '')
     });
@@ -716,7 +830,6 @@ function svcDecideRequest(p, decision) {
   var recipient = _resolveRecipient_({
     recipient_name: req.requester_name,
     recipient_email: req.requester_email,
-    recipient_department: req.requester_department
   });
   svcStockChange({
     id: item.id, quantity: req.quantity, custodian_id: recipient.id,
@@ -764,7 +877,7 @@ function adminLogin(pass) {
 
 // Every action name the frontend may invoke, and whether it needs admin.
 // Anything not listed here is rejected by handleAction().
-const ACTIONS_PUBLIC = ['Ping', 'SubmitRequest'];
+const ACTIONS_PUBLIC = ['Ping', 'SubmitRequest', 'SubmitReturnProof'];
 const ACTIONS_ADMIN  = [
   'AddItem', 'UpdateItem', 'DeleteItem',
   'StockAdd', 'StockRemove',
@@ -773,8 +886,9 @@ const ACTIONS_ADMIN  = [
   'SaveCategory', 'DeleteCategory',
   'SaveLocation', 'DeleteLocation',
   'SaveCustodian', 'DeleteCustodian',
-  'RunDateCheck', 'SeedReference',
-  'ApproveRequest', 'RejectRequest'
+  'RunDateCheck', 'SeedReference', 'SaveConfig',
+  'ApproveRequest', 'RejectRequest',
+  'ApproveGroup', 'RejectGroup'
 ];
 
 // ============================================================
@@ -796,8 +910,11 @@ function handleAction(actionType, payload) {
   switch (actionType) {
     case 'Ping':            return { success: true, result: 'pong' };
     case 'SubmitRequest':   return _txn_(function () { return svcSubmitRequest(p); });
+    case 'SubmitReturnProof': return _txn_(function () { return svcSubmitReturnProof(p); });
     case 'ApproveRequest':  return _txn_(function () { return svcDecideRequest(p, 'approved'); });
     case 'RejectRequest':   return _txn_(function () { return svcDecideRequest(p, 'rejected'); });
+    case 'ApproveGroup':    return _txn_(function () { return svcDecideGroup(p, 'approved'); });
+    case 'RejectGroup':     return _txn_(function () { return svcDecideGroup(p, 'rejected'); });
     case 'AddItem':         return _txn_(function () { return svcAddItem(p); });
     case 'UpdateItem':      return _txn_(function () { return svcUpdateItem(p); });
     case 'DeleteItem':      return _txn_(function () { return svcDeleteItem(p); });
@@ -815,6 +932,7 @@ function handleAction(actionType, payload) {
     case 'DeleteCustodian': return _txn_(function () { return svcDeleteRef('Custodians', p); });
     case 'RunDateCheck':    return { success: true, result: checkDates(true) };
     case 'SeedReference':   return _txn_(function () { return svcSeedReference(); });
+    case 'SaveConfig':      return _txn_(function () { return svcSaveConfig(p); });
     default:                return { success: false, error: 'Tindakan tidak dikenali: ' + actionType };
   }
 }
@@ -841,9 +959,21 @@ function _ledger_(fields) {
     transaction_date:     fields.transaction_date || now,
     expected_return_date: fields.expected_return_date || null,
     actual_return_date:   fields.actual_return_date || null,
+    photo_borrower:       fields.photo_borrower || '',
+    photo_admin:          fields.photo_admin || '',
     reason_notes:         fields.reason_notes || '',
     created_at:           now
   });
+}
+
+// A capability token, not a password. Handed to one borrower for one loan,
+// it grants exactly three things: read that item's public details, one Drive
+// upload, and attach a photo URL to that loan. Cleared at check-in.
+function _token_() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I/O/0/1 — these get read aloud
+  var out = '';
+  for (var i = 0; i < 24; i++) out += abc.charAt(Math.floor(Math.random() * abc.length));
+  return out;
 }
 
 // ── Asset tag: AST-YYYY-NNNN ────────────────────────────────
@@ -869,7 +999,6 @@ function _nextAssetTag_(year) {
 
 const ITEM_SCHEMA = {
   name:                 { required: true,  max: 120, label: 'Nama item' },
-  category_id:          { required: true,  type: 'number', label: 'Kategori' },
   location_id:          { required: true,  type: 'number', label: 'Lokasi' },
   item_type:            { required: true,  in: ITEM_TYPES, label: 'Jenis item' },
   serial_number:        { max: 80,  label: 'Nombor siri' },
@@ -879,7 +1008,6 @@ const ITEM_SCHEMA = {
   date_next_inspection: { type: 'date', label: 'Tarikh pemeriksaan seterusnya' },
   date_last_maintained: { type: 'date', label: 'Tarikh penyelenggaraan terakhir' },
   date_last_audited:    { type: 'date', label: 'Tarikh audit terakhir' },
-  is_portable:          { max: 5, label: 'Mudah alih' },
   photo_url:            { max: 500, label: 'Foto aset' },
   receipt_url:          { max: 500, label: 'Resit/Invois' },
   notes:                { max: 2000, label: 'Catatan' }
@@ -889,8 +1017,7 @@ function svcAddItem(p) {
   const v = _validate_(ITEM_SCHEMA, p);
 
   // Referential integrity — Sheets has no foreign keys, so it is checked here.
-  if (!_findById_(_readTable_('Categories'), v.category_id)) throw new Error('Kategori tidak wujud.');
-  if (!_findById_(_readTable_('Locations'),  v.location_id))  throw new Error('Lokasi tidak wujud.');
+  if (!_findById_(_readTable_('Locations'), v.location_id)) throw new Error('Lokasi tidak wujud.');
 
   // A fixed asset is one physical thing; quantity is meaningless above 1.
   const qty = (v.item_type === 'fixed_asset') ? 1 : Math.max(0, Number(v.quantity_total || 0));
@@ -905,7 +1032,6 @@ function svcAddItem(p) {
     id: id,
     asset_tag: tag,
     name: v.name,
-    category_id: v.category_id,
     location_id: v.location_id,
     serial_number: v.serial_number || '',
     item_type: v.item_type,
@@ -918,7 +1044,6 @@ function svcAddItem(p) {
     date_next_inspection: v.date_next_inspection,
     date_last_audited: v.date_last_audited,
     date_decommissioned: null,
-    is_portable: (v.is_portable === 'FALSE') ? 'FALSE' : 'TRUE',
     custodian_id: null,
     photo_url: v.photo_url || '',
     receipt_url: v.receipt_url || '',
@@ -947,17 +1072,14 @@ function svcUpdateItem(p) {
   if (!item) throw new Error('Item tidak dijumpai.');
 
   const v = _validate_(ITEM_SCHEMA, p);
-  if (!_findById_(_readTable_('Categories'), v.category_id)) throw new Error('Kategori tidak wujud.');
-  if (!_findById_(_readTable_('Locations'),  v.location_id))  throw new Error('Lokasi tidak wujud.');
+  if (!_findById_(_readTable_('Locations'), v.location_id)) throw new Error('Lokasi tidak wujud.');
 
   _update_('Items', item._row, {
     name: v.name,
-    category_id: v.category_id,
     location_id: v.location_id,
     serial_number: v.serial_number || '',
     item_type: v.item_type,
     min_stock_alert: v.min_stock_alert || 0,
-    is_portable: (v.is_portable === 'FALSE') ? 'FALSE' : 'TRUE',
     date_acquired: v.date_acquired,
     date_last_maintained: v.date_last_maintained,
     date_next_inspection: v.date_next_inspection,
@@ -1053,11 +1175,6 @@ function svcCheckOut(p) {
   if (item.status === 'decommissioned' || item.status === 'disposed') {
     throw new Error('Item telah dilupuskan dan tidak boleh dipinjam.');
   }
-  // Fixed furniture is explicitly marked non-portable. Blank means portable,
-  // so existing rows keep working after this column was added.
-  if (item.item_type === 'fixed_asset' && String(item.is_portable) === 'FALSE') {
-    throw new Error('Aset ini ditanda bukan mudah alih — tidak boleh didaftar keluar.');
-  }
 
   const custodian = _resolveRecipient_(v);
 
@@ -1080,10 +1197,14 @@ function svcCheckOut(p) {
     throw new Error('Tarikh jangka pulang tidak boleh sebelum hari ini.');
   }
 
+  const returnToken = _token_();
   _update_('Items', item._row, {
     quantity_available: avail,
     status:             'assigned',
     custodian_id:       custodian.id,
+    return_token:       returnToken,
+    return_photo_url:   '',
+    return_claimed_at:  null,
     updated_at:         new Date()
   });
 
@@ -1095,14 +1216,14 @@ function svcCheckOut(p) {
   });
 
   const txnId = _nextId_('Transactions') - 1;   // the row just appended
-  const cat = (_findById_(_readTable_('Categories'), item.category_id) || {}).name;
+  const cat = (item.item_type === 'fixed_asset') ? 'Aset Alih' : 'Alat Tulis';
   const locRow = _findById_(_readTable_('Locations'), item.location_id);
   const loc = locRow ? [locRow.building, locRow.floor, locRow.room_number].filter(String).join(' · ') : '';
 
   // Notification is best-effort: a mail quota failure must not roll back a
   // check-out that already happened and is already in the ledger.
   var mailed = true;
-  try { _mailCheckOut_(item, custodian, v.expected_return_date, qty, txnId, loc, cat); }
+  try { _mailCheckOut_(item, custodian, v.expected_return_date, qty, txnId, loc, cat, returnToken); }
   catch (e) { mailed = false; }
 
   return {
@@ -1116,6 +1237,7 @@ function svcCheckIn(p) {
   const v = _validate_({
     id:                 { required: true, type: 'number', label: 'Item' },
     actual_return_date: { type: 'date', label: 'Tarikh pulang' },
+    photo_admin:        { max: 500, label: 'Foto admin' },
     reason_notes:       { max: 500, label: 'Catatan' }
   }, p);
 
@@ -1131,10 +1253,15 @@ function svcCheckIn(p) {
   const qty  = Math.abs(Number(loan.quantity || 1));
   const returned = v.actual_return_date || new Date();
 
+  // Clearing return_token is what expires the borrower's link: the loan it
+  // referred to no longer exists.
   _update_('Items', item._row, {
     quantity_available: Number(item.quantity_available || 0) + qty,
     status:             'available',
-    custodian_id:       null,   // clears the active assignment, per spec 5.3
+    custodian_id:       null,
+    return_token:       '',
+    return_photo_url:   '',
+    return_claimed_at:  null,
     updated_at:         new Date()
   });
 
@@ -1144,12 +1271,14 @@ function svcCheckIn(p) {
     action_type: 'check_in', quantity: qty,
     expected_return_date: loan.expected_return_date,
     actual_return_date: returned,
+    photo_borrower: item.return_photo_url || '',
+    photo_admin: v.photo_admin || '',
     reason_notes: v.reason_notes || ''
   });
 
   const txnId = _nextId_('Transactions') - 1;
   const custodian = _findById_(_readTable_('Custodians'), loan.custodian_id);
-  const cat = (_findById_(_readTable_('Categories'), item.category_id) || {}).name;
+  const cat = (item.item_type === 'fixed_asset') ? 'Aset Alih' : 'Alat Tulis';
   const locRow = _findById_(_readTable_('Locations'), item.location_id);
   const loc = locRow ? [locRow.building, locRow.floor, locRow.room_number].filter(String).join(' · ') : '';
 
@@ -1297,7 +1426,8 @@ function svcDeleteRef(table, p) {
 
   // Block deletes that would orphan an item — Sheets has no ON DELETE.
   const items = _readTable_('Items');
-  const fk = { Categories: 'category_id', Locations: 'location_id', Custodians: 'custodian_id' }[table];
+  const fk = { Locations: 'location_id', Custodians: 'custodian_id' }[table];
+  if (!fk) { _sheet_(table).deleteRow(row._row); return { id: row.id }; }
   const used = items.filter(function (it) { return Number(it[fk]) === Number(row.id); });
   if (used.length) {
     throw new Error('Tidak boleh dipadam — masih digunakan oleh ' + used.length + ' item.');
@@ -1307,21 +1437,40 @@ function svcDeleteRef(table, p) {
   return { id: row.id };
 }
 
+// Upserts by key, so adding a setting later needs no schema change.
+function svcSaveConfig(p) {
+  const v = _validate_({
+    admin_name:  { required: true, max: 120, label: 'Nama pentadbir' },
+    admin_email: { required: true, type: 'email', max: 120, label: 'Emel pentadbir' },
+    admin_cc:    { max: 240, label: 'Emel salinan' }
+  }, p);
+
+  // Each CC address is checked individually — one bad entry in a list would
+  // otherwise make MailApp reject the whole send at notification time,
+  // silently, long after this form was saved.
+  if (v.admin_cc) {
+    const bad = String(v.admin_cc).split(/[,;]+/)
+      .map(function (x) { return x.trim(); }).filter(Boolean)
+      .filter(function (x) { return !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x); });
+    if (bad.length) throw new Error('Emel salinan tidak sah: ' + bad.join(', '));
+  }
+
+  const now  = new Date();
+  const rows = _readTable_('Config');
+  Object.keys(v).forEach(function (k) {
+    var existing = null;
+    for (var i = 0; i < rows.length; i++) if (String(rows[i].key) === k) existing = rows[i];
+    if (existing) _update_('Config', existing._row, { value: v[k] === null ? '' : v[k], updated_at: now });
+    else _insert_('Config', { key: k, value: v[k] === null ? '' : v[k], updated_at: now });
+  });
+  return { saved: true };
+}
+
 // First-run reference data, so a fresh sheet is usable immediately.
 // Idempotent: skips any table that already has rows.
 function svcSeedReference() {
   const now = new Date();
-  const added = { categories: 0, locations: 0 };
-
-  if (!_readTable_('Categories').length) {
-    [['Komputer Riba', 'fixed_asset'], ['Monitor', 'fixed_asset'], ['Perabot', 'fixed_asset'],
-     ['Peralatan Rangkaian', 'fixed_asset'], ['Alat Tulis', 'consumable'],
-     ['Kartrij Pencetak', 'consumable'], ['Bekalan Makmal', 'consumable']
-    ].forEach(function (c, i) {
-      _insert_('Categories', { id: i + 1, name: c[0], type: c[1], created_at: now, updated_at: now });
-      added.categories++;
-    });
-  }
+  const added = { locations: 0 };
 
   if (!_readTable_('Locations').length) {
     [['IMEN', 'Aras 1', 'Pejabat Am'], ['IMEN', 'Aras 1', 'Stor'],
@@ -1385,7 +1534,7 @@ function _fmtDateTime_(d) {
 }
 
 // Sent to the recipient on check-out (spec 5.3).
-function _mailCheckOut_(item, custodian, expected, qty, txnId, loc, cat) {
+function _mailCheckOut_(item, custodian, expected, qty, txnId, loc, cat, returnToken) {
   if (!custodian || !custodian.email) return;
   const now = new Date();
   const body = _emailLayout_('Aset Didaftar Keluar',
@@ -1401,14 +1550,24 @@ function _mailCheckOut_(item, custodian, expected, qty, txnId, loc, cat) {
       ['Kuantiti', String(qty)],
       ['Tarikh & Masa Didaftar Keluar', _fmtDateTime_(now)],
       ['Tarikh Jangka Pulang', _fmtDate_(expected)],
-      ['Direkod Oleh', 'Admin i-Nventori']
+      ['Direkod Oleh', _adminName_()]
     ]) +
     '<p style="color:#b45309;margin-top:14px;">Sila pulangkan sebelum atau pada <b>' + _fmtDate_(expected) + '</b>. ' +
     'Peringatan automatik akan dihantar jika aset belum dipulangkan selepas tarikh tersebut.</p>' +
+    (returnToken
+      ? '<div style="margin:18px 0;padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">' +
+        '<p style="margin:0 0 10px;font-size:13px;color:#9a3412;"><b>Bila anda pulangkan aset ini</b>, tekan butang ' +
+        'di bawah pada telefon anda. Kamera akan terbuka — snap keadaan aset sebagai bukti hantar. ' +
+        'Tiada log masuk diperlukan.</p>' +
+        '<a href="' + PAGES_ORIGIN + '/i-Nventoriofis/?pulang=' + returnToken + '" ' +
+        'style="display:inline-block;background:#f4511e;color:#ffffff;text-decoration:none;' +
+        'padding:11px 20px;border-radius:999px;font-size:14px;font-weight:bold;">Pulangkan &amp; Snap Bukti</a>' +
+        '</div>'
+      : '') +
     '<p style="font-size:12px;color:#64748b;">Simpan emel ini sebagai rekod penerimaan anda.</p>'
   );
   MailApp.sendEmail({
-    to: custodian.email, cc: ADMIN_EMAIL,
+    to: custodian.email, cc: [_adminEmail_(), _adminCc_()].filter(Boolean).join(','),
     subject: '[i-Nventori Ofis] Aset ' + item.asset_tag + ' didaftar keluar kepada anda',
     htmlBody: body
   });
@@ -1439,7 +1598,7 @@ function _mailCheckIn_(item, custodian, loan, returned, txnId, loc, cat) {
       ['Tempoh Dipinjam', (days === null ? '—' : days + ' hari')],
       ['Status Pemulangan', status],
       ['Dikembalikan Ke', loc || '—'],
-      ['Direkod Oleh', 'Admin i-Nventori']
+      ['Direkod Oleh', _adminName_()]
     ]) +
     '<p style="color:' + (late > 0 ? '#b45309' : '#047857') + ';margin-top:14px;">' +
     (late > 0
@@ -1448,7 +1607,7 @@ function _mailCheckIn_(item, custodian, loan, returned, txnId, loc, cat) {
     '<p style="font-size:12px;color:#64748b;">Simpan emel ini sebagai bukti pemulangan anda.</p>'
   );
   MailApp.sendEmail({
-    to: custodian.email, cc: ADMIN_EMAIL,
+    to: custodian.email, cc: [_adminEmail_(), _adminCc_()].filter(Boolean).join(','),
     subject: '[i-Nventori Ofis] Aset ' + item.asset_tag + ' telah dipulangkan',
     htmlBody: body
   });
@@ -1487,34 +1646,44 @@ function _resolveRecipient_(v) {
   return rec;
 }
 
-// Acknowledgement to the requester, and a heads-up to the admin.
-function _mailRequestReceived_(item, v, reqId) {
+// Acknowledgement to the requester, and a heads-up to the officer. Both
+// list every line of the submission, so one request means one email
+// regardless of how many items it carries.
+function _mailRequestReceived_(lines, v, groupId) {
   const now = new Date();
-  const rows = [
-    ['Rujukan', 'REQ_' + ('00000' + reqId).slice(-6)],
-    ['Item', item.name],
-    ['Jenis', item.item_type === 'fixed_asset' ? 'Aset' : 'Inventori'],
-    ['Kuantiti', String(v.quantity || 1)],
+  const itemRows = lines.map(function (ln) {
+    return [ln.item.name + (ln.item.asset_tag ? ' (' + ln.item.asset_tag + ')' : ''),
+            (ln.isAsset ? 'Aset Alih' : 'Alat Tulis') + ' × ' + ln.quantity];
+  });
+  const meta = [
+    ['Rujukan', groupId],
+    ['Bilangan Barang', String(lines.length)],
     ['Tujuan', v.purpose],
     ['Tarikh Diperlukan', v.needed_date ? _fmtDate_(v.needed_date) : '—'],
     ['Dihantar Pada', _fmtDateTime_(now)]
   ];
+
   MailApp.sendEmail({
     to: v.requester_email,
-    subject: '[i-Nventori Ofis] Permohonan diterima — ' + item.name,
+    subject: '[i-Nventori Ofis] Permohonan diterima — ' + lines.length + ' barang',
     htmlBody: _emailLayout_('Permohonan Diterima',
       '<p>Salam <b>' + _esc_(v.requester_name) + '</b>,</p>' +
-      '<p>Permohonan anda telah diterima dan sedang <b>menunggu kelulusan admin</b>.</p>' +
-      _kvRows_(rows) +
+      '<p>Permohonan anda telah diterima dan sedang <b>menunggu kelulusan</b>.</p>' +
+      '<h3 style="font-size:14px;margin:16px 0 4px;">Barang Dipohon</h3>' +
+      _kvRows_(itemRows) +
+      _kvRows_(meta) +
       '<p style="font-size:12px;color:#64748b;">Anda akan menerima emel sebaik permohonan ini diluluskan atau ditolak.</p>')
   });
+
   MailApp.sendEmail({
-    to: ADMIN_EMAIL,
-    subject: '[i-Nventori Ofis] Permohonan baharu — ' + item.name,
+    to: _adminEmail_(), cc: _adminCc_(),
+    subject: '[i-Nventori Ofis] Permohonan baharu — ' + _esc_(v.requester_name) + ' (' + lines.length + ' barang)',
     htmlBody: _emailLayout_('Permohonan Baharu Menunggu',
-      '<p>Permohonan baharu daripada <b>' + _esc_(v.requester_name) + '</b> (' + _esc_(v.requester_email) + '):</p>' +
-      _kvRows_(rows) +
-      '<p>Buka i-Nventori &rarr; Permohonan untuk meluluskan atau menolak.</p>')
+      '<p>Permohonan baharu daripada <b>' + _esc_(v.requester_name) + '</b> (' +
+        _esc_(v.requester_email) + '):</p>' +
+      _kvRows_(itemRows) +
+      _kvRows_(meta) +
+      '<p>Buka i-Nventori Ofis &rarr; Permohonan untuk meluluskan atau menolak.</p>')
   });
 }
 
@@ -1522,7 +1691,7 @@ function _mailRequestDecided_(item, req, decision, notes) {
   const approved = decision === 'approved';
   MailApp.sendEmail({
     to: req.requester_email,
-    cc: ADMIN_EMAIL,
+    cc: [_adminEmail_(), _adminCc_()].filter(Boolean).join(','),
     subject: '[i-Nventori Ofis] Permohonan ' + (approved ? 'DILULUSKAN' : 'DITOLAK') + ' — ' + item.name,
     htmlBody: _emailLayout_(approved ? 'Permohonan Diluluskan' : 'Permohonan Ditolak',
       '<p>Salam <b>' + _esc_(req.requester_name) + '</b>,</p>' +
@@ -1611,7 +1780,7 @@ function checkDates(skipMail) {
 
   try {
     MailApp.sendEmail({
-      to: ADMIN_EMAIL,
+      to: _adminEmail_(), cc: _adminCc_(),
       subject: '[i-Nventori Ofis] ' + total + ' amaran inventori — ' + _fmtDate_(today),
       htmlBody: _emailLayout_('Amaran Harian', html)
     });
@@ -1658,38 +1827,133 @@ function _safeOrigin_(origin) {
   return PAGES_ORIGIN; // unknown origin -> fall back, never echo it blindly
 }
 
+// The Drive session body, shared so the admin path and the borrower's
+// token path cannot drift apart.
+function _driveSession_(fileName, mimeType, origin) {
+  const safeName = String(fileName || 'lampiran').replace(/[^\w.\- ]+/g, '_').slice(0, 80);
+  const meta = {
+    name:     Date.now() + '_' + safeName,
+    parents:  [FOLDER_ID],
+    mimeType: mimeType || 'application/octet-stream'
+  };
+  const res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+    {
+      method: 'post',
+      contentType: 'application/json; charset=UTF-8',
+      headers: {
+        Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+        Origin: _safeOrigin_(origin)
+      },
+      payload: JSON.stringify(meta),
+      muteHttpExceptions: true
+    }
+  );
+  if (res.getResponseCode() !== 200) {
+    return { ok: false, error: 'Drive init HTTP ' + res.getResponseCode() };
+  }
+  const headers    = res.getAllHeaders();
+  const sessionUri = headers['Location'] || headers['location'];
+  if (!sessionUri) return { ok: false, error: 'Drive tidak memulangkan session URI.' };
+  return { ok: true, sessionUri: sessionUri };
+}
+
 function startResumableUpload(fileName, mimeType, origin, adminPass) {
   try {
     _requireAdmin_(adminPass);
-    const safeName = String(fileName || 'lampiran').replace(/[^\w.\- ]+/g, '_').slice(0, 80);
-    const meta = {
-      name:     Date.now() + '_' + safeName,
-      parents:  [FOLDER_ID],
-      mimeType: mimeType || 'application/octet-stream'
-    };
-    const res = UrlFetchApp.fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
-      {
-        method: 'post',
-        contentType: 'application/json; charset=UTF-8',
-        headers: {
-          Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
-          Origin: _safeOrigin_(origin)
-        },
-        payload: JSON.stringify(meta),
-        muteHttpExceptions: true
-      }
-    );
-    if (res.getResponseCode() !== 200) {
-      return { ok: false, error: 'Drive init HTTP ' + res.getResponseCode() };
-    }
-    const headers    = res.getAllHeaders();
-    const sessionUri = headers['Location'] || headers['location'];
-    if (!sessionUri) return { ok: false, error: 'Drive tidak memulangkan session URI.' };
-    return { ok: true, sessionUri: sessionUri };
+    return _driveSession_(fileName, mimeType, origin);
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
   }
+}
+
+// ============================================================
+//  RETURN PROOF  (borrower side, token-gated)
+//
+//  The borrower never logs in. The check-out email carries ?pulang=<token>,
+//  and that token is the only credential — scoped to one open loan, and dead
+//  the moment the loan is closed.
+// ============================================================
+
+// Resolves a token to its item, or throws. Every token path goes through
+// here so the "open loan only" rule is stated once.
+function _itemByReturnToken_(token) {
+  const t = String(token || '').trim();
+  if (!t || t.length < 12) throw new Error('Pautan tidak sah.');
+  const rows = _readTable_('Items').filter(function (i) {
+    return String(i.return_token || '') === t;
+  });
+  if (!rows.length) {
+    throw new Error('Pautan tidak sah atau telah tamat tempoh. Aset ini mungkin sudah direkod sebagai dipulangkan.');
+  }
+  const item = rows[0];
+  if (item.status === 'decommissioned' || item.status === 'disposed') {
+    throw new Error('Aset ini telah dilupuskan.');
+  }
+  return item;
+}
+
+// Public read. Carries only what the borrower needs to recognise the item
+// they are holding — never the holder's name, never the ledger.
+function getReturnContext(token) {
+  ensureSheets_();
+  const item = _itemByReturnToken_(token);
+  const loans = _openLoans_(_readTable_('Transactions')).filter(function (l) {
+    return Number(l.item_id) === Number(item.id);
+  });
+  return {
+    name: item.name,
+    asset_tag: item.asset_tag || '',
+    expected_return_date: loans.length ? loans[0].expected_return_date : null,
+    already_claimed: !!item.return_claimed_at,
+    claimed_at: item.return_claimed_at || null
+  };
+}
+
+function startReturnUpload(token, fileName, mimeType, origin) {
+  try {
+    ensureSheets_();
+    _itemByReturnToken_(token);          // throws unless the token is live
+    return _driveSession_(fileName, mimeType, origin);
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+// Records the borrower's evidence and tells the officer it arrived. This does
+// NOT close the loan — the admin still confirms physical receipt.
+function svcSubmitReturnProof(p) {
+  const item = _itemByReturnToken_(p && p.token);
+  const url = String((p && p.photo_url) || '').trim();
+  if (!/^https:\/\//.test(url)) throw new Error('Foto tidak sah.');
+
+  const now = new Date();
+  _update_('Items', item._row, {
+    return_photo_url: url,
+    return_claimed_at: now,
+    updated_at: now
+  });
+
+  var mailed = true;
+  try { _mailReturnClaimed_(item, url, now); } catch (e) { mailed = false; }
+  return { name: item.name, claimed_at: now, mailed: mailed };
+}
+
+function _mailReturnClaimed_(item, url, when) {
+  MailApp.sendEmail({
+    to: _adminEmail_(), cc: _adminCc_(),
+    subject: '[i-Nventori Ofis] Bukti pemulangan diterima — ' + (item.asset_tag || item.name),
+    htmlBody: _emailLayout_('Bukti Pemulangan Diterima',
+      '<p>Peminjam telah menghantar bukti pemulangan:</p>' +
+      _kvRows_([
+        ['Tag Aset', item.asset_tag || '—'],
+        ['Nama Aset', item.name],
+        ['Dihantar Pada', _fmtDateTime_(when)]
+      ]) +
+      '<p><a href="' + _esc_(url) + '">Lihat foto bukti</a></p>' +
+      '<p style="color:#b45309;">Pemulangan <b>belum</b> direkod. Sila sahkan penerimaan ' +
+      'melalui Aset Alih &rarr; Pinjaman &rarr; Daftar Masuk.</p>')
+  });
 }
 
 // ============================================================
@@ -1742,6 +2006,8 @@ function doPost(e) {
     switch (req.fn) {
       case 'getInitialData':       result = getInitialData(args[0]); break;
       case 'getPublicCatalog':     result = getPublicCatalog(); break;
+      case 'getReturnContext':     result = getReturnContext(args[0]); break;
+      case 'startReturnUpload':    result = startReturnUpload(args[0], args[1], args[2], args[3]); break;
       case 'handleAction':         result = handleAction(args[0], args[1]); break;
       case 'adminLogin':           result = adminLogin(args[0]); break;
       case 'getItemHistory':       result = getItemHistory(args[0], args[1]); break;

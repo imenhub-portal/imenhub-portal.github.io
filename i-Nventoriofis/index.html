@@ -25,7 +25,8 @@
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
   var API_URL = 'https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec';
-  var API_FNS = ['getInitialData', 'getPublicCatalog', 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload'];
+  var API_FNS = ['getInitialData', 'getPublicCatalog', 'getReturnContext', 'startReturnUpload',
+                 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload'];
   function makeRunner() {
     var onOk = function () {};
     var onErr = function (e) { console.error('[API]', e); };
@@ -612,6 +613,48 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 .pub-foot{text-align:center; color:var(--muted-2); font-size:11.5px; margin-top:34px}
 
+/* Two-button chooser: the first thing a requester sees. Deliberately large
+   — the choice between stationery and equipment shapes the whole form. */
+.pub-choose{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:8px}
+.pub-choice{
+  display:flex; flex-direction:column; align-items:flex-start; gap:5px;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-card); padding:24px; cursor:pointer; text-align:left;
+  font-family:inherit; transition:box-shadow .15s, transform .15s, border-color .15s;
+}
+.pub-choice:hover{box-shadow:var(--shadow-card-hover); transform:translateY(-2px); border-color:var(--accent)}
+.pub-choice .pc-ico{
+  width:52px; height:52px; border-radius:16px; background:var(--accent-soft); color:var(--accent);
+  display:flex; align-items:center; justify-content:center; margin-bottom:10px;
+}
+.pub-choice .pc-title{font-size:19px; font-weight:600; letter-spacing:-.02em; color:var(--ink)}
+.pub-choice .pc-sub{font-size:13px; color:var(--muted); line-height:1.5}
+.pub-choice .pc-stat{font-size:12px; color:var(--muted-2); margin-top:4px; font-family:var(--mono)}
+.pub-choice .pc-go{
+  margin-top:14px; display:inline-flex; align-items:center; gap:6px;
+  background:var(--ink); color:var(--surface); border-radius:var(--r-pill);
+  padding:8px 16px; font-size:13.5px; font-weight:600;
+}
+.pub-choice:hover .pc-go{background:var(--accent)}
+
+/* One repeatable row per requested item */
+.lineRow{display:flex; gap:8px; align-items:center; margin-bottom:8px}
+.lineRow select{
+  flex:1; min-width:0; padding:9px 11px; border:1px solid var(--border-2);
+  border-radius:11px; background:var(--surface); outline:none;
+}
+.lineRow select:focus{border-color:var(--accent)}
+.lineRow input{
+  width:78px; padding:9px 10px; border:1px solid var(--border-2); border-radius:11px;
+  background:var(--surface); outline:none; text-align:center;
+}
+.lineRow input:focus{border-color:var(--accent)}
+.lineRow .lineQty{
+  width:78px; text-align:center; color:var(--muted); font-size:13px;
+  padding:9px 0; border:1px dashed var(--border-2); border-radius:11px;
+}
+.reqmeta{font-size:12px; color:var(--muted); margin-bottom:12px}
+
 /* ═══ RESPONSIVE ═════════════════════════════════════════════════════ */
 @media (max-width:1180px){
   .dash-top{grid-template-columns:1fr 1fr}
@@ -625,6 +668,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 @media (max-width:820px){
   .pub-stats{grid-template-columns:1fr}
+  .pub-choose{grid-template-columns:1fr}
   .pub-grid{grid-template-columns:1fr}
   #public{padding:10px 12px 40px}
   .pub-hero h1{font-size:23px}
@@ -757,8 +801,8 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 
     <nav class="topnav" id="topnav">
       <button data-view="requests" onclick="go('requests')">Permohonan<span class="badge hide" id="bReq">0</span></button>
-      <button data-view="inventori" onclick="go('inventori')">Inventori<span class="badge hide" id="bStock">0</span></button>
-      <button data-view="aset" onclick="go('aset')">Aset<span class="badge hide" id="bLoans">0</span></button>
+      <button data-view="inventori" onclick="go('inventori')">Alat Tulis<span class="badge hide" id="bStock">0</span></button>
+      <button data-view="aset" onclick="go('aset')">Aset Alih<span class="badge hide" id="bLoans">0</span></button>
       <button data-view="dashboard" onclick="go('dashboard')">Ringkasan</button>
       <button data-view="reports" onclick="go('reports')">Laporan</button>
       <button data-view="settings" onclick="go('settings')">Tetapan</button>
@@ -798,8 +842,8 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
         </button>
       </div>
       <button class="rail-btn" data-view="requests" onclick="go('requests')" title="Permohonan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></button>
-      <button class="rail-btn" data-view="inventori" onclick="go('inventori')" title="Inventori"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
-      <button class="rail-btn" data-view="aset" onclick="go('aset')" title="Aset"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
+      <button class="rail-btn" data-view="inventori" onclick="go('inventori')" title="Alat Tulis"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg></button>
+      <button class="rail-btn" data-view="aset" onclick="go('aset')" title="Aset Alih"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg></button>
       <button class="rail-btn" data-view="dashboard" onclick="go('dashboard')" title="Ringkasan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dash"/></svg></button>
       <button class="rail-btn" data-view="reports" onclick="go('reports')" title="Laporan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></button>
       <button class="rail-btn" data-view="settings" onclick="go('settings')" title="Tetapan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-gear"/></svg></button>
@@ -843,9 +887,11 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 // ══════════════════════════════════════════════════════════════════════
 var D = null;            // the payload from getInitialData
 var PASS = '';           // admin password, kept in memory + localStorage
-var VIEW = 'dashboard';
+// Pending requests are what need acting on, so that is what an admin
+// sees at login rather than the overview.
+var VIEW = 'requests';
 var SORT = { key: 'asset_tag', dir: 1 };
-var FILTER = { q: '', type: 'all', status: '', category: '', location: '' };
+var FILTER = { q: '', type: 'all', status: '', location: '' };
 var CACHE_KEY = 'inv_cache_v1';
 
 // ══════════════════════════════════════════════════════════════════════
@@ -908,11 +954,14 @@ function pill(status) {
   return '<span class="pill ' + m.cls + '"><i></i>' + esc(m.label) + '</span>';
 }
 
-// The owner's vocabulary, and it is not interchangeable:
-//   Aset      = kerusi, meja, komputer, alat besar — tracked individually
-//   Inventori = alat tulis, kertas, kartrij — tracked by quantity
-// The DB enum stays fixed_asset/consumable; only the labels change.
-var TYPE_LABEL = { fixed_asset: 'Aset', consumable: 'Inventori' };
+// The two categories the office recognises, and they are not
+// interchangeable:
+//   Aset Alih  = laptop, projektor, mikrofon — one physical thing each,
+//                borrowed and returned, carries an asset tag
+//   Alat Tulis = kertas, pen, dakwat — a quantity of interchangeable units,
+//                issued and never returned, no tag
+// The DB enum stays fixed_asset/consumable; only the labels are Malay.
+var TYPE_LABEL = { fixed_asset: 'Aset Alih', consumable: 'Alat Tulis' };
 var ACTION_LABEL = {
   stock_add: 'Tambah Stok', stock_remove: 'Keluar Stok', check_out: 'Daftar Keluar',
   check_in: 'Daftar Masuk', decommission: 'Pelupusan', audit_adjust: 'Pelarasan Audit'
@@ -931,7 +980,10 @@ function toast(msg, kind) {
 }
 
 // Lookups
-function catName(id) { var c = find(D.categories, id); return c ? c.name : '—'; }
+// Legacy only. Items no longer get a category — the item type is the
+// category — but rows created before that change still carry one, and the
+// CSV keeps exporting it so nothing already recorded is lost.
+function catName(id) { var c = find(D.categories, id); return c ? c.name : ''; }
 function locName(id) { var l = find(D.locations, id); return l ? [l.building, l.floor, l.room_number].filter(Boolean).join(' · ') : '—'; }
 function custName(id) { var c = find(D.custodians, id); return c ? c.name : (id ? 'Penjaga #' + id : '—'); }
 function find(arr, id) {
@@ -1111,11 +1163,17 @@ window.addEventListener('DOMContentLoaded', function () {
     $('app').classList.remove('hide');
     boot();
   } else {
-    // Everyone else is a requester. The gate is one click away.
-    var cachedPub = null;
-    try { cachedPub = JSON.parse(localStorage.getItem('inv_pub_v1') || 'null'); } catch (e) {}
-    if (cachedPub) PUB = cachedPub;    // instant paint, same as the admin side
-    showPublic();
+    // A ?pulang= link is a borrower returning something — it takes priority
+    // over both the gate and the catalog.
+    var pulang = /[?&]pulang=([^&]+)/.exec(location.search);
+    if (pulang) {
+      showReturnPage(decodeURIComponent(pulang[1]));
+    } else {
+      var cachedPub = null;
+      try { cachedPub = JSON.parse(localStorage.getItem('inv_pub_v1') || 'null'); } catch (e) {}
+      if (cachedPub) PUB = cachedPub;    // instant paint, same as the admin side
+      showPublic();
+    }
   }
   var th = 'light';
   try { th = localStorage.getItem('inv_theme') || 'light'; } catch (e) {}
@@ -1190,16 +1248,16 @@ function render() {
 // ══════════════════════════════════════════════════════════════════════
 var SECTION = {
   inventori: {
-    title: 'Inventori',
-    sub: 'Alat tulis, kertas, kartrij — dijejak mengikut baki stok.',
+    title: 'Alat Tulis',
+    sub: 'Kertas, pen, dakwat — dijejak mengikut baki stok, dikeluarkan dan tidak dipulangkan.',
     type: 'consumable',
-    tabs: [['senarai', 'Senarai Item'], ['stok', 'Stok'], ['log', 'Log']]
+    tabs: [['senarai', 'Senarai'], ['stok', 'Stok'], ['log', 'Log']]
   },
   aset: {
-    title: 'Aset',
-    sub: 'Kerusi, meja, komputer dan alat besar — dijejak seunit mengikut lokasi.',
+    title: 'Aset Alih',
+    sub: 'Laptop, projektor, mikrofon — dijejak seunit, dipinjam dan dipulangkan.',
     type: 'fixed_asset',
-    tabs: [['senarai', 'Senarai Aset'], ['pinjaman', 'Pinjaman'], ['log', 'Log']]
+    tabs: [['senarai', 'Senarai'], ['pinjaman', 'Pinjaman'], ['log', 'Log']]
   }
 };
 var SUBTAB = { inventori: 'senarai', aset: 'senarai' };
@@ -1222,9 +1280,9 @@ function viewSection(sec) {
     '<div class="spacer"></div>' +
     '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button>' +
     (isInv
-      ? '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>'
+      ? '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Alat Tulis Baharu</button>'
       : '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
-        '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset</button>') +
+        '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset Alih</button>') +
     '</div>';
 
   h += '<div class="tabs" style="display:inline-flex;margin-bottom:16px">' +
@@ -1406,8 +1464,8 @@ function viewDashboard() {
     '</div>';
 
   // ══════════════ ASET ══════════════
-  h += sectionHead('Aset',
-    'Kerusi, meja, komputer dan alat besar — dijejak seunit mengikut lokasi.',
+  h += sectionHead('Aset Alih',
+    'Laptop, projektor, mikrofon — dijejak seunit mengikut lokasi.',
     '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'aset\')">Lihat semua ' + icon('i-out', 13) + '</button>');
 
   // Where the assets physically are — the core question this app answers.
@@ -1423,13 +1481,13 @@ function viewDashboard() {
   h += '<div class="dash-top">';
 
   h += '<div class="hero">' +
-    '<div class="lbl">Jumlah Aset</div>' +
+    '<div class="lbl">Jumlah Aset Alih</div>' +
     '<div class="big mono">' + assets.length + '</div>' +
     '<div class="trend ' + (overdue ? 'down' : 'up') + '">' +
       (onLoan.length ? onLoan.length + ' sedang dipinjam' : 'Semua berada di lokasi') +
       ' <span>' + (overdue ? '· ' + overdue + ' lewat dipulangkan' : '') + '</span></div>' +
     '<div class="hero-actions">' +
-      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset</button>' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset Alih</button>' +
       '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
     '</div>' +
     '<div class="substrip"><div class="cap">Kedudukan aset <b>· ' + locKeys.length + ' lokasi</b></div>' +
@@ -1484,8 +1542,8 @@ function viewDashboard() {
   h += '</div>';   // /dash-top
 
   // ══════════════ INVENTORI ══════════════
-  h += sectionHead('Inventori',
-    'Alat tulis, kertas, kartrij — dijejak mengikut baki stok.',
+  h += sectionHead('Alat Tulis',
+    'Kertas, pen, dakwat — dijejak mengikut baki stok.',
     '<button class="btn btn-sm" onclick="go(\'inventori\')">Urus stok ' + icon('i-out', 13) + '</button>');
 
   h += '<div class="dash-top">';
@@ -1503,7 +1561,7 @@ function viewDashboard() {
       (low ? '↓ ' + low + ' jenis stok rendah' : '✓ semua paras selamat') +
       ' <span>· ' + cons.length + ' jenis item</span></div>' +
     '<div class="hero-actions">' +
-      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Item Baharu</button>' +
+      '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Alat Tulis Baharu</button>' +
       '<button class="btn" onclick="go(\'inventori\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
     '</div>' +
     '<div class="substrip"><div class="cap">Paling hampir habis <b>· ' + cons.length + ' jenis item</b></div>' +
@@ -1520,7 +1578,7 @@ function viewDashboard() {
     '</div></div></div>';
 
   h += '<div class="tiles">' +
-    tile('i-layers', 'Jenis Item', cons.length, 'Dalam inventori', 'inventori', true,
+    tile('i-layers', 'Jenis Alat Tulis', cons.length, 'Dalam inventori', 'inventori', true,
          '<div class="trend"><span>' + stockUnits + ' unit di tangan</span></div>') +
     tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'inventori', false,
          low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
@@ -1713,14 +1771,12 @@ function filteredItems() {
   return (D.items || []).filter(function (i) {
     if (FILTER.type !== 'all' && i.item_type !== FILTER.type) return false;
     if (FILTER.status && i.status !== FILTER.status) return false;
-    if (FILTER.category && Number(i.category_id) !== Number(FILTER.category)) return false;
     if (FILTER.location && Number(i.location_id) !== Number(FILTER.location)) return false;
     if (!q) return true;
-    return [i.name, i.asset_tag, i.serial_number, i.notes, catName(i.category_id)]
+    return [i.name, i.asset_tag, i.serial_number, i.notes]
       .join(' ').toLowerCase().indexOf(q) !== -1;
   }).sort(function (a, b) {
     var k = SORT.key, av = a[k], bv = b[k];
-    if (k === 'category_id') { av = catName(a.category_id); bv = catName(b.category_id); }
     if (k === 'location_id') { av = locName(a.location_id); bv = locName(b.location_id); }
     if (av == null) return 1;
     if (bv == null) return -1;
@@ -1752,7 +1808,6 @@ function viewItems(embed, forceType) {
     selectFilter('fstatus', 'status', 'Semua Status', (D.meta.item_status || []).map(function (s) {
       return { v: s, t: (STATUS_META[s] || {}).label || s };
     })) +
-    selectFilter('fcat', 'category', 'Semua Kategori', (D.categories || []).map(function (c) { return { v: c.id, t: c.name }; })) +
     selectFilter('floc', 'location', 'Semua Lokasi', (D.locations || []).map(function (l) { return { v: l.id, t: locName(l.id) }; })) +
     (hasFilter() ? '<button class="btn btn-sm btn-ghost" onclick="clearFilters()">' + icon('i-x', 13) + ' Reset</button>' : '') +
   '</div><div id="tblHost">' + itemsTable(rows) + '</div></div>';
@@ -1769,8 +1824,8 @@ function selectFilter(id, key, allLabel, opts) {
       return '<option value="' + esc(o.v) + '"' + (String(FILTER[key]) === String(o.v) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
     }).join('') + '</select>';
 }
-function hasFilter() { return FILTER.q || FILTER.status || FILTER.category || FILTER.location; }
-function clearFilters() { FILTER = { q: '', type: FILTER.type, status: '', category: '', location: '' }; render(); }
+function hasFilter() { return FILTER.q || FILTER.status || FILTER.location; }
+function clearFilters() { FILTER = { q: '', type: FILTER.type, status: '', location: '' }; render(); }
 
 // Re-renders only the table body, so typing in the filter box does not
 // steal focus by rebuilding the input underneath the cursor.
@@ -1798,7 +1853,7 @@ function itemsTable(rows) {
   }
   var h = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
     (ITEMS_HIDE_TAG ? '' : th('asset_tag', 'Tag Aset')) +
-    th('name', 'Nama Item') + th('category_id', 'Kategori') +
+    th('name', 'Nama Item') +
     th('location_id', 'Lokasi') + th('status', 'Status') +
     th('quantity_available', 'Baki', 't-num') + th('date_acquired', 'Diperoleh') +
     '<th style="width:40px"></th></tr></thead><tbody>';
@@ -1815,7 +1870,6 @@ function itemsTable(rows) {
       '<td><div class="t-name">' + esc(i.name) + '</div>' +
         '<div class="t-sub">' + esc(TYPE_LABEL[i.item_type] || i.item_type) +
         (i.serial_number ? ' · <span class="mono">' + esc(i.serial_number) + '</span>' : '') + '</div></td>' +
-      '<td>' + esc(catName(i.category_id)) + '</td>' +
       '<td><span style="font-size:12.5px">' + esc(locName(i.location_id)) + '</span></td>' +
       '<td>' + pill(i.status) +
         (loan ? '<div class="t-sub" style="margin-top:3px">' + esc(custName(loan.custodian_id)) +
@@ -1906,7 +1960,10 @@ function viewLoans(embed) {
       '<td class="mono" style="font-size:12.5px">' + fmtDate(l.expected_return_date) + '</td>' +
       '<td>' + (l.is_overdue
         ? '<span class="pill pill-err">' + Math.abs(d) + ' hari lewat</span>'
-        : '<span class="pill ' + (d <= 3 ? 'pill-warn' : 'pill-info') + '">' + d + ' hari lagi</span>') + '</td>' +
+        : '<span class="pill ' + (d <= 3 ? 'pill-warn' : 'pill-info') + '">' + d + ' hari lagi</span>') +
+        (i.return_claimed_at
+          ? '<div style="margin-top:4px"><span class="pill pill-ok"><i></i>Bukti dihantar</span></div>'
+          : '') + '</td>' +
       '<td><button class="btn btn-sm" onclick="openCheckIn(' + i.id + ')">' + icon('i-in', 14) + ' Daftar Masuk</button></td>' +
       '</tr>';
   }).join('');
@@ -1935,7 +1992,7 @@ function viewStock(embed) {
     '<p>' + cons.length + ' item inventori · ' + low.length + ' pada paras rendah</p></div></div>';
 
   h += '<div class="grid g-3" style="margin-bottom:16px">' +
-    kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Item', cons.length, 'Dalam inventori', 'stock') +
+    kpi('i-layers', 'var(--accent)', 'var(--accent-soft)', 'Jenis Alat Tulis', cons.length, 'Dalam inventori', 'stock') +
     kpi('i-warn', 'var(--warn)', 'var(--warn-bg)', 'Perlu Diisi Semula', low.length, 'Pada atau bawah paras minimum', 'stock') +
     kpi('i-box', 'var(--ok)', 'var(--ok-bg)', 'Unit Di Tangan', units, 'Jumlah baki semua item', 'stock') +
     '</div>';
@@ -1957,7 +2014,7 @@ function viewStock(embed) {
     var pct = Math.max(3, Math.min(100, (av / Math.max(min * 2, 1)) * 100));
     return '<tr>' +
       '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + esc(i.asset_tag || '—') + '</td>' +
-      '<td><div class="t-name">' + esc(i.name) + '</div><div class="t-sub">' + esc(catName(i.category_id)) + '</div></td>' +
+      '<td><div class="t-name">' + esc(i.name) + '</div><div class="t-sub">' + esc(TYPE_LABEL[i.item_type] || '') + '</div></td>' +
       '<td style="font-size:12.5px">' + esc(locName(i.location_id)) + '</td>' +
       '<td class="t-num mono" style="font-weight:700;' + (isLow ? 'color:var(--warn)' : '') + '">' + av + '</td>' +
       '<td class="t-num mono" style="color:var(--muted)">' + min + '</td>' +
@@ -2149,12 +2206,12 @@ function viewReports() {
     h += '<div class="card" style="margin-top:16px"><div class="card-head">' +
       '<h3>Item Paling Banyak Digunakan</h3><div class="spacer"></div>' +
       '<span class="t-sub">90 hari</span></div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Kategori</th>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Jenis</th>' +
       '<th class="t-num">Dikeluarkan</th><th class="t-num">Baki Kini</th><th class="t-num">Minimum</th></tr></thead><tbody>';
     h += issued.items.slice(0, 20).map(function (r) {
       var low = Number(r.item.quantity_available || 0) <= Number(r.item.min_stock_alert || 0);
       return '<tr><td class="t-name">' + esc(r.item.name) + '</td>' +
-        '<td style="font-size:12.5px;color:var(--muted)">' + esc(catName(r.item.category_id)) + '</td>' +
+        '<td style="font-size:12.5px;color:var(--muted)">' + esc(TYPE_LABEL[r.item.item_type] || '') + '</td>' +
         '<td class="t-num mono" style="font-weight:700">' + r.units + '</td>' +
         '<td class="t-num mono" style="' + (low ? 'color:var(--warn);font-weight:700' : '') + '">' +
           r.item.quantity_available + '</td>' +
@@ -2166,20 +2223,20 @@ function viewReports() {
 }
 
 function viewSettings() {
-  var h = '<div class="page-head"><div><h2>Tetapan</h2><p>Data rujukan: kategori, lokasi dan penjaga aset</p></div></div>';
-  h += '<div class="grid g-3">';
-
-  h += refCard('Kategori', 'i-tag', D.categories || [], function (c) {
-    return { title: c.name, sub: TYPE_LABEL[c.type] || c.type };
-  }, 'Category');
+  var h = '<div class="page-head"><div><h2>Tetapan</h2>' +
+    '<p>Lokasi penyimpanan dan pegawai yang menguruskan permohonan</p></div></div>';
+  h += '<div class="grid g-2">';
 
   h += refCard('Lokasi', 'i-pin', D.locations || [], function (l) {
     return { title: l.building, sub: [l.floor, l.room_number].filter(Boolean).join(' · ') || '—' };
   }, 'Location');
 
-  h += refCard('Penjaga Aset', 'i-users', D.custodians || [], function (c) {
-    return { title: c.name, sub: c.employee_id + ' · ' + (c.department || c.email) };
-  }, 'Custodian');
+  // The staff list used to live here as "Penjaga Aset". It was removed: nobody
+  // is pre-registered any more — _resolveRecipient_ creates a person the first
+  // time they borrow or receive something — and "who is holding this" is
+  // already answered in Ringkasan, Pinjaman, Senarai and Log. The table
+  // itself stays, because the ledger references it for per-person reporting.
+  h += adminOfficerCard();
 
   h += '</div>';
 
@@ -2196,6 +2253,34 @@ function viewSettings() {
     '<div class="spacer"></div><button class="btn btn-sm" onclick="goSub(\'aset\',\'log\',\'all\')">Lihat Log</button></div>' +
     '</div></div>';
   return h;
+}
+
+// The Pentadbir Inventori card. Saved to the Config sheet, so changing the
+// officer needs no redeploy.
+function adminOfficerCard() {
+  var c = D.config || {};
+  return '<div class="card"><div class="card-head">' + icon('i-shield', 16) +
+    '<h3>Pentadbir Inventori</h3></div>' +
+    '<div class="card-body" style="padding:0 18px 18px">' +
+    '<p style="font-size:12px;color:var(--muted);margin:0 0 14px">' +
+      'Pegawai yang meluluskan permohonan. Semua notifikasi permohonan, ' +
+      'pemulangan dan ringkasan harian dihantar ke sini.</p>' +
+    field('Nama', input('cfName', 'text', c.admin_name || '', 'placeholder="cth. Hazde"'), null, true) +
+    field('Emel', input('cfEmail', 'email', c.admin_email || '', 'placeholder="nama@ukm.edu.my"'), null, true) +
+    field('Emel Salinan', input('cfCc', 'text', c.admin_cc || '', 'placeholder="pilihan — pisahkan dengan koma"'),
+      'Pegawai ganti atau emel pejabat') +
+    '<button class="btn btn-accent btn-block" onclick="saveOfficer(this)">' +
+      icon('i-check', 15) + ' Simpan</button>' +
+    '</div></div>';
+}
+
+function saveOfficer(btn) {
+  busy(btn);
+  api('SaveConfig', {
+    admin_name: val('cfName'), admin_email: val('cfEmail'), admin_cc: val('cfCc')
+  }, function () {
+    refresh(function () { unbusy(btn); toast('Pentadbir Inventori dikemas kini.', 'ok'); });
+  }, function (e) { unbusy(btn); toast(e, 'err'); });
 }
 
 function refCard(title, ic, rows, fmt, kind) {
@@ -2294,12 +2379,11 @@ function openItemDrawer(id, presetType) {
   UPLOADS = { photo_url: it ? (it.photo_url || '') : '', receipt_url: it ? (it.receipt_url || '') : '' };
   var type = it ? it.item_type : (presetType || 'fixed_asset');
 
-  var catOpts = (D.categories || []).map(function (c) { return { v: c.id, t: c.name + ' (' + (TYPE_LABEL[c.type] || c.type) + ')' }; });
   var locOpts = (D.locations || []).map(function (l) { return { v: l.id, t: locName(l.id) }; });
 
-  if (!catOpts.length || !locOpts.length) {
-    openDrawer('Data rujukan diperlukan', '',
-      '<div class="err-box">Sila tambah sekurang-kurangnya satu kategori dan satu lokasi di Tetapan sebelum mendaftar item.</div>',
+  if (!locOpts.length) {
+    openDrawer('Lokasi diperlukan', '',
+      '<div class="err-box">Sila tambah sekurang-kurangnya satu lokasi di Tetapan sebelum mendaftar item.</div>',
       '<button class="btn" onclick="closeDrawer()">Batal</button>' +
       '<button class="btn btn-primary" onclick="closeDrawer();go(\'settings\')">Buka Tetapan</button>');
     return;
@@ -2314,10 +2398,7 @@ function openItemDrawer(id, presetType) {
       ], type, 'onchange="toggleItemType()"'), null, true) +
       field('Nombor Siri', input('fSerial', 'text', it ? it.serial_number : '')) +
     '</div>' +
-    '<div class="row-2">' +
-      field('Kategori', select('fCat', catOpts, it ? it.category_id : ''), null, true) +
-      field('Lokasi', select('fLoc', locOpts, it ? it.location_id : ''), null, true) +
-    '</div>';
+    field('Lokasi', select('fLoc', locOpts, it ? it.location_id : ''), null, true);
   if (it && it.asset_tag) b += '<div class="info-box">Tag aset <b class="mono">' + esc(it.asset_tag) + '</b> — dijana automatik dan kekal.</div>';
   else if (!it) b += '<div class="info-box">Aset menerima tag (<span class="mono">AST-TAHUN-NNNN</span>) secara automatik. Item inventori tidak bertag — ia dikenali melalui nama.</div>';
   b += '</fieldset>';
@@ -2329,12 +2410,6 @@ function openItemDrawer(id, presetType) {
         it ? 'Ubah kuantiti melalui Tambah/Keluar Stok supaya lejar kekal tepat.' : null) +
       field('Amaran Stok Minimum', input('fMin', 'number', it ? it.min_stock_alert : 5, 'min="0" step="1"'), 'Amaran dicetuskan pada paras ini') +
     '</div>' +
-    '<div id="portableRow" class="field"><label>Aset Mudah Alih</label>' +
-      select('fPortable', [
-        { v: 'TRUE',  t: 'Ya — boleh didaftar keluar kepada individu' },
-        { v: 'FALSE', t: 'Tidak — kekal di lokasi (cth. meja, kerusi)' }
-      ], (it && String(it.is_portable) === 'FALSE') ? 'FALSE' : 'TRUE', '') +
-      '<div class="hint">Hanya aset mudah alih boleh dipinjamkan</div></div>' +
     '</fieldset>';
 
   b += '<fieldset class="fs"><legend>Tarikh Kitaran Hayat</legend>' +
@@ -2365,9 +2440,6 @@ function openItemDrawer(id, presetType) {
 
 function toggleItemType() {
   var t = val('fType');
-  // "Mudah alih" is an asset concept; stock quantity is an inventory one.
-  var pr = $('portableRow');
-  if (pr) pr.style.display = (t === 'fixed_asset') ? '' : 'none';
   var row = $('qtyRow');
   if (!row) return;
   // A fixed asset is one physical thing; the quantity fields only make
@@ -2382,7 +2454,6 @@ function saveItem(btn, id) {
     name: val('fName'),
     item_type: type,
     serial_number: val('fSerial'),
-    category_id: num('fCat'),
     location_id: num('fLoc'),
     quantity_total: type === 'consumable' ? num('fQty') : 1,
     min_stock_alert: num('fMin') || 0,
@@ -2390,7 +2461,6 @@ function saveItem(btn, id) {
     date_next_inspection: val('fInspect'),
     date_last_maintained: val('fMaint'),
     date_last_audited: val('fAudit'),
-    is_portable: (type === 'fixed_asset') ? val('fPortable') : 'TRUE',
     photo_url: UPLOADS.photo_url,
     receipt_url: UPLOADS.receipt_url,
     notes: val('fNotes')
@@ -2516,6 +2586,7 @@ function doCheckOut(btn) {
 function openCheckIn(id) {
   var it = itemById(id);
   if (!it || !it.open_loan) { toast('Tiada pinjaman terbuka untuk item ini.', 'err'); return; }
+  UPLOADS.checkin_photo = '';
   var l = it.open_loan;
   var late = l.is_overdue;
   var d = daysBetween(today(), l.expected_return_date);
@@ -2526,6 +2597,14 @@ function openCheckIn(id) {
     (late ? 'Lewat ' + Math.abs(d) + ' hari (sepatutnya ' + fmtDate(l.expected_return_date) + ')'
           : 'Jangka pulang ' + fmtDate(l.expected_return_date)) + '</div>' +
     field('Tarikh Pulang Sebenar', input('kDate', 'date', inputDate(new Date()))) +
+    (it.return_photo_url
+      ? '<div class="field"><label>Bukti Daripada Peminjam</label>' +
+        '<a class="btn btn-sm btn-block" href="' + esc(it.return_photo_url) + '" target="_blank" rel="noopener">' +
+        icon('i-scan', 14) + ' Lihat foto (dihantar ' + fmtDateTime(it.return_claimed_at) + ')</a></div>'
+      : '<div class="info-box">Peminjam belum menghantar bukti pemulangan.</div>') +
+    '<div class="field"><label>Foto Admin (pilihan)</label>' +
+      dropZone('checkin_photo', true, 'Ambil Foto') +
+      '<div class="hint">Bukti keadaan aset semasa diterima</div></div>' +
     field('Catatan / Keadaan Aset', '<textarea id="kNote" placeholder="cth. keadaan baik, tiada kerosakan"></textarea>') +
     '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
       ' ' + esc(custName(l.custodian_id)) + ' akan menerima emel pengesahan pemulangan, ' +
@@ -2537,7 +2616,10 @@ function openCheckIn(id) {
 }
 function doCheckIn(btn, id) {
   busy(btn);
-  api('CheckIn', { id: id, actual_return_date: val('kDate'), reason_notes: val('kNote') },
+  api('CheckIn', {
+      id: id, actual_return_date: val('kDate'), reason_notes: val('kNote'),
+      photo_admin: UPLOADS.checkin_photo || ''
+    },
     function (res) {
       refresh(function () {
         unbusy(btn); closeDrawer();
@@ -2594,7 +2676,7 @@ function openDecommission(id) {
     'Rekod dan sejarahnya kekal dalam lejar audit.</div>' +
     '<div class="info-box"><b class="mono">' + esc(it.asset_tag || it.name) + '</b>' +
     (it.asset_tag ? ' — ' + esc(it.name) : '') +
-    '<br>' + esc(catName(it.category_id)) + ' · ' + esc(locName(it.location_id)) + '</div>' +
+    '<br>' + esc(TYPE_LABEL[it.item_type] || '') + ' · ' + esc(locName(it.location_id)) + '</div>' +
     field('Sebab Pelupusan', select('dReason', (D.meta.removal_reasons || []).map(function (r) {
       return { v: r, t: r };
     }), '', ''), null, true) +
@@ -2645,13 +2727,7 @@ function openRef(kind, id) {
   var r = id ? find(D[tab], id) : null;
   var b = '', title = '';
 
-  if (kind === 'Category') {
-    title = 'Kategori';
-    b = field('Nama Kategori', input('rName', 'text', r ? r.name : '', 'placeholder="cth. Komputer Riba"'), null, true) +
-        field('Jenis', select('rType', [
-          { v: 'fixed_asset', t: TYPE_LABEL.fixed_asset }, { v: 'consumable', t: TYPE_LABEL.consumable }
-        ], r ? r.type : 'fixed_asset', ''), null, true);
-  } else if (kind === 'Location') {
+  if (kind === 'Location') {
     title = 'Lokasi';
     b = field('Bangunan', input('rBuilding', 'text', r ? r.building : '', 'placeholder="cth. IMEN"'), null, true) +
         '<div class="row-2">' +
@@ -2675,8 +2751,7 @@ function openRef(kind, id) {
 }
 function saveRef(btn, kind, id) {
   var p = { id: id || undefined };
-  if (kind === 'Category') { p.name = val('rName'); p.type = val('rType'); }
-  else if (kind === 'Location') { p.building = val('rBuilding'); p.floor = val('rFloor'); p.room_number = val('rRoom'); }
+  if (kind === 'Location') { p.building = val('rBuilding'); p.floor = val('rFloor'); p.room_number = val('rRoom'); }
   else { p.employee_id = val('rEmp'); p.name = val('rName'); p.email = val('rEmail'); p.department = val('rDept'); }
   submitAction(btn, 'Save' + kind, p, 'Rekod disimpan.');
 }
@@ -2707,7 +2782,6 @@ function renderHistory(it, txns) {
   var h = '<fieldset class="fs"><legend>Ringkasan</legend>' +
     kvRow('Status', pill(it.status)) +
     kvRow('Jenis', esc(TYPE_LABEL[it.item_type] || it.item_type)) +
-    kvRow('Kategori', esc(catName(it.category_id))) +
     kvRow('Lokasi', esc(locName(it.location_id))) +
     (it.serial_number ? kvRow('Nombor Siri', '<span class="mono">' + esc(it.serial_number) + '</span>') : '') +
     kvRow('Baki / Jumlah', '<span class="mono">' + it.quantity_available + ' / ' + it.quantity_total + '</span>') +
@@ -2899,12 +2973,19 @@ function handleDeepLink() {
 //  The bytes never pass through Apps Script: the server opens a Drive
 //  resumable session and the browser PUTs the file straight to Google.
 // ══════════════════════════════════════════════════════════════════════
-function dropZone(key) {
+// `camera` adds capture="environment", which makes a phone open the camera
+// directly instead of a file picker. That single attribute is the whole
+// "snap a photo" feature — no getUserMedia, no extra library.
+function dropZone(key, camera, label) {
   var has = UPLOADS[key];
   return '<div class="drop ' + (has ? 'done' : '') + '" id="drop_' + key + '" onclick="document.getElementById(\'file_' + key + '\').click()">' +
-    (has ? icon('i-check', 16) + ' Fail dimuat naik' : icon('i-down', 16) + ' Klik untuk pilih fail') +
+    (has
+      ? icon('i-check', 16) + ' Foto dimuat naik'
+      : icon(camera ? 'i-scan' : 'i-down', 16) + ' ' + esc(label || (camera ? 'Ambil Foto' : 'Klik untuk pilih fail'))) +
     '</div><div class="prog hide" id="prog_' + key + '"><span></span></div>' +
-    '<input type="file" id="file_' + key + '" class="hide" accept="image/*,application/pdf" onchange="doUpload(\'' + key + '\',this)">';
+    '<input type="file" id="file_' + key + '" class="hide" accept="image/*' + (camera ? '' : ',application/pdf') + '"' +
+      (camera ? ' capture="environment"' : '') +
+      ' onchange="doUpload(\'' + key + '\',this)">';
 }
 
 function doUpload(key, inputEl) {
@@ -2917,7 +2998,7 @@ function doUpload(key, inputEl) {
   drop.innerHTML = '<span class="spin" style="border-color:rgba(0,0,0,.15);border-top-color:var(--accent)"></span> Memuat naik…';
   prog.classList.remove('hide');
 
-  google.script.run
+  var runner = google.script.run
     .withSuccessHandler(function (r) {
       if (!r || !r.ok) { uploadFailed(key, (r && r.error) || 'Gagal memulakan muat naik'); return; }
       var xhr = new XMLHttpRequest();
@@ -2939,8 +3020,12 @@ function doUpload(key, inputEl) {
       xhr.onerror = function () { uploadFailed(key, 'Sambungan terputus'); };
       xhr.send(file);
     })
-    .withFailureHandler(function (e) { uploadFailed(key, (e && e.message) || String(e)); })
-    .startResumableUpload(file.name, file.type, location.origin, PASS);
+    .withFailureHandler(function (e) { uploadFailed(key, (e && e.message) || String(e)); });
+
+  // A borrower on the return page has no password; their upload is
+  // authorised by the loan token instead.
+  if (RETURN_TOKEN) runner.startReturnUpload(RETURN_TOKEN, file.name, file.type, location.origin);
+  else runner.startResumableUpload(file.name, file.type, location.origin, PASS);
 }
 
 function uploadFailed(key, msg) {
@@ -2971,7 +3056,7 @@ function palResults() {
   var q = $('palInput').value.toLowerCase().trim();
   if (!q) return (D.items || []).slice(0, 8);
   return (D.items || []).filter(function (i) {
-    return [i.name, i.asset_tag, i.serial_number, catName(i.category_id), locName(i.location_id)]
+    return [i.name, i.asset_tag, i.serial_number, locName(i.location_id)]
       .join(' ').toLowerCase().indexOf(q) !== -1;
   }).slice(0, 25);
 }
@@ -3009,14 +3094,16 @@ function palPick(id) {
 //  PUBLIC PAGE — PEMOHON
 //
 //  What a member of staff sees when they open the link. No password, and
-//  deliberately no access to the admin payload: it calls getPublicCatalog,
-//  which carries availability and location but never the name of whoever
-//  is holding something.
+//  no access to the admin payload: it calls getPublicCatalog, which carries
+//  availability and location but never the name of whoever holds something.
+//
+//  Two steps by design. Picking Alat Tulis or Aset Alih first means the form
+//  can be shaped for that kind — quantities for stationery, availability and
+//  return dates for equipment — instead of one form hedging for both.
 // ══════════════════════════════════════════════════════════════════════
 var PUB = null;                       // the catalog
-// Staff come here for stationery far more often than for equipment, so
-// Inventori is the landing tab rather than a mixed list.
-var PUB_FILTER = { q: '', type: 'consumable' };
+var PUB_KIND = null;                  // null = the two buttons, else the form
+var PUB_LINES = [];                   // rows of { item_id, quantity }
 
 function showPublic() {
   $('gate').classList.add('hide');
@@ -3032,15 +3119,14 @@ function loadCatalog() {
     .withSuccessHandler(function (d) {
       PUB = d || { items: [] };
       try { localStorage.setItem('inv_pub_v1', JSON.stringify(PUB)); } catch (e) {}
-      renderCatalog();
+      renderPublic();
     })
     .withFailureHandler(function (e) {
-      if (PUB) return;               // a warm cache is better than an error
+      if (PUB) return;               // a warm cache beats an error
       var msg = (e && e.message) || String(e || '');
       // "Unknown API function" means the page is newer than the deployed
-      // backend — by far the most common cause, and the old generic
-      // "sila muat semula" sent people reloading forever instead of
-      // redeploying. Name the actual fix.
+      // backend — by far the most common cause, and a generic "reload" sent
+      // people reloading forever instead of redeploying.
       var stale = /Unknown API function/i.test(msg);
       host.innerHTML = '<div class="empty">' + icon('i-warn', 30) +
         (stale
@@ -3054,168 +3140,304 @@ function loadCatalog() {
     .getPublicCatalog();
 }
 
-function renderCatalog() {
+function pubItems(kind) {
+  var t = (kind === 'alat') ? 'consumable' : 'fixed_asset';
+  return (PUB.items || []).filter(function (i) { return i.item_type === t; });
+}
+
+function renderPublic() {
   var host = $('pubBody');
   if (!host || !PUB) return;
-  var q = PUB_FILTER.q.toLowerCase().trim();
-  var rows = (PUB.items || []).filter(function (i) {
-    if (PUB_FILTER.type !== 'all' && i.item_type !== PUB_FILTER.type) return false;
-    if (!q) return true;
-    return [i.name, i.asset_tag, i.category, i.location].join(' ').toLowerCase().indexOf(q) !== -1;
-  });
+  host.innerHTML = PUB_KIND ? renderRequestForm() : renderChooser();
+}
 
-  var assets = (PUB.items || []).filter(function (i) { return i.item_type === 'fixed_asset'; });
-  var avail  = assets.filter(function (i) { return i.available; }).length;
+// ── Step 1: the two big buttons ───────────────────────────────────────
+function renderChooser() {
+  var alat = pubItems('alat');
+  var aset = pubItems('aset');
+  var alatReady = alat.filter(function (i) { return i.available; }).length;
+  var asetReady = aset.filter(function (i) { return i.available; }).length;
 
-  var h = '<div class="pub-stats">' +
-    pubStat(avail, 'Aset tersedia') +
-    pubStat(assets.length - avail, 'Sedang dipinjam') +
-    pubStat((PUB.items || []).filter(function (i) { return i.item_type === 'consumable' && i.available; }).length,
-            'Item inventori ada stok') +
+  return '<div class="pub-choose">' +
+    chooserCard('alat', 'i-layers', 'Alat Tulis',
+      'Kertas, pen, dakwat dan bekalan pejabat.',
+      alat.length + ' jenis · ' + alatReady + ' ada stok') +
+    chooserCard('aset', 'i-box', 'Aset Alih',
+      'Laptop, projektor, mikrofon, penunjuk laser.',
+      aset.length + ' aset · ' + asetReady + ' tersedia') +
     '</div>';
-
-  h += '<div class="pub-filters">' +
-    '<div class="tabs">' +
-      pubTab('consumable', 'Inventori') + pubTab('fixed_asset', 'Aset') + pubTab('all', 'Semua') +
-    '</div>' +
-    '<div class="searchbox" style="flex:1;max-width:320px">' +
-      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-search"/></svg>' +
-      '<input id="pubQ" placeholder="Cari nama, kategori, lokasi…" value="' + esc(PUB_FILTER.q) + '" oninput="PUB_FILTER.q=this.value;renderCatalog()">' +
-    '</div></div>';
-
-  if (!rows.length) {
-    h += '<div class="empty">' + icon('i-box', 30) + '<p>Tiada item sepadan.</p></div>';
-    host.innerHTML = h;
-    return;
-  }
-
-  h += '<div class="pub-grid">' + rows.map(function (i) {
-    var isAsset = i.item_type === 'fixed_asset';
-    var badge = i.available
-      ? '<span class="pill pill-ok"><i></i>Tersedia</span>'
-      : (isAsset
-          ? '<span class="pill pill-warn"><i></i>Sedang dipinjam</span>'
-          : '<span class="pill pill-err"><i></i>Kehabisan stok</span>');
-
-    // An unavailable asset shows WHEN it comes back — never WHO has it.
-    var note = '';
-    if (!i.available && isAsset) {
-      note = i.expected_return_date
-        ? '<div class="pub-note">' + icon('i-clock', 13) + ' Dijangka pulang ' + fmtDate(i.expected_return_date) +
-          (i.is_overdue ? ' <b style="color:var(--err)">(sudah lewat)</b>' : '') + '</div>'
-        : '<div class="pub-note">' + icon('i-clock', 13) + ' Tarikh pulang belum ditetapkan</div>';
-    }
-
-    return '<div class="pub-card">' +
-      '<div class="pub-card-top">' +
-        '<span class="rowicon" style="background:' + (isAsset ? 'var(--accent-soft)' : 'var(--surface-3)') +
-          ';color:' + (isAsset ? 'var(--accent)' : 'var(--ink-2)') + '">' +
-          icon(isAsset ? 'i-box' : 'i-layers', 14) + '</span>' +
-        '<div style="min-width:0;flex:1">' +
-          '<div class="pub-name">' + esc(i.name) + '</div>' +
-          '<div class="t-sub">' + esc(i.category || TYPE_LABEL[i.item_type]) +
-            (i.asset_tag ? ' · <span class="mono">' + esc(i.asset_tag) + '</span>' : '') + '</div>' +
-        '</div>' + badge +
-      '</div>' +
-      '<div class="pub-meta">' + icon('i-pin', 13) + ' ' + esc(i.location || '—') + '</div>' +
-      (!isAsset ? '<div class="pub-meta">' + icon('i-layers', 13) + ' Baki <b class="mono">' + i.quantity_available + '</b> unit</div>' : '') +
-      note +
-      '<button class="btn ' + (i.available ? 'btn-accent' : '') + ' btn-block" style="margin-top:12px"' +
-        (i.available ? ' onclick="openRequest(' + i.id + ')"' : ' disabled') + '>' +
-        (i.available
-          ? icon('i-check', 14) + ' Mohon'
-          : (isAsset ? 'Tunggu dipulangkan' : 'Tiada stok')) + '</button>' +
-      '</div>';
-  }).join('') + '</div>';
-
-  host.innerHTML = h;
 }
 
-function pubStat(n, label) {
-  return '<div class="pub-stat"><div class="v mono">' + n + '</div><div class="l">' + esc(label) + '</div></div>';
-}
-function pubTab(v, label) {
-  return '<button class="' + (PUB_FILTER.type === v ? 'active' : '') + '" onclick="PUB_FILTER.type=\'' + v + '\';renderCatalog()">' + label + '</button>';
+function chooserCard(kind, ic, title, sub, stat) {
+  return '<button class="pub-choice" onclick="pickKind(\'' + kind + '\')">' +
+    '<span class="pc-ico">' + icon(ic, 26) + '</span>' +
+    '<span class="pc-title">' + esc(title) + '</span>' +
+    '<span class="pc-sub">' + esc(sub) + '</span>' +
+    '<span class="pc-stat">' + esc(stat) + '</span>' +
+    '<span class="pc-go">Mohon ' + icon('i-out', 14) + '</span>' +
+    '</button>';
 }
 
-// ── Request form ──────────────────────────────────────────────────────
-function openRequest(id) {
-  var i = (PUB.items || []).filter(function (x) { return Number(x.id) === Number(id); })[0];
-  if (!i) return;
-  var isAsset = i.item_type === 'fixed_asset';
+function pickKind(kind) {
+  PUB_KIND = kind;
+  PUB_LINES = [{ item_id: '', quantity: 1 }];
+  renderPublic();
+  window.scrollTo(0, 0);
+}
 
-  // Remember the requester so they do not retype it every time.
+function backToChooser() {
+  PUB_KIND = null;
+  PUB_LINES = [];
+  renderPublic();
+}
+
+// ── Step 2: the form ──────────────────────────────────────────────────
+function renderRequestForm() {
+  var isAlat = PUB_KIND === 'alat';
+  var rows = pubItems(PUB_KIND);
   var me = {};
   try { me = JSON.parse(localStorage.getItem('inv_me') || '{}'); } catch (e) {}
-
   var need = new Date(); need.setDate(need.getDate() + 3);
 
-  var b = '<div class="info-box"><b>' + esc(i.name) + '</b>' +
-    (i.asset_tag ? ' · <span class="mono">' + esc(i.asset_tag) + '</span>' : '') +
-    '<br>' + esc(i.category || '') + ' · ' + esc(i.location || '') +
-    (isAsset ? '' : '<br>Baki tersedia: <b class="mono">' + i.quantity_available + '</b> unit') + '</div>';
+  var h = '<button class="btn btn-sm" style="margin-bottom:16px" onclick="backToChooser()">' +
+    icon('i-in', 14) + ' Kembali</button>';
 
-  b += '<fieldset class="fs"><legend>Maklumat Pemohon</legend>' +
+  // Built once so each return path below emits its own complete, balanced
+  // card rather than relying on the other branch to close it.
+  var intro = '<h3 style="font-size:17px;margin-bottom:4px">' +
+      (isAlat ? 'Mohon Alat Tulis' : 'Mohon Aset Alih') + '</h3>' +
+    '<p style="font-size:13px;color:var(--muted);margin:0 0 18px">' +
+      (isAlat
+        ? 'Pilih barang dan kuantiti. Baki semasa ditunjukkan pada setiap pilihan.'
+        : 'Pilih aset yang ingin dipinjam. Aset yang sedang dipinjam tidak boleh dipilih dan tarikh pulangnya ditunjukkan.') +
+    '</p>';
+
+  if (!rows.length) {
+    return h + '<div class="card card-pad">' + intro +
+      '<div class="info-box" style="margin-bottom:0">Belum ada ' +
+      (isAlat ? 'alat tulis' : 'aset alih') + ' didaftarkan.</div></div>';
+  }
+
+  h += '<div class="card card-pad">' + intro;
+
+  h += '<fieldset class="fs"><legend>Barang Dipohon</legend><div id="lineHost">' +
+    renderLines() + '</div>' +
+    '<button class="btn btn-sm" style="margin-top:10px" onclick="addLine()">' +
+      icon('i-plus', 14) + ' Tambah Barang</button></fieldset>';
+
+  h += '<fieldset class="fs"><legend>Maklumat Pemohon</legend>' +
     field('Nama Penuh', input('qName', 'text', me.name || '', 'placeholder="cth. Farah binti Ali"'), null, true) +
     field('Emel', input('qEmail', 'email', me.email || '', 'placeholder="nama@ukm.edu.my"'),
       'Kemas kini permohonan akan dihantar ke sini', true) +
-    field('Jabatan', input('qDept', 'text', me.dept || '', 'placeholder="cth. Akademik"')) +
     '</fieldset>';
 
-  b += '<fieldset class="fs"><legend>Butiran Permohonan</legend>' +
-    (isAsset ? '' : field('Kuantiti', input('qQty', 'number', 1, 'min="1" max="' + i.quantity_available + '" step="1"'),
-      'Maksimum ' + i.quantity_available + ' unit', true)) +
+  h += '<fieldset class="fs"><legend>Butiran</legend>' +
     field('Tujuan', '<textarea id="qPurpose" placeholder="cth. Bengkel pelajar pada 20 Ogos"></textarea>',
-      'Bantu admin membuat keputusan', true) +
+      'Bantu Pentadbir Inventori membuat keputusan', true) +
     field('Tarikh Diperlukan', input('qNeed', 'date', inputDate(need), 'min="' + inputDate(new Date()) + '"')) +
     '</fieldset>';
 
-  b += '<div class="info-box" style="margin-bottom:0">' + icon('i-bell', 14) +
-    ' Permohonan anda akan dihantar kepada admin untuk kelulusan. Anda akan menerima emel ' +
+  h += '<div class="info-box">' + icon('i-bell', 14) +
+    ' Permohonan dihantar kepada Pentadbir Inventori untuk kelulusan. Anda terima emel ' +
     'pengesahan sekarang, dan satu lagi apabila keputusan dibuat.</div>';
 
-  openDrawer('Mohon ' + (isAsset ? 'Aset' : 'Item'), i.name, b,
-    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
-    '<button class="btn btn-accent" onclick="submitRequest(this,' + id + ')">' +
-      icon('i-check', 15) + ' Hantar Permohonan</button>');
+  h += '<button class="btn btn-accent btn-block" onclick="submitRequest(this)">' +
+    icon('i-check', 15) + ' Hantar Permohonan</button>';
+
+  return h + '</div>';
 }
 
-function submitRequest(btn, id) {
+// One repeatable row per requested item. Availability is baked into each
+// option label, so a requester never has to look it up elsewhere.
+function renderLines() {
+  var isAlat = PUB_KIND === 'alat';
+  var rows = pubItems(PUB_KIND);
+  var chosen = PUB_LINES.map(function (l) { return String(l.item_id); });
+
+  return PUB_LINES.map(function (ln, n) {
+    var opts = '<option value="">— Pilih ' + (isAlat ? 'alat tulis' : 'aset') + ' —</option>' +
+      rows.map(function (i) {
+        // Already picked on another row: hide rather than let the server
+        // reject the duplicate after submit.
+        if (chosen.indexOf(String(i.id)) !== -1 && String(ln.item_id) !== String(i.id)) return '';
+        var label = i.name + ' — ' + (i.available
+          ? (isAlat ? 'baki ' + i.quantity_available : 'tersedia')
+          : (isAlat ? 'tiada stok' : 'dipinjam' +
+              (i.expected_return_date ? ', pulang ' + fmtDate(i.expected_return_date) : '')));
+        return '<option value="' + i.id + '"' +
+          (String(ln.item_id) === String(i.id) ? ' selected' : '') +
+          (i.available ? '' : ' disabled') + '>' + esc(label) + '</option>';
+      }).join('');
+
+    var maxQty = 1;
+    if (isAlat && ln.item_id) {
+      var it = rows.filter(function (x) { return String(x.id) === String(ln.item_id); })[0];
+      if (it) maxQty = Math.max(1, Number(it.quantity_available || 1));
+    }
+
+    return '<div class="lineRow">' +
+      '<select onchange="setLineItem(' + n + ',this.value)">' + opts + '</select>' +
+      (isAlat
+        ? '<input type="number" min="1" max="' + maxQty + '" value="' + ln.quantity +
+          '" onchange="setLineQty(' + n + ',this.value)" title="Kuantiti">'
+        : '<span class="lineQty mono" title="Satu unit sahaja">1</span>') +
+      (PUB_LINES.length > 1
+        ? '<button class="btn btn-sm btn-ghost" onclick="removeLine(' + n + ')" title="Buang">' + icon('i-x', 14) + '</button>'
+        : '<span style="width:34px"></span>') +
+      '</div>';
+  }).join('');
+}
+
+function redrawLines() {
+  var host = $('lineHost');
+  if (host) host.innerHTML = renderLines();
+}
+function addLine() {
+  if (PUB_LINES.length >= 20) { toast('Maksimum 20 barang satu permohonan.', 'err'); return; }
+  PUB_LINES.push({ item_id: '', quantity: 1 });
+  redrawLines();
+}
+function removeLine(n) { PUB_LINES.splice(n, 1); redrawLines(); }
+function setLineItem(n, v) { PUB_LINES[n].item_id = v; PUB_LINES[n].quantity = 1; redrawLines(); }
+function setLineQty(n, v) { PUB_LINES[n].quantity = Math.max(1, Number(v) || 1); }
+
+function submitRequest(btn) {
+  var lines = PUB_LINES.filter(function (l) { return l.item_id; })
+    .map(function (l) { return { item_id: Number(l.item_id), quantity: Number(l.quantity) || 1 }; });
+  if (!lines.length) { toast('Sila pilih sekurang-kurangnya satu barang.', 'err'); return; }
+
   var p = {
-    item_id: id,
     requester_name: val('qName'),
     requester_email: val('qEmail'),
-    requester_department: val('qDept'),
-    quantity: $('qQty') ? num('qQty') : 1,
     purpose: val('qPurpose'),
-    needed_date: val('qNeed')
+    needed_date: val('qNeed'),
+    lines: lines
   };
   busy(btn, 'Menghantar…');
   // No password: SubmitRequest is a public action.
   google.script.run
     .withSuccessHandler(function (res) {
       unbusy(btn);
-      if (!res || !res.success) { drawerErr((res && res.error) || 'Ralat tidak diketahui'); return; }
+      if (!res || !res.success) { toast((res && res.error) || 'Ralat tidak diketahui', 'err'); return; }
       try {
         localStorage.setItem('inv_me', JSON.stringify({
-          name: p.requester_name, email: p.requester_email, dept: p.requester_department
+          name: p.requester_name, email: p.requester_email
         }));
       } catch (e) {}
-      closeDrawer();
+      PUB_KIND = null; PUB_LINES = [];
       loadCatalog();
       requestSent(res.result);
     })
-    .withFailureHandler(function (e) { unbusy(btn); drawerErr((e && e.message) || String(e)); })
+    .withFailureHandler(function (e) { unbusy(btn); toast((e && e.message) || String(e), 'err'); })
     .handleAction('SubmitRequest', p);
 }
 
+// ══════════════════════════════════════════════════════════════════════
+//  RETURN PROOF  (borrower, reached from the check-out email)
+//
+//  Opened as ?pulang=<token>. No login, no searching: the link resolves to
+//  exactly the one item the borrower is holding.
+// ══════════════════════════════════════════════════════════════════════
+var RETURN_TOKEN = null;
+
+function showReturnPage(token) {
+  RETURN_TOKEN = token;
+  UPLOADS.return_photo = '';
+  $('gate').classList.add('hide');
+  $('app').classList.add('hide');
+  $('public').classList.remove('hide');
+  $('pubBody').innerHTML = '<div id="loading">Memuatkan maklumat aset…</div>';
+
+  google.script.run
+    .withSuccessHandler(function (c) { renderReturnPage(c); })
+    .withFailureHandler(function (e) {
+      $('pubBody').innerHTML = '<div class="card card-pad" style="max-width:520px;margin:0 auto">' +
+        '<div class="err-box" style="margin-bottom:14px">' +
+          esc((e && e.message) || 'Pautan tidak sah.') + '</div>' +
+        '<p style="font-size:13px;color:var(--muted);margin:0 0 14px">' +
+          'Pautan ini sah untuk satu pinjaman sahaja dan tamat sebaik pemulangan direkod. ' +
+          'Jika aset masih di tangan anda, sila hubungi Pentadbir Inventori.</p>' +
+        '<button class="btn btn-primary btn-block" onclick="clearReturn()">Buka Halaman Permohonan</button></div>';
+    })
+    .getReturnContext(token);
+}
+
+function clearReturn() {
+  RETURN_TOKEN = null;
+  // Drop ?pulang= so a refresh does not land back on a spent link.
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  showPublic();
+}
+
+function renderReturnPage(c) {
+  var late = c.expected_return_date && daysBetween(today(), c.expected_return_date) < 0;
+
+  var h = '<div class="card card-pad" style="max-width:520px;margin:0 auto">' +
+    '<h3 style="font-size:18px;margin-bottom:4px">Pulangkan Aset</h3>' +
+    '<p style="font-size:13px;color:var(--muted);margin:0 0 16px">' +
+      'Snap keadaan aset sebagai bukti hantar, kemudian serahkan kepada pejabat.</p>' +
+    '<div class="info-box"><b>' + esc(c.name) + '</b>' +
+      (c.asset_tag ? ' · <span class="mono">' + esc(c.asset_tag) + '</span>' : '') +
+      (c.expected_return_date
+        ? '<br>Jangka pulang ' + fmtDate(c.expected_return_date) +
+          (late ? ' <b style="color:var(--err)">(sudah lewat)</b>' : '')
+        : '') + '</div>';
+
+  if (c.already_claimed) {
+    h += '<div class="drop done" style="cursor:default">' + icon('i-check', 16) +
+      ' Bukti telah dihantar pada ' + fmtDateTime(c.claimed_at) + '</div>' +
+      '<p style="font-size:12.5px;color:var(--muted);margin:14px 0 0">' +
+        'Pentadbir Inventori telah dimaklumkan. Anda boleh snap semula jika foto sebelum ini tidak jelas.</p>';
+  }
+
+  h += '<div class="field" style="margin-top:16px"><label>Foto Bukti</label>' +
+    dropZone('return_photo', true, 'Ambil Foto') +
+    '<div class="hint">Kamera akan terbuka terus pada telefon</div></div>';
+
+  h += '<button class="btn btn-accent btn-block" id="rpSend" onclick="sendReturnProof(this)">' +
+    icon('i-check', 15) + ' Hantar Bukti Pemulangan</button>';
+
+  h += '<p style="font-size:11.5px;color:var(--muted-2);margin:14px 0 0;text-align:center">' +
+    'Menghantar bukti tidak menutup pinjaman — pejabat akan sahkan penerimaan.</p>';
+
+  $('pubBody').innerHTML = h + '</div>';
+}
+
+function sendReturnProof(btn) {
+  if (!UPLOADS.return_photo) { toast('Sila ambil foto dahulu.', 'err'); return; }
+  busy(btn, 'Menghantar…');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      unbusy(btn);
+      if (!res || !res.success) { toast((res && res.error) || 'Ralat tidak diketahui', 'err'); return; }
+      returnProofSent(res.result);
+    })
+    .withFailureHandler(function (e) { unbusy(btn); toast((e && e.message) || String(e), 'err'); })
+    .handleAction('SubmitReturnProof', { token: RETURN_TOKEN, photo_url: UPLOADS.return_photo });
+}
+
+function returnProofSent(r) {
+  $('pubBody').innerHTML = '<div class="card card-pad" style="max-width:520px;margin:0 auto;text-align:center">' +
+    '<div style="width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok);' +
+      'display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' + icon('i-check', 26) + '</div>' +
+    '<h3 style="font-size:17px;margin-bottom:6px">Bukti dihantar</h3>' +
+    '<p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">' +
+      esc((r && r.name) || 'Aset') + ' — Pentadbir Inventori telah dimaklumkan.<br>' +
+      'Sila serahkan aset kepada pejabat untuk pengesahan akhir.</p>' +
+    (r && r.mailed === false
+      ? '<div class="err-box">Bukti direkod, tetapi emel makluman gagal dihantar.</div>'
+      : '') +
+    '<button class="btn btn-primary" onclick="clearReturn()">Selesai</button></div>';
+}
+
 function requestSent(r) {
-  openDrawer('Permohonan Dihantar', 'Rujukan REQ_' + ('00000' + (r && r.id)).slice(-6),
+  openDrawer('Permohonan Dihantar', 'Rujukan ' + ((r && r.group_id) || ''),
     '<div style="text-align:center;padding:26px 10px">' +
       '<div style="width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok);' +
         'display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' + icon('i-check', 26) + '</div>' +
       '<h3 style="font-size:17px;margin-bottom:6px">Terima kasih!</h3>' +
-      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Permohonan anda sedang menunggu kelulusan admin.</p>' +
+      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">' +
+        ((r && r.count) || 0) + ' barang dipohon. Menunggu kelulusan Pentadbir Inventori.</p>' +
       (r && r.mailed === false
         ? '<div class="err-box">Permohonan direkod, tetapi emel pengesahan gagal dihantar.</div>'
         : '<div class="info-box">Emel pengesahan telah dihantar. Anda akan dimaklumkan apabila keputusan dibuat.</div>') +
@@ -3225,67 +3447,133 @@ function requestSent(r) {
 
 // ══════════════════════════════════════════════════════════════════════
 //  ADMIN — PERMOHONAN QUEUE
+//
+//  Rows are grouped by group_id so one submission reads as one request,
+//  however many items it carried. Decisions can be taken on the whole group
+//  or line by line, since an officer may well approve the paper and refuse
+//  the projector.
 // ══════════════════════════════════════════════════════════════════════
 var REQ_FILTER = 'pending';
 
 var REQ_STATUS_META = {
-  pending:  { cls: 'pill-warn', label: 'Menunggu' },
-  approved: { cls: 'pill-ok',   label: 'Diluluskan' },
-  rejected: { cls: 'pill-err',  label: 'Ditolak' },
-  cancelled:{ cls: 'pill-mute', label: 'Dibatalkan' }
+  pending:   { cls: 'pill-warn', label: 'Menunggu' },
+  approved:  { cls: 'pill-ok',   label: 'Diluluskan' },
+  rejected:  { cls: 'pill-err',  label: 'Ditolak' },
+  cancelled: { cls: 'pill-mute', label: 'Dibatalkan' }
 };
 
+// Collapses the flat row list into one entry per submission.
+function requestGroups() {
+  var by = {};
+  (D.requests || []).forEach(function (r) {
+    var k = String(r.group_id || ('solo-' + r.id));   // legacy rows have no group
+    if (!by[k]) {
+      by[k] = {
+        group_id: k, lines: [],
+        requester_name: r.requester_name, requester_email: r.requester_email,
+        purpose: r.purpose, needed_date: r.needed_date, created_at: r.created_at
+      };
+    }
+    by[k].lines.push(r);
+  });
+  return Object.keys(by).map(function (k) {
+    var g = by[k];
+    g.pending = g.lines.filter(function (l) { return l.status === 'pending'; }).length;
+    // A group's status is the single status of its lines, or 'mixed' once
+    // they have been decided differently.
+    var st = {};
+    g.lines.forEach(function (l) { st[l.status] = 1; });
+    var keys = Object.keys(st);
+    g.status = keys.length === 1 ? keys[0] : 'mixed';
+    return g;
+  }).sort(function (a, b) {
+    if (a.pending !== b.pending) return b.pending - a.pending;   // waiting first
+    return (toDate(b.created_at) || 0) - (toDate(a.created_at) || 0);
+  });
+}
+
 function viewRequests() {
-  var all = D.requests || [];
-  var rows = all.filter(function (r) { return REQ_FILTER === 'all' || r.status === REQ_FILTER; });
-  var pending = all.filter(function (r) { return r.status === 'pending'; }).length;
+  var groups = requestGroups();
+  var pendingGroups = groups.filter(function (g) { return g.pending > 0; });
+  var shown = groups.filter(function (g) {
+    if (REQ_FILTER === 'all') return true;
+    if (REQ_FILTER === 'pending') return g.pending > 0;
+    return g.lines.some(function (l) { return l.status === REQ_FILTER; });
+  });
 
   var h = '<div class="page-head"><div><h2>Permohonan</h2>' +
-    '<p>' + pending + ' menunggu kelulusan · ' + all.length + ' keseluruhan</p></div></div>';
+    '<p>' + pendingGroups.length + ' menunggu kelulusan · ' + groups.length + ' keseluruhan</p></div></div>';
 
-  // Built once so each return path below emits its own complete, balanced
-  // card element rather than relying on the other branch to close it.
-  var filterBar = '<div class="filters">' +
-    '<div class="tabs">' +
-      reqTab('pending', 'Menunggu', pending) +
-      reqTab('approved', 'Diluluskan', all.filter(function (r) { return r.status === 'approved'; }).length) +
-      reqTab('rejected', 'Ditolak', all.filter(function (r) { return r.status === 'rejected'; }).length) +
-      reqTab('all', 'Semua', all.length) +
-    '</div></div>';
+  var filterBar = '<div class="tabs" style="display:inline-flex;margin-bottom:16px">' +
+    reqTab('pending', 'Menunggu', pendingGroups.length) +
+    reqTab('approved', 'Diluluskan', groups.filter(function (g) {
+      return g.lines.some(function (l) { return l.status === 'approved'; }); }).length) +
+    reqTab('rejected', 'Ditolak', groups.filter(function (g) {
+      return g.lines.some(function (l) { return l.status === 'rejected'; }); }).length) +
+    reqTab('all', 'Semua', groups.length) +
+    '</div>';
 
-  if (!rows.length) {
-    return h + '<div class="card">' + filterBar + '<div class="empty">' + icon('i-check', 30) +
-      '<p>' + (REQ_FILTER === 'pending' ? 'Tiada permohonan menunggu. Semuanya selesai.' : 'Tiada rekod.') + '</p></div></div>';
+  if (!shown.length) {
+    return h + filterBar + '<div class="card"><div class="empty">' + icon('i-check', 30) +
+      '<p>' + (REQ_FILTER === 'pending'
+        ? 'Tiada permohonan menunggu. Semuanya selesai.'
+        : 'Tiada rekod.') + '</p></div></div>';
   }
 
-  h += '<div class="card">' + filterBar +
-    '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-    '<th>Rujukan</th><th>Pemohon</th><th>Item</th><th class="t-num">Kuantiti</th>' +
-    '<th>Tujuan</th><th>Diperlukan</th><th>Status</th><th style="width:180px"></th>' +
-    '</tr></thead><tbody>';
+  h += filterBar + '<div class="stack">' + shown.map(reqGroupCard).join('') + '</div>';
+  return h;
+}
 
-  h += rows.map(function (r) {
-    var it = itemById(r.item_id);
-    var m = REQ_STATUS_META[r.status] || REQ_STATUS_META.cancelled;
+function reqGroupCard(g) {
+  var m = REQ_STATUS_META[g.status] || { cls: 'pill-mute', label: 'Sebahagian' };
+  var hasAsset = g.lines.some(function (l) { return l.request_type === 'asset' && l.status === 'pending'; });
+
+  var h = '<div class="card"><div class="card-head">' +
+    '<div style="min-width:0;flex:1">' +
+      '<h3 style="font-size:15px">' + esc(g.requester_name) + '</h3>' +
+      '<p style="margin:2px 0 0;font-size:12px;color:var(--muted)">' + esc(g.requester_email) +
+        ' · ' + g.lines.length + ' barang' +
+        (g.needed_date ? ' · perlu ' + fmtDate(g.needed_date) : '') + '</p>' +
+    '</div>' +
+    '<span class="pill ' + m.cls + '"><i></i>' + m.label + '</span>' +
+    '</div><div class="card-body" style="padding:0 18px 16px">';
+
+  h += '<div class="reqmeta"><span class="mono">' + esc(g.group_id) + '</span> · ' +
+    esc(g.purpose || '—') + '</div>';
+
+  h += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+    '<th>Barang</th><th>Jenis</th><th class="t-num">Kuantiti</th><th>Status</th>' +
+    '<th style="width:150px"></th></tr></thead><tbody>';
+
+  h += g.lines.map(function (l) {
+    var it = itemById(l.item_id);
+    var lm = REQ_STATUS_META[l.status] || REQ_STATUS_META.cancelled;
     return '<tr>' +
-      '<td class="mono" style="font-size:12px;color:var(--muted)">REQ_' + ('00000' + r.id).slice(-6) + '</td>' +
-      '<td><div class="t-name" style="font-size:13px">' + esc(r.requester_name) + '</div>' +
-        '<div class="t-sub">' + esc(r.requester_email) + (r.requester_department ? ' · ' + esc(r.requester_department) : '') + '</div></td>' +
-      '<td><div class="t-name" style="font-size:13px">' + esc(it ? it.name : 'Item #' + r.item_id) + '</div>' +
-        '<div class="t-sub">' + esc(r.request_type === 'asset' ? 'Aset' : 'Inventori') + '</div></td>' +
-      '<td class="t-num mono">' + (r.quantity || 1) + '</td>' +
-      '<td style="font-size:12.5px;color:var(--muted);max-width:220px">' + esc(r.purpose || '—') + '</td>' +
-      '<td class="mono" style="font-size:12.5px">' + fmtDate(r.needed_date) + '</td>' +
-      '<td><span class="pill ' + m.cls + '"><i></i>' + m.label + '</span>' +
-        (r.actioned_at ? '<div class="t-sub" style="margin-top:3px">' + fmtDate(r.actioned_at) + '</div>' : '') + '</td>' +
-      '<td>' + (r.status === 'pending'
-        ? '<button class="btn btn-sm btn-accent" onclick="openDecide(' + r.id + ',true)">' + icon('i-check', 13) + ' Lulus</button> ' +
-          '<button class="btn btn-sm" onclick="openDecide(' + r.id + ',false)">' + icon('i-x', 13) + ' Tolak</button>'
-        : (r.admin_notes ? '<span class="t-sub">' + esc(r.admin_notes) + '</span>' : '')) + '</td>' +
+      '<td><div class="t-name" style="font-size:13px">' + esc(it ? it.name : 'Item #' + l.item_id) + '</div>' +
+        (it && it.asset_tag ? '<div class="t-sub mono">' + esc(it.asset_tag) + '</div>' : '') + '</td>' +
+      '<td style="font-size:12.5px;color:var(--muted)">' +
+        esc(l.request_type === 'asset' ? 'Aset Alih' : 'Alat Tulis') + '</td>' +
+      '<td class="t-num mono">' + (l.quantity || 1) + '</td>' +
+      '<td><span class="pill ' + lm.cls + '"><i></i>' + lm.label + '</span></td>' +
+      '<td>' + (l.status === 'pending'
+        ? '<button class="btn btn-sm" onclick="openDecide(' + l.id + ',true)">Lulus</button> ' +
+          '<button class="btn btn-sm btn-ghost" style="color:var(--err)" onclick="openDecide(' + l.id + ',false)">Tolak</button>'
+        : (l.admin_notes ? '<span class="t-sub">' + esc(l.admin_notes) + '</span>' : '')) + '</td>' +
       '</tr>';
   }).join('');
 
-  return h + '</tbody></table></div></div>';
+  h += '</tbody></table></div>';
+
+  if (g.pending > 0) {
+    h += '<div style="display:flex;gap:8px;margin-top:14px">' +
+      '<button class="btn btn-accent" onclick="openDecideGroup(\'' + esc(g.group_id) + '\',true,' + hasAsset + ')">' +
+        icon('i-check', 15) + ' Luluskan Semua (' + g.pending + ')</button>' +
+      '<button class="btn" onclick="openDecideGroup(\'' + esc(g.group_id) + '\',false,false)">' +
+        icon('i-x', 15) + ' Tolak Semua</button>' +
+      '</div>';
+  }
+
+  return h + '</div></div>';
 }
 
 function reqTab(v, label, n) {
@@ -3293,6 +3581,56 @@ function reqTab(v, label, n) {
     label + (n ? ' (' + n + ')' : '') + '</button>';
 }
 
+// ── Whole-group decision ──────────────────────────────────────────────
+function openDecideGroup(groupId, approve, hasAsset) {
+  var g = requestGroups().filter(function (x) { return x.group_id === groupId; })[0];
+  if (!g) return;
+  var due = new Date(); due.setDate(due.getDate() + 14);
+
+  var b = '<div class="info-box"><b>' + esc(g.requester_name) + '</b> · ' + esc(g.requester_email) +
+    '<br>' + g.pending + ' barang menunggu · Tujuan: ' + esc(g.purpose || '—') + '</div>';
+
+  b += '<fieldset class="fs"><legend>Barang</legend>' +
+    g.lines.filter(function (l) { return l.status === 'pending'; }).map(function (l) {
+      var it = itemById(l.item_id);
+      return '<div class="alert-row"><div class="t-name" style="font-size:13px">' +
+        esc(it ? it.name : 'Item #' + l.item_id) + '</div><div class="spacer"></div>' +
+        '<span class="mono">×' + (l.quantity || 1) + '</span></div>';
+    }).join('') + '</fieldset>';
+
+  if (approve && hasAsset) {
+    b += field('Tarikh Jangka Pulang', input('dcDue', 'date', inputDate(due), 'min="' + inputDate(new Date()) + '"'),
+      'Digunakan untuk semua aset alih dalam permohonan ini', true);
+  }
+  if (approve) {
+    b += '<div class="info-box">Meluluskan akan mengeluarkan stok alat tulis dan mendaftar keluar ' +
+      'aset alih terus kepada pemohon, serta menghantar emel kepadanya.</div>';
+  }
+  b += field('Catatan Admin', '<textarea id="dcNote" placeholder="' +
+    (approve ? 'cth. sila ambil di pejabat' : 'cth. stok perlu disimpan untuk keperluan lain') + '"></textarea>',
+    'Disertakan dalam emel kepada pemohon');
+
+  openDrawer(approve ? 'Luluskan Permohonan' : 'Tolak Permohonan', g.group_id, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    '<button class="btn ' + (approve ? 'btn-accent' : 'btn-danger') + '" ' +
+      'onclick="doDecideGroup(this,\'' + esc(groupId) + '\',' + approve + ')">' +
+      icon(approve ? 'i-check' : 'i-x', 15) + ' ' + (approve ? 'Luluskan Semua' : 'Tolak Semua') + '</button>');
+}
+
+function doDecideGroup(btn, groupId, approve) {
+  var p = { group_id: groupId, admin_notes: val('dcNote') };
+  if ($('dcDue')) p.expected_return_date = val('dcDue');
+  busy(btn);
+  api(approve ? 'ApproveGroup' : 'RejectGroup', p, function (res) {
+    refresh(function () {
+      unbusy(btn); closeDrawer();
+      toast((approve ? 'Diluluskan' : 'Ditolak') + ' — ' + ((res && res.decided) || 0) +
+        ' barang. Pemohon dimaklumkan.', 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
+}
+
+// ── Single-line decision ──────────────────────────────────────────────
 function openDecide(id, approve) {
   var r = find(D.requests, id);
   if (!r) return;
@@ -3302,7 +3640,6 @@ function openDecide(id, approve) {
 
   var b = '<div class="info-box">' +
     '<b>' + esc(r.requester_name) + '</b> · ' + esc(r.requester_email) +
-    (r.requester_department ? ' · ' + esc(r.requester_department) : '') +
     '<br>Memohon <b>' + esc(it ? it.name : 'Item #' + r.item_id) + '</b>' +
     (isAsset ? '' : ' × ' + (r.quantity || 1) + ' unit') +
     '<br>Tujuan: ' + esc(r.purpose || '—') +
@@ -3320,8 +3657,8 @@ function openDecide(id, approve) {
     (approve ? 'cth. sila ambil di pejabat' : 'cth. stok perlu disimpan untuk keperluan lain') + '"></textarea>',
     'Disertakan dalam emel kepada pemohon');
 
-  openDrawer(approve ? 'Luluskan Permohonan' : 'Tolak Permohonan',
-    'REQ_' + ('00000' + r.id).slice(-6), b,
+  openDrawer(approve ? 'Luluskan Barang' : 'Tolak Barang',
+    (it ? it.name : 'Item #' + r.item_id), b,
     '<button class="btn" onclick="closeDrawer()">Batal</button>' +
     '<button class="btn ' + (approve ? 'btn-accent' : 'btn-danger') + '" onclick="doDecide(this,' + id + ',' + approve + ')">' +
       icon(approve ? 'i-check' : 'i-x', 15) + ' ' + (approve ? 'Luluskan' : 'Tolak') + '</button>');
@@ -3336,7 +3673,7 @@ function doDecide(btn, id, approve) {
       unbusy(btn); closeDrawer();
       toast(res && res.mailed === false
         ? 'Keputusan direkod — tetapi emel gagal dihantar.'
-        : (approve ? 'Permohonan diluluskan dan pemohon dimaklumkan.' : 'Permohonan ditolak dan pemohon dimaklumkan.'),
+        : (approve ? 'Diluluskan dan pemohon dimaklumkan.' : 'Ditolak dan pemohon dimaklumkan.'),
         res && res.mailed === false ? 'err' : 'ok');
     });
   }, function (e) { unbusy(btn); drawerErr(e); });

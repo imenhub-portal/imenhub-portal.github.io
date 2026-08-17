@@ -134,7 +134,16 @@ function loadBackend(opts) {
       })
     },
     MailApp: { sendEmail: (o) => { sentMail.push(o); } },
-    UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getContentText: () => '', getAllHeaders: () => ({}) }) },
+    // Drive's resumable-session response is a 200 plus a Location header;
+    // without the header _driveSession_ correctly reports failure, so the
+    // mock has to supply it for the upload paths to be testable at all.
+    UrlFetchApp: {
+      fetch: () => ({
+        getResponseCode: () => 200,
+        getContentText: () => '',
+        getAllHeaders: () => ({ Location: 'https://upload.googleapis.com/session/mock' })
+      })
+    },
     ScriptApp: {
       getOAuthToken: () => 'token',
       getProjectTriggers: () => [],
@@ -473,7 +482,6 @@ section('8. Validation and referential integrity');
   throws('a missing name is rejected', () => S.svcAddItem({ ...base, name: '' }), /Nama item wajib/);
   throws('an unknown item_type is rejected', () => S.svcAddItem({ ...base, item_type: 'kereta' }), /Jenis item tidak sah/);
   throws('a bad date is rejected', () => S.svcAddItem({ ...base, date_acquired: 'semalam' }), /bukan tarikh/);
-  throws('a nonexistent category is rejected', () => S.svcAddItem({ ...base, category_id: 999 }), /Kategori tidak wujud/);
   throws('a nonexistent location is rejected', () => S.svcAddItem({ ...base, location_id: 999 }), /Lokasi tidak wujud/);
 
   throws('a duplicate employee_id is rejected', () => S.svcSaveRef('Custodians', {
@@ -486,11 +494,12 @@ section('8. Validation and referential integrity');
     employee_id: 'E002', name: 'Y', email: 'bukan-emel'
   }), /bukan emel/);
 
-  // Deleting reference data still in use would orphan items.
+  // Deleting reference data still in use would orphan items. Categories are
+  // gone (the item type is the category now), so Locations carry this rule.
   S._txn_(() => S.svcAddItem(base));
-  throws('a category still in use cannot be deleted',
-    () => S.svcDeleteRef('Categories', { id: 1 }), /masih digunakan oleh 1 item/);
-  ok('an unused category can be deleted', S._txn_(() => S.svcDeleteRef('Categories', { id: 7 })).success);
+  throws('a location still in use cannot be deleted',
+    () => S.svcDeleteRef('Locations', { id: 1 }), /masih digunakan oleh 1 item/);
+  ok('an unused location can be deleted', S._txn_(() => S.svcDeleteRef('Locations', { id: 4 })).success);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -498,14 +507,15 @@ section('9. Migrations (ensureSheets_) and header auto-heal');
 {
   const S = loadBackend();
   S.ensureSheets_();
-  eq('all six tabs are created', Object.keys(S.__test.ss._sheets).sort(),
-    ['Categories', 'Custodians', 'Items', 'Locations', 'Requests', 'Transactions']);
+  eq('all seven tabs are created', Object.keys(S.__test.ss._sheets).sort(),
+    ['Categories', 'Config', 'Custodians', 'Items', 'Locations', 'Requests', 'Transactions']);
   eq('Items header matches the schema', S.__test.rows('Items')[0], S.SCHEMA.Items);
 
-  // Simulate a sheet created before a column was added — is_portable is a
-  // real example, added after the app was already deployed with live rows.
+  // Simulate a sheet created before a column existed. Any column
+  // demonstrates it; date_last_audited is used because nothing else in this
+  // test depends on it.
   const items = S.__test.ss.getSheetByName('Items');
-  const older = S.SCHEMA.Items.filter((c) => c !== 'is_portable');
+  const older = S.SCHEMA.Items.filter((c) => c !== 'date_last_audited');
   items._data[0] = older;
   const row = older.map((c) => {
     if (c === 'id') return '1';
@@ -524,20 +534,27 @@ section('9. Migrations (ensureSheets_) and header auto-heal');
 
   S.ensureSheets_();
   const header = items._data[0];
-  ok('the missing column is appended, not thrown on', header.includes('is_portable'));
+  ok('the missing column is appended, not thrown on', header.includes('date_last_audited'));
   eq('running it again is idempotent', (S.ensureSheets_(), items._data[0].length), header.length);
   ok('the pre-existing row survives untouched', items._data[1].length === before);
 
   const read = S._readTable_('Items');
   eq('the healed row still reads', read.length, 1);
-  eq('and the new column reads as empty rather than breaking', read[0].is_portable, null);
+  eq('and the new column reads as empty rather than breaking', read[0].date_last_audited, null);
 
-  // Blank must behave as "movable", so rows predating the column stay loanable.
+  // A row predating the column must remain fully usable.
   const outc = S._txn_(() => S.svcCheckOut({
     id: 1, recipient_name: 'A', recipient_email: 'a@ukm.edu.my',
     expected_return_date: iso(daysFromNow(3))
   }));
   ok('so a pre-existing asset can still be checked out', outc.success, outc.error);
+
+  // A sheet with no Config tab at all is the real upgrade path.
+  const S2 = loadBackend();
+  S2.ensureSheets_();
+  delete S2.__test.ss._sheets.Config;
+  S2.ensureSheets_();
+  ok('a missing Config tab is recreated', !!S2.__test.ss.getSheetByName('Config'));
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -718,23 +735,17 @@ section('12. Handover: ad-hoc recipients and two-way email');
   }));
   eq('a malformed recipient email is refused', badMail.success, false);
 
-  // ── Non-portable assets cannot be handed out ──
-  const deskId = S._txn_(() => S.svcAddItem({
-    name: 'Meja Pejabat', category_id: 1, location_id: 1, item_type: 'fixed_asset',
-    date_acquired: '2026-01-10', unit_cost: 700, is_portable: 'FALSE'
-  })).result.id;
-  const desk = S._findById_(S._readTable_('Items'), deskId);
-  eq('an asset can be marked not movable', desk.is_portable, 'FALSE');
-  const deskOut = S._txn_(() => S.svcCheckOut({
-    id: deskId, recipient_name: 'A', recipient_email: 'a@ukm.edu.my',
+  // Every asset is now "Aset Alih" — movable by definition — so there is no
+  // non-portable case left to block. Any registered asset is loanable.
+  const anyAsset = S._txn_(() => S.svcAddItem({
+    name: 'Mikrofon', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  }));
+  ok('any asset can be registered without a portability flag', anyAsset.success, anyAsset.error);
+  const micOut = S._txn_(() => S.svcCheckOut({
+    id: anyAsset.result.id, recipient_name: 'A', recipient_email: 'a@ukm.edu.my',
     expected_return_date: iso(daysFromNow(3))
   }));
-  eq('and then cannot be checked out', deskOut.success, false);
-  ok('with a reason naming the flag', /bukan mudah alih/i.test(deskOut.error), deskOut.error);
-
-  // Default must stay permissive so rows predating the column still work.
-  const plain = S._findById_(S._readTable_('Items'), id3);
-  eq('new assets default to movable', plain.is_portable, 'TRUE');
+  ok('and is loanable straight away', micOut.success, micOut.error);
 }
 
 section('13. A notification failure must never lose the record');
@@ -772,17 +783,13 @@ section('14. Public catalog leaks nothing personal');
     date_acquired: '2026-01-10'
   })).result.id;
   S._txn_(() => S.svcAddItem({
-    name: 'Meja Berat', category_id: 1, location_id: 1, item_type: 'fixed_asset',
-    date_acquired: '2026-01-10', is_portable: 'FALSE'
-  }));
-  S._txn_(() => S.svcAddItem({
     name: 'Pen Biru', category_id: 5, location_id: 2, item_type: 'consumable',
     quantity_total: 40, min_stock_alert: 10, date_acquired: '2026-01-10'
   }));
 
   const cat = S.getPublicCatalog();
   const names = cat.items.map((i) => i.name).sort();
-  eq('non-movable assets are not offered at all', names, ['Pen Biru', 'Projektor']);
+  eq('both categories are offered', names, ['Pen Biru', 'Projektor']);
 
   const proj = cat.items.filter((i) => i.name === 'Projektor')[0];
   eq('an available asset says so', proj.available, true);
@@ -805,112 +812,356 @@ section('14. Public catalog leaks nothing personal');
   ok('nor the ledger', blob.indexOf('transaction_date') === -1);
 }
 
-section('15. Request lifecycle');
+section('15. Request lifecycle (multi-line)');
 {
   const S = fresh();
   const projId = S._txn_(() => S.svcAddItem({
-    name: 'Projektor', category_id: 1, location_id: 3, item_type: 'fixed_asset',
-    date_acquired: '2026-01-10'
+    name: 'Projektor', location_id: 3, item_type: 'fixed_asset', date_acquired: '2026-01-10'
   })).result.id;
   const penId = S._txn_(() => S.svcAddItem({
-    name: 'Pen Biru', category_id: 5, location_id: 2, item_type: 'consumable',
+    name: 'Pen Biru', location_id: 2, item_type: 'consumable',
     quantity_total: 40, min_stock_alert: 10, date_acquired: '2026-01-10'
   })).result.id;
+  const paperId = S._txn_(() => S.svcAddItem({
+    name: 'Kertas A4', location_id: 2, item_type: 'consumable',
+    quantity_total: 20, min_stock_alert: 5, date_acquired: '2026-01-10'
+  })).result.id;
 
-  // ── Submitting needs no password ──
+  // ── One submission, many lines, no password ──
   S.__test.sentMail.length = 0;
   const sub = S.handleAction('SubmitRequest', {
-    item_id: projId, requester_name: 'Farah binti Ali', requester_email: 'farah@ukm.edu.my',
-    requester_department: 'Akademik', purpose: 'Bengkel pelajar', needed_date: iso(daysFromNow(4))
+    requester_name: 'Farah binti Ali', requester_email: 'farah@ukm.edu.my',
+    purpose: 'Bengkel pelajar', needed_date: iso(daysFromNow(4)),
+    lines: [{ item_id: penId, quantity: 4 }, { item_id: paperId, quantity: 2 }]
   });
-  ok('a request can be submitted with no admin password', sub.success, sub.error);
+  ok('a multi-line request needs no admin password', sub.success, sub.error);
+  eq('it reports both lines', sub.result.count, 2);
   eq('and lands as pending', sub.result.status, 'pending');
-  eq('acknowledgement + admin heads-up are sent', S.__test.sentMail.length, 2);
-  eq('one goes to the requester', S.__test.sentMail[0].to, 'farah@ukm.edu.my');
 
-  // ── Duplicates are refused ──
-  const dup = S.handleAction('SubmitRequest', {
-    item_id: projId, requester_name: 'Farah binti Ali', requester_email: 'FARAH@ukm.edu.my',
-    purpose: 'Sekali lagi'
+  const rows = S._readTable_('Requests');
+  eq('one row per line was written', rows.length, 2);
+  eq('sharing a single group_id', new Set(rows.map((r) => r.group_id)).size, 1);
+  eq('quantities are preserved per line',
+    rows.map((r) => r.quantity).sort((a, b) => a - b), [2, 4]);
+
+  // The whole point of grouping: four pens must not mean four emails.
+  eq('exactly two emails go out, not one per line', S.__test.sentMail.length, 2);
+  eq('one to the requester', S.__test.sentMail[0].to, 'farah@ukm.edu.my');
+  ok('listing both items', /Pen Biru/.test(S.__test.sentMail[0].htmlBody) &&
+                           /Kertas A4/.test(S.__test.sentMail[0].htmlBody));
+
+  // ── A group is all-or-nothing ──
+  const before = S._readTable_('Requests').length;
+  const partial = S.handleAction('SubmitRequest', {
+    requester_name: 'Zed', requester_email: 'zed@ukm.edu.my', purpose: 'Ujian',
+    lines: [{ item_id: projId, quantity: 1 }, { item_id: penId, quantity: 9999 }]
   });
-  eq('the same person cannot queue the same item twice', dup.success, false);
-  ok('and is told why', /masih menunggu/i.test(dup.error), dup.error);
+  eq('a group with one impossible line is refused', partial.success, false);
+  ok('naming the offending item', /Pen Biru/.test(partial.error), partial.error);
+  eq('and nothing at all was written', S._readTable_('Requests').length, before);
+
+  // ── Guards ──
+  eq('an empty request is refused', S.handleAction('SubmitRequest', {
+    requester_name: 'A', requester_email: 'a@ukm.edu.my', purpose: 'X', lines: []
+  }).success, false);
+  eq('the same item twice in one request is refused', S.handleAction('SubmitRequest', {
+    requester_name: 'A', requester_email: 'a@ukm.edu.my', purpose: 'X',
+    lines: [{ item_id: penId, quantity: 1 }, { item_id: penId, quantity: 2 }]
+  }).success, false);
+  const dup = S.handleAction('SubmitRequest', {
+    requester_name: 'Farah', requester_email: 'FARAH@ukm.edu.my', purpose: 'Lagi',
+    lines: [{ item_id: penId, quantity: 1 }]
+  });
+  eq('a second pending request for the same item by the same person is refused', dup.success, false);
+  ok('and says it is still waiting', /masih menunggu/i.test(dup.error), dup.error);
 
   // ── Deciding is admin-only ──
-  const sneaky = S.handleAction('ApproveRequest', { id: 1, expected_return_date: iso(daysFromNow(9)) });
-  eq('approving without the admin password is denied', sneaky.success, false);
+  const gid = rows[0].group_id;
+  eq('approving a group without the password is denied',
+    S.handleAction('ApproveGroup', { group_id: gid }).success, false);
 
-  // ── Approve: the real handover runs ──
+  // ── Approving a group issues every line ──
   S.__test.sentMail.length = 0;
-  const appr = S.handleAction('ApproveRequest', {
-    __pass: 'rahsia', id: 1, expected_return_date: iso(daysFromNow(9)), admin_notes: 'Diluluskan'
+  const appr = S.handleAction('ApproveGroup', {
+    __pass: 'rahsia', group_id: gid, admin_notes: 'Diluluskan'
   });
-  ok('an admin can approve', appr.success, appr.error);
-  eq('status becomes approved', appr.result.status, 'approved');
+  ok('an admin can approve the whole group', appr.success, appr.error);
+  eq('both lines were decided', appr.result.decided, 2);
 
-  const item = S._findById_(S._readTable_('Items'), projId);
-  eq('the asset is genuinely checked out', item.status, 'assigned');
-  eq('to the requester', S._findById_(S._readTable_('Custodians'), item.custodian_id).email, 'farah@ukm.edu.my');
-  eq('and the ledger records it',
+  eq('pen stock was issued', S._findById_(S._readTable_('Items'), penId).quantity_available, 36);
+  eq('paper stock was issued', S._findById_(S._readTable_('Items'), paperId).quantity_available, 18);
+  const issues = S._readTable_('Transactions').filter((t) => t.action_type === 'stock_remove');
+  eq('one ledger row per line', issues.length, 2);
+  ok('each attributed to the requester', issues.every((t) => Number(t.custodian_id) > 0));
+  eq('every line is now approved',
+    S._readTable_('Requests').filter((r) => r.group_id === gid && r.status === 'approved').length, 2);
+
+  // ── A mixed group: asset + stationery ──
+  const mixed = S.handleAction('SubmitRequest', {
+    requester_name: 'Rajesh', requester_email: 'rajesh@ukm.edu.my', purpose: 'Kelas',
+    lines: [{ item_id: projId, quantity: 1 }, { item_id: paperId, quantity: 3 }]
+  });
+  ok('a mixed group can be submitted', mixed.success, mixed.error);
+  const mApp = S.handleAction('ApproveGroup', {
+    __pass: 'rahsia', group_id: mixed.result.group_id,
+    expected_return_date: iso(daysFromNow(7))
+  });
+  ok('and approved with one return date for its assets', mApp.success, mApp.error);
+  eq('the asset is checked out', S._findById_(S._readTable_('Items'), projId).status, 'assigned');
+  eq('and the stationery deducted', S._findById_(S._readTable_('Items'), paperId).quantity_available, 15);
+  eq('with a check_out ledger row',
     S._readTable_('Transactions').filter((t) => t.action_type === 'check_out').length, 1);
-  const led = S._readTable_('Transactions').filter((t) => t.action_type === 'check_out')[0];
-  ok('referencing the request', /Permohonan #1/.test(led.reason_notes), led.reason_notes);
-  ok('the requester is emailed the handover', S.__test.sentMail.some((m) => m.to === 'farah@ukm.edu.my'));
 
-  // ── Approving twice is refused ──
-  const again = S.handleAction('ApproveRequest', {
-    __pass: 'rahsia', id: 1, expected_return_date: iso(daysFromNow(9))
-  });
-  eq('a decided request cannot be decided again', again.success, false);
-
-  // ── An asset already out cannot be requested ──
+  // ── A loaned asset cannot be requested again ──
   const busy = S.handleAction('SubmitRequest', {
-    item_id: projId, requester_name: 'Lain', requester_email: 'lain@ukm.edu.my', purpose: 'Cuba'
+    requester_name: 'Lain', requester_email: 'lain@ukm.edu.my', purpose: 'Cuba',
+    lines: [{ item_id: projId, quantity: 1 }]
   });
   eq('a loaned asset cannot be requested', busy.success, false);
   ok('and says to wait for its return', /sedang dipinjam/i.test(busy.error), busy.error);
 
-  // ── Inventory request: approving issues the stock ──
-  const invReq = S.handleAction('SubmitRequest', {
-    item_id: penId, requester_name: 'Farah binti Ali', requester_email: 'farah@ukm.edu.my',
-    quantity: 6, purpose: 'Mesyuarat'
+  // ── Rejecting a group moves no stock ──
+  const rej = S.handleAction('SubmitRequest', {
+    requester_name: 'Siti', requester_email: 'siti@ukm.edu.my', purpose: 'Ujian',
+    lines: [{ item_id: penId, quantity: 5 }]
   });
-  ok('inventory can be requested', invReq.success, invReq.error);
-  const invApprove = S.handleAction('ApproveRequest', { __pass: 'rahsia', id: invReq.result.id });
-  ok('and approved without a return date', invApprove.success, invApprove.error);
-  const pen = S._findById_(S._readTable_('Items'), penId);
-  eq('stock is deducted', pen.quantity_available, 34);
-  const issue = S._readTable_('Transactions').filter((t) => t.action_type === 'stock_remove')[0];
-  ok('and attributed to the requester', Number(issue.custodian_id) > 0);
-
-  // ── Over-requesting is refused up front ──
-  const greedy = S.handleAction('SubmitRequest', {
-    item_id: penId, requester_name: 'Zed', requester_email: 'zed@ukm.edu.my',
-    quantity: 999, purpose: 'Banyak'
-  });
-  eq('more than the balance is refused', greedy.success, false);
-
-  // ── Reject path ──
-  const rReq = S.handleAction('SubmitRequest', {
-    item_id: penId, requester_name: 'Zed', requester_email: 'zed@ukm.edu.my',
-    quantity: 2, purpose: 'Ujian'
-  });
+  const penBefore = S._findById_(S._readTable_('Items'), penId).quantity_available;
   S.__test.sentMail.length = 0;
-  const rej = S.handleAction('RejectRequest', {
-    __pass: 'rahsia', id: rReq.result.id, admin_notes: 'Stok perlu disimpan'
+  const rejected = S.handleAction('RejectGroup', {
+    __pass: 'rahsia', group_id: rej.result.group_id, admin_notes: 'Stok perlu disimpan'
   });
-  ok('a request can be rejected', rej.success, rej.error);
-  eq('status becomes rejected', rej.result.status, 'rejected');
-  const penAfter = S._findById_(S._readTable_('Items'), penId);
-  eq('and no stock moves on a rejection', penAfter.quantity_available, 34);
-  ok('the requester is told', S.__test.sentMail.some((m) => m.to === 'zed@ukm.edu.my'));
+  ok('a group can be rejected', rejected.success, rejected.error);
+  eq('no stock moved', S._findById_(S._readTable_('Items'), penId).quantity_available, penBefore);
+  ok('the requester is told', S.__test.sentMail.some((m) => m.to === 'siti@ukm.edu.my'));
   ok('with the reason', /Stok perlu disimpan/.test(S.__test.sentMail[0].htmlBody));
 
-  // ── Anonymous callers still see no request queue ──
-  const anon = S.getInitialData('salah-password');
-  eq('the request queue is admin-only', anon.requests.length, 0);
-  const admin = S.getInitialData('rahsia');
-  ok('but an admin sees it', admin.requests.length >= 3, String(admin.requests.length));
+  // ── A decided group cannot be decided again ──
+  eq('re-approving a decided group is refused',
+    S.handleAction('ApproveGroup', { __pass: 'rahsia', group_id: gid }).success, false);
+
+  // ── The queue stays admin-only ──
+  eq('the request queue is admin-only', S.getInitialData('salah').requests.length, 0);
+  ok('but an admin sees it', S.getInitialData('rahsia').requests.length >= 5);
+}
+
+section('16. Pentadbir Inventori (Config)');
+{
+  const S = fresh();
+
+  // Defaults are readable before anything is saved.
+  const c0 = S.getInitialData('rahsia').config;
+  eq('the officer defaults to the seeded email', c0.admin_email, 'hazde@ukm.edu.my');
+  eq('and a role name rather than a blank', c0.admin_name, 'Pentadbir Inventori');
+
+  // Gated.
+  eq('saving without the admin password is denied',
+    S.handleAction('SaveConfig', { admin_name: 'X', admin_email: 'x@ukm.edu.my' }).success, false);
+
+  const ok1 = S.handleAction('SaveConfig', {
+    __pass: 'rahsia', admin_name: 'Hazde', admin_email: 'hazde@ukm.edu.my',
+    admin_cc: 'pejabat@ukm.edu.my, ganti@ukm.edu.my'
+  });
+  ok('an admin can save the officer', ok1.success, ok1.error);
+
+  const c1 = S.getInitialData('rahsia').config;
+  eq('name persists', c1.admin_name, 'Hazde');
+  eq('email persists', c1.admin_email, 'hazde@ukm.edu.my');
+  ok('cc persists', /ganti@ukm\.edu\.my/.test(c1.admin_cc), c1.admin_cc);
+
+  // Saving again updates rather than appending a second row per key.
+  S.handleAction('SaveConfig', { __pass: 'rahsia', admin_name: 'Hazde B', admin_email: 'hazde@ukm.edu.my' });
+  const keys = S._readTable_('Config').map((r) => r.key);
+  eq('each key is stored once, not duplicated', keys.length, new Set(keys).size);
+  eq('and the update took', S.getInitialData('rahsia').config.admin_name, 'Hazde B');
+
+  // Validation.
+  eq('a malformed officer email is rejected',
+    S.handleAction('SaveConfig', { __pass: 'rahsia', admin_name: 'X', admin_email: 'bukan-emel' }).success, false);
+  const badCc = S.handleAction('SaveConfig', {
+    __pass: 'rahsia', admin_name: 'X', admin_email: 'x@ukm.edu.my', admin_cc: 'ok@ukm.edu.my, rosak'
+  });
+  eq('one bad address in the CC list is rejected', badCc.success, false);
+  ok('naming the offender', /rosak/.test(badCc.error), badCc.error);
+  ok('a blank CC is allowed', S.handleAction('SaveConfig', {
+    __pass: 'rahsia', admin_name: 'X', admin_email: 'x@ukm.edu.my', admin_cc: ''
+  }).success);
+
+  // Privacy: the officer's address is contact detail, not public data.
+  eq('an anonymous caller gets no config', Object.keys(S.getInitialData('salah').config).length, 0);
+}
+
+section('17. Notifications follow the configured officer');
+{
+  const S = fresh();
+  const projId = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+
+  S.handleAction('SaveConfig', {
+    __pass: 'rahsia', admin_name: 'Hazde', admin_email: 'hazde@ukm.edu.my',
+    admin_cc: 'pejabat@ukm.edu.my'
+  });
+
+  S.__test.sentMail.length = 0;
+  S.handleAction('SubmitRequest', {
+    requester_name: 'Farah', requester_email: 'farah@ukm.edu.my',
+    purpose: 'Bengkel', lines: [{ item_id: projId, quantity: 1 }]
+  });
+  const toAdmin = S.__test.sentMail.filter((m) => m.to === 'hazde@ukm.edu.my');
+  eq('the officer is notified at the configured address', toAdmin.length, 1);
+  ok('with the CC applied', /pejabat@ukm\.edu\.my/.test(toAdmin[0].cc || ''), toAdmin[0].cc);
+
+  // Fallback: an empty Config must not send mail into the void.
+  const S2 = fresh();
+  S2.__test.ss._sheets.Config._data.length = 1;   // header only
+  // The seeded default is itself a real address, so an empty Config still
+  // resolves to somebody; ADMIN_EMAIL is the last resort behind it.
+  ok('with Config empty the resolver still yields an address',
+    /@/.test(S2._adminEmail_()), S2._adminEmail_());
+  S2.__test.sentMail.length = 0;
+  const pid = S2._txn_(() => S2.svcAddItem({
+    name: 'Kamera', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+  S2.handleAction('SubmitRequest', {
+    requester_name: 'A', requester_email: 'a@ukm.edu.my', purpose: 'X',
+    lines: [{ item_id: pid, quantity: 1 }]
+  });
+  ok('and the notification still reaches somebody',
+    S2.__test.sentMail.some((m) => /@/.test(m.to || '')));
+
+  // The officer's name signs official handover mail.
+  const S3 = fresh();
+  S3.handleAction('SaveConfig', { __pass: 'rahsia', admin_name: 'Hazde', admin_email: 'hazde@ukm.edu.my' });
+  const aid = S3._txn_(() => S3.svcAddItem({
+    name: 'Mikrofon', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+  S3.__test.sentMail.length = 0;
+  S3._txn_(() => S3.svcCheckOut({
+    id: aid, recipient_name: 'B', recipient_email: 'b@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(5))
+  }));
+  ok('handover mail is signed by the officer, not a generic label',
+    /Hazde/.test(S3.__test.sentMail[0].htmlBody) && !/Admin i-Nventori/.test(S3.__test.sentMail[0].htmlBody));
+}
+
+section('18. Return proof — the token is a capability, not a password');
+{
+  const S = fresh();
+  const aid = S._txn_(() => S.svcAddItem({
+    name: 'Projektor Epson', location_id: 3, item_type: 'fixed_asset',
+    date_acquired: '2026-01-10', serial_number: 'SN-EP-1'
+  })).result.id;
+
+  // Before any loan there is no token to hold.
+  throws('a garbage token is refused', () => S.getReturnContext('NOTATOKEN1234'), /tidak sah/);
+  throws('an empty token is refused', () => S.getReturnContext(''), /tidak sah/);
+
+  // ── Check-out mints one and mails the link ──
+  S.__test.sentMail.length = 0;
+  const out = S._txn_(() => S.svcCheckOut({
+    id: aid, recipient_name: 'Farah', recipient_email: 'farah@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(5))
+  }));
+  ok('check-out succeeds', out.success, out.error);
+
+  const item = S._findById_(S._readTable_('Items'), aid);
+  const token = item.return_token;
+  ok('a return token was minted', !!token && token.length === 24, String(token));
+  ok('the check-out email carries the return link',
+    /\?pulang=/.test(S.__test.sentMail[0].htmlBody));
+  ok('and the link contains that token', S.__test.sentMail[0].htmlBody.indexOf(token) !== -1);
+  ok('with a button label a borrower will understand',
+    /Snap Bukti/.test(S.__test.sentMail[0].htmlBody));
+
+  // ── What the token can read: the item, and nothing personal ──
+  const ctx = S.getReturnContext(token);
+  eq('the borrower sees which item it is', ctx.name, 'Projektor Epson');
+  eq('and its tag', ctx.asset_tag, 'AST-2026-0001');
+  ok('and the due date', isDate(ctx.expected_return_date));
+  eq('no proof submitted yet', ctx.already_claimed, false);
+
+  const blob = JSON.stringify(ctx);
+  ok('the context never names the holder', blob.indexOf('Farah') === -1);
+  ok('nor leaks any email address', blob.indexOf('@') === -1, blob);
+  ok('nor any custodian reference', blob.indexOf('custodian') === -1);
+  ok('nor the ledger', blob.indexOf('transaction') === -1);
+
+  // ── A token belonging to nobody else's loan ──
+  const bid = S._txn_(() => S.svcAddItem({
+    name: 'Mikrofon', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+  S._txn_(() => S.svcCheckOut({
+    id: bid, recipient_name: 'Rajesh', recipient_email: 'rajesh@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(5))
+  }));
+  const tokenB = S._findById_(S._readTable_('Items'), bid).return_token;
+  ok('each loan gets its own token', token !== tokenB);
+  eq('and a token resolves only to its own item', S.getReturnContext(tokenB).name, 'Mikrofon');
+
+  // ── Submitting proof ──
+  S.__test.sentMail.length = 0;
+  const proof = S._txn_(() => S.svcSubmitReturnProof({
+    token: token, photo_url: 'https://drive.google.com/file/d/abc123/view'
+  }));
+  ok('the borrower can submit proof with no password', proof.success, proof.error);
+  const after = S._findById_(S._readTable_('Items'), aid);
+  ok('the photo is recorded', /abc123/.test(after.return_photo_url), after.return_photo_url);
+  ok('with a timestamp', isDate(after.return_claimed_at));
+  eq('the officer is notified', S.__test.sentMail.length, 1);
+  ok('at the configured address', /@/.test(S.__test.sentMail[0].to));
+  ok('and told the return is NOT yet recorded',
+    /belum/i.test(S.__test.sentMail[0].htmlBody));
+
+  eq('the context now reports the claim', S.getReturnContext(token).already_claimed, true);
+
+  // Submitting proof must not close the loan by itself — the admin confirms.
+  eq('the asset is still on loan', S._findById_(S._readTable_('Items'), aid).status, 'assigned');
+  eq('and no check_in row exists yet',
+    S._readTable_('Transactions').filter((t) => t.action_type === 'check_in').length, 0);
+
+  // A junk URL is refused rather than stored.
+  throws('a non-https photo url is refused',
+    () => S.svcSubmitReturnProof({ token: token, photo_url: 'javascript:alert(1)' }), /tidak sah/);
+
+  // ── Check-in banks both photos and kills the token ──
+  const ci = S._txn_(() => S.svcCheckIn({
+    id: aid, photo_admin: 'https://drive.google.com/file/d/admin999/view'
+  }));
+  ok('check-in succeeds', ci.success, ci.error);
+
+  const row = S._readTable_('Transactions').filter((t) => t.action_type === 'check_in')[0];
+  ok('the borrower photo is on the ledger row', /abc123/.test(row.photo_borrower), row.photo_borrower);
+  ok('and the admin photo too', /admin999/.test(row.photo_admin), row.photo_admin);
+  eq('the two are kept apart, not merged', row.photo_borrower === row.photo_admin, false);
+
+  const closed = S._findById_(S._readTable_('Items'), aid);
+  eq('the token is cleared', closed.return_token, null);
+  eq('the pending photo is cleared', closed.return_photo_url, null);
+  eq('and the claim timestamp too', closed.return_claimed_at, null);
+
+  throws('the old link no longer works', () => S.getReturnContext(token), /tidak sah|tamat tempoh/);
+  const late = S._txn_(() => S.svcSubmitReturnProof({
+    token: token, photo_url: 'https://drive.google.com/file/d/xyz/view'
+  }));
+  eq('and proof cannot be submitted against it', late.success, false);
+
+  // The ledger stayed append-only through all of this.
+  eq('no ledger row was ever edited or deleted', S.__test.ledgerMutations, []);
+
+  // ── A fresh loan mints a fresh token ──
+  const out2 = S._txn_(() => S.svcCheckOut({
+    id: aid, recipient_name: 'Siti', recipient_email: 'siti@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(3))
+  }));
+  ok('the asset can be loaned again', out2.success, out2.error);
+  const token2 = S._findById_(S._readTable_('Items'), aid).return_token;
+  ok('with a different token', !!token2 && token2 !== token);
+
+  // ── startReturnUpload is gated by the token, not by a password ──
+  const up = S.startReturnUpload(token2, 'bukti.jpg', 'image/jpeg', 'https://imenhub-portal.github.io');
+  eq('a live token opens an upload session', up.ok, true);
+  const upBad = S.startReturnUpload('NOTATOKEN1234', 'x.jpg', 'image/jpeg', 'https://imenhub-portal.github.io');
+  eq('a bogus token does not', upBad.ok, false);
 }
 
 // ══════════════════════════════════════════════════════════════════════
