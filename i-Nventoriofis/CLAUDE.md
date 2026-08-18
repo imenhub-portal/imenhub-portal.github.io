@@ -267,24 +267,38 @@ Each of these looks like an oversight and is not.
 - **Padam and Lupuskan are two different things, worded apart on purpose.**
   *Lupuskan* (`svcDecommission`) records the disposal of something that genuinely
   existed — it stays in the register with a ledger row. *Padam* (`svcDeleteItem`) removes
-  an item that should never have been registered: a duplicate or a typo. Padam is a
-  **soft** delete — `deleted_at` is set, every read filters it out, and the ledger keeps
-  pointing at a row that still exists, so a mistaken deletion is undone by clearing one
-  cell in the Sheet. A reason is **required** and stored in `deleted_reason`, so the sheet
-  still explains itself. An item on open loan cannot be deleted, and the returned
-  `movements` count (ledger rows beyond the registration `stock_add`) is what lets the UI
-  warn that an item had a real life and should probably be Lupuskan-ed instead. A deleted
-  item keeps its asset tag reserved — the number is never reused.
+  an item that should never have been registered: a duplicate or a typo.
+  Padam is a **hard** delete: the item row and all its ledger rows go. That is deliberate
+  — see the ledger note above. Guards, in order: an item on **open loan** is refused
+  outright (somebody is holding it); and if the item has any movement beyond its
+  registration `stock_add`, the first attempt is **refused** with the count, and only a
+  second call carrying `confirm_history: true` proceeds. The UI backs that with a
+  checkbox the admin must tick, and offers Lupuskan as the alternative. Because nothing
+  remains, a purged asset tag **is** reissued — unlike the soft delete this replaced.
+- **`deleted_at` survives with nothing writing it.** `_readTable_` still honours it, so an
+  admin can hide a row by typing a date into the Sheet by hand. Keep the filter.
 
 ### The ledger
 
-- **`Transactions` is immutable mechanically, not by convention.** `_update_()` **throws**
-  if handed that tab, so no code path can edit or delete a row. A check-in appends a *new*
-  row; it never touches the original `check_out`. Open loans are **derived** by replaying
-  the ledger (`_openLoans_`) rather than stored, so the two cannot drift. A test asserts
-  no ledger mutation ever occurs.
+- **A ledger row is never EDITED. It is appended, or — in exactly one case — purged.**
+  `_update_()` **throws** if handed the `Transactions` tab, so nothing can rewrite history
+  in place. A check-in appends a *new* row; it never touches the original `check_out`.
+  Open loans are **derived** by replaying the ledger (`_openLoans_`) rather than stored, so
+  the two cannot drift.
+  The single exception is `_purgeLedgerRows_`, called only by `svcDeleteItem`: a
+  mis-entered item's rows describe stock that never arrived, and keeping them does not
+  preserve history, it fabricates it. Rows are deleted bottom-up, because deleting a row
+  shifts everything below it up by one. A test asserts that every recorded ledger mutation
+  is a `deleteRow` and that no `setValue` ever happens.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
+
+- **The duplicate finder matches on a normalised name** — trimmed, lowercased, inner
+  whitespace collapsed — so "Pen  Biru" and "pen biru" group together. Deliberately **not**
+  fuzzy: a near-match that silently grouped two genuinely different items would be worse
+  than missing one. It labels each row Selamat / Ada rekod / Dipinjam so the admin can see
+  at a glance which copy is safe to remove, and offers no delete button at all on one that
+  is out on loan.
 
 ### Stock movements
 

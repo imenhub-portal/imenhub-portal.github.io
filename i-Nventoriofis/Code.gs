@@ -111,7 +111,7 @@ const SCHEMA = {
     // Return-proof state for the CURRENT loan only. All three are cleared at
     // check-in, which is what kills the token.
     'return_token', 'return_photo_url', 'return_claimed_at',
-    'created_at', 'updated_at', 'deleted_at', 'deleted_reason'
+    'created_at', 'updated_at', 'deleted_at'
   ],
 
   // Requests raised by staff from the public page. Unlike Transactions
@@ -282,6 +282,26 @@ function _insert_(name, obj) {
   });
   sh.appendRow(row);
   return obj;
+}
+
+// The ONLY path by which a ledger row ever leaves the sheet.
+//
+// The ledger is otherwise append-only and _update_ refuses the tab outright.
+// This exists for one narrow case: an item registered by mistake — the same
+// pen entered twice — whose ledger rows describe stock that never arrived.
+// Keeping those rows does not preserve history, it fabricates it. Callers
+// must establish that the item is a mis-entry before calling this.
+//
+// Rows are deleted bottom-up because deleting a row shifts every row below
+// it up by one, which would corrupt the remaining indices.
+function _purgeLedgerRows_(itemId) {
+  const sh = _sheet_('Transactions');
+  const rows = _readTable_('Transactions').filter(function (t) {
+    return Number(t.item_id) === Number(itemId);
+  });
+  rows.sort(function (a, b) { return b._row - a._row; });
+  rows.forEach(function (r) { sh.deleteRow(r._row); });
+  return rows.length;
 }
 
 // Patches specific columns of one row, addressed by the `_row` that
@@ -1099,12 +1119,17 @@ function svcUpdateItem(p) {
 
 // Soft delete. The row and its whole ledger history stay in the sheet.
 // Removes an item that should never have been registered — a duplicate, or
-// a typo. This is NOT the same as svcDecommission: that records the disposal
-// of something which genuinely existed and keeps it in the register.
+// a typo. This is NOT svcDecommission: that records the disposal of
+// something which genuinely existed and keeps it in the register.
 //
-// A SOFT delete. The row stays in the sheet with deleted_at set and every
-// read filters it out, so the ledger keeps pointing at something real and a
-// mistaken deletion is undone by clearing one cell in the Sheet.
+// This is a HARD delete. The item row and its ledger rows are removed
+// outright, because a mis-entry's ledger rows describe stock that never
+// arrived; leaving them behind would keep a fiction in the audit trail.
+//
+// The dangerous case is an item that had a real life — stock issued to
+// staff — whose ledger rows record things that DID happen. Those are only
+// purged when the caller explicitly acknowledges it (`confirm_history`), so
+// it can never happen by accident.
 function svcDeleteItem(p) {
   const v = _validate_({
     id:     { required: true, type: 'number', label: 'Item' },
@@ -1122,21 +1147,26 @@ function svcDeleteItem(p) {
     throw new Error('Item masih dipinjam. Daftar masuk dahulu sebelum memadam.');
   }
 
-  // Movements beyond the registration row mean this item had a real life.
-  // Deleting is still allowed — the admin may have issued stock from a
-  // duplicate before noticing — but the count is returned so the UI can say
-  // exactly what is being hidden.
-  const moves = _readTable_('Transactions').filter(function (t) {
-    return Number(t.item_id) === Number(item.id) && t.action_type !== 'stock_add';
-  }).length;
-
-  const now = new Date();
-  _update_('Items', item._row, {
-    deleted_at: now,
-    deleted_reason: v.reason,
-    updated_at: now
+  // Anything beyond the registration stock_add means this item was actually
+  // used, and its ledger rows record real events.
+  const all = _readTable_('Transactions').filter(function (t) {
+    return Number(t.item_id) === Number(item.id);
   });
-  return { id: item.id, name: item.name, asset_tag: item.asset_tag || '', movements: moves };
+  const real = all.filter(function (t) { return t.action_type !== 'stock_add'; }).length;
+
+  if (real > 0 && !p.confirm_history) {
+    throw new Error('Item ini ada ' + real + ' pergerakan sebenar direkodkan. ' +
+      'Memadamnya akan membuang rekod tersebut secara kekal. ' +
+      'Sahkan sekali lagi, atau gunakan Lupuskan untuk mengekalkan rekodnya.');
+  }
+
+  const purged = _purgeLedgerRows_(item.id);
+  _sheet_('Items').deleteRow(item._row);
+
+  return {
+    id: item.id, name: item.name, asset_tag: item.asset_tag || '',
+    ledger_removed: purged, real_movements: real, reason: v.reason
+  };
 }
 
 // ── Consumable stock in/out ─────────────────────────────────

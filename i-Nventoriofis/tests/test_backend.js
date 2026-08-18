@@ -1256,7 +1256,7 @@ section('19. Topping up Alat Tulis records when and from where');
   eq('no ledger row was edited or deleted', S.__test.ledgerMutations, []);
 }
 
-section('20. Padam — removing an item that should never have existed');
+section('20. Padam — a mis-entry is removed outright, ledger and all');
 {
   const S = fresh();
   const mkPen = (name) => S._txn_(() => S.svcAddItem({
@@ -1268,42 +1268,36 @@ section('20. Padam — removing an item that should never have existed');
   const realId = mkPen('Pen Biru');
   const dupId  = mkPen('Pen Biru');
   eq('both duplicates are in the list', S._readTable_('Items').length, 2);
+  eq('each has its registration row', S._readTable_('Transactions').length, 2);
 
   // ── Gated ──
   eq('deleting without the admin password is denied',
     S.handleAction('DeleteItem', { id: dupId, reason: 'Berulang' }).success, false);
 
-  // ── A reason is required — the Sheet must still explain itself ──
+  // ── A reason is required ──
   const noReason = S.handleAction('DeleteItem', { __pass: 'rahsia', id: dupId });
   eq('a delete with no reason is refused', noReason.success, false);
   ok('naming the missing field', /Sebab/i.test(noReason.error), noReason.error);
 
-  // ── The duplicate goes ──
+  // ── The duplicate goes, and so does its fictional stock_add ──
   const del = S.handleAction('DeleteItem', {
     __pass: 'rahsia', id: dupId, reason: 'Tersalah masuk / berulang'
   });
   ok('an admin can delete it', del.success, del.error);
   eq('it reports what went', del.result.name, 'Pen Biru');
-  eq('and that it had no real movements', del.result.movements, 0);
+  eq('one ledger row was purged with it', del.result.ledger_removed, 1);
+  eq('and it had no real movements', del.result.real_movements, 0);
 
-  const visible = S._readTable_('Items');
-  eq('it is gone from the list', visible.length, 1);
-  eq('and the surviving one is the original', visible[0].id, realId);
+  eq('the item is gone from the sheet entirely', S._readTable_('Items').length, 1);
+  eq('not merely hidden', S._readTable_('Items', true).length, 1);
+  eq('the surviving one is the original', S._readTable_('Items')[0].id, realId);
 
-  // ── Soft, not destructive ──
-  const withTrashed = S._readTable_('Items', true);
-  eq('the row is still in the sheet', withTrashed.length, 2);
-  const gone = withTrashed.filter((i) => Number(i.id) === Number(dupId))[0];
-  ok('stamped with a delete time', isDate(gone.deleted_at));
-  eq('and the reason is kept', gone.deleted_reason, 'Tersalah masuk / berulang');
+  // The survivor's own ledger row must be untouched — purging must not
+  // take the neighbours with it.
+  const left = S._readTable_('Transactions');
+  eq('only the deleted item ledger row went', left.length, 1);
+  eq('and the survivor keeps its own', Number(left[0].item_id), realId);
 
-  // Its registration row is untouched, so the ledger still points at
-  // something real.
-  eq('its ledger row survives',
-    S._readTable_('Transactions').filter((t) => Number(t.item_id) === Number(dupId)).length, 1);
-  eq('and the ledger was never edited', S.__test.ledgerMutations, []);
-
-  // Deleting the same thing twice is a no-op rather than a crash.
   eq('a deleted item cannot be deleted again',
     S.handleAction('DeleteItem', { __pass: 'rahsia', id: dupId, reason: 'Lagi' }).success, false);
 
@@ -1321,23 +1315,45 @@ section('20. Padam — removing an item that should never have existed');
   eq('an item on loan is refused', onLoan.success, false);
   ok('telling the admin to check it in first', /Daftar masuk dahulu/i.test(onLoan.error), onLoan.error);
 
-  // Once returned, it can go.
-  S._txn_(() => S.svcCheckIn({ id: projId }));
-  ok('and can be deleted after check-in', S.handleAction('DeleteItem', {
-    __pass: 'rahsia', id: projId, reason: 'Tersalah masuk'
-  }).success);
-
-  // ── An item with real movement still deletes, but says so ──
+  // ── Real history is not destroyed by accident ──
   const usedId = mkPen('Pen Merah');
   S._txn_(() => S.svcStockChange(
     { id: usedId, quantity: 3, custodian_id: 1, reason_notes: 'Bekalan' }, 'stock_remove'));
-  const used = S.handleAction('DeleteItem', {
+
+  const guarded = S.handleAction('DeleteItem', {
     __pass: 'rahsia', id: usedId, reason: 'Rekod salah'
   });
-  ok('an item with history can still be deleted', used.success, used.error);
-  eq('and the movement count is reported so the UI can warn', used.result.movements, 1);
+  eq('an item with real movements is refused on the first attempt', guarded.success, false);
+  ok('naming how many real events would be destroyed',
+    /1 pergerakan sebenar/.test(guarded.error), guarded.error);
+  ok('and offering Lupuskan as the alternative', /Lupuskan/.test(guarded.error), guarded.error);
+  eq('nothing was removed', S._readTable_('Items').filter((i) => i.id === usedId).length, 1);
 
-  // ── A deleted tag stays reserved — no reuse, no collision ──
+  // With the acknowledgement it proceeds — the admin is not blocked, only
+  // stopped from doing it by accident.
+  const forced = S.handleAction('DeleteItem', {
+    __pass: 'rahsia', id: usedId, reason: 'Rekod salah', confirm_history: true
+  });
+  ok('an explicit confirmation lets it through', forced.success, forced.error);
+  eq('and both its ledger rows go', forced.result.ledger_removed, 2);
+  eq('reporting the real ones among them', forced.result.real_movements, 1);
+  eq('the item is gone', S._readTable_('Items').filter((i) => i.id === usedId).length, 0);
+  eq('and none of its ledger rows remain',
+    S._readTable_('Transactions').filter((t) => Number(t.item_id) === usedId).length, 0);
+
+  // ── The invariant that still holds ──
+  // Rows are removed wholesale when their item is purged, but a ledger row
+  // is NEVER edited in place — that would rewrite history rather than
+  // retract it.
+  const edits = S.__test.ledgerMutations.filter((m) => m[0] !== 'deleteRow');
+  eq('no ledger row was ever EDITED', edits, []);
+  ok('deletions only ever came from a purge',
+    S.__test.ledgerMutations.every((m) => m[0] === 'deleteRow'));
+  throws('_update_ still refuses the ledger outright',
+    () => S._update_('Transactions', 2, { quantity: 999 }), /append-only/);
+
+  // ── A purged tag is genuinely free again ──
+  // Unlike the soft delete this replaced, nothing remains to reserve it.
   const S2 = fresh();
   const a1 = S2._txn_(() => S2.svcAddItem({
     name: 'Kamera', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-03-01'
@@ -1345,14 +1361,16 @@ section('20. Padam — removing an item that should never have existed');
   eq('first asset tag', a1.result.asset_tag, 'AST-2026-0001');
   S2.handleAction('DeleteItem', { __pass: 'rahsia', id: a1.result.id, reason: 'Berulang' });
   const a2 = S2._txn_(() => S2.svcAddItem({
-    name: 'Kamera Baharu', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-03-02'
+    name: 'Kamera Betul', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-03-02'
   }));
-  eq('a deleted item does not free its tag for reuse', a2.result.asset_tag, 'AST-2026-0002');
+  eq('the tag is reissued, because nothing holds it any more',
+    a2.result.asset_tag, 'AST-2026-0001');
+  eq('and there is exactly one item', S2._readTable_('Items').length, 1);
 
-  // ── Deleted items stay out of the public catalog ──
+  // ── Purged items leave the public catalog ──
   const cat = S2.getPublicCatalog();
-  eq('the public catalog only shows the survivor', cat.items.length, 1);
-  eq('and it is the right one', cat.items[0].name, 'Kamera Baharu');
+  eq('the catalog shows only the survivor', cat.items.length, 1);
+  eq('and it is the right one', cat.items[0].name, 'Kamera Betul');
 }
 
 // ══════════════════════════════════════════════════════════════════════

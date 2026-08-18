@@ -655,6 +655,14 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 .reqmeta{font-size:12px; color:var(--muted); margin-bottom:12px}
 
+/* Acknowledgement row on a destructive confirm */
+.ackrow{
+  display:flex; align-items:flex-start; gap:10px; padding:12px 13px; margin-bottom:14px;
+  border:1px solid var(--err-bd); background:var(--err-bg); border-radius:12px;
+  font-size:12.5px; color:var(--err); cursor:pointer; line-height:1.5;
+}
+.ackrow .ck{flex:0 0 16px; margin-top:1px}
+
 /* ═══ RESPONSIVE ═════════════════════════════════════════════════════ */
 @media (max-width:1180px){
   .dash-top{grid-template-columns:1fr 1fr}
@@ -1278,6 +1286,7 @@ function viewSection(sec) {
 
   var h = '<div class="page-head"><div><h2>' + c.title + '</h2><p>' + c.sub + '</p></div>' +
     '<div class="spacer"></div>' +
+    '<button class="btn" onclick="openDuplicates(\'' + c.type + '\')">' + icon('i-search', 15) + ' Cari Pendua</button>' +
     '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport CSV</button>' +
     (isInv
       ? '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Alat Tulis Baharu</button>'
@@ -2735,18 +2744,21 @@ function doDecom(btn, id) {
 
 // ── Padam (mis-entry) ─────────────────────────────────────────────────
 // Separate from Lupuskan on purpose. This is for a duplicate or a typo —
-// something that should never have been in the list at all.
+// something that should never have been in the list — and it removes the
+// item AND its ledger rows, because those rows describe stock that never
+// arrived.
 function openDeleteItem(id) {
   var it = itemById(id);
   if (!it) return;
 
-  // Anything beyond the registration row means this item had a real life,
-  // and the admin should see that before hiding it.
-  var moves = (D.transactions || []).filter(function (t) {
-    return Number(t.item_id) === Number(id) && t.action_type !== 'stock_add';
-  }).length;
+  var rows = (D.transactions || []).filter(function (t) {
+    return Number(t.item_id) === Number(id);
+  });
+  // Anything beyond the registration stock_add means this item was really
+  // used, so its ledger rows record events that DID happen.
+  var real = rows.filter(function (t) { return t.action_type !== 'stock_add'; }).length;
 
-  var b = '<div class="err-box">Padam item ini daripada senarai. ' +
+  var b = '<div class="err-box">Padam item ini <b>terus dari senarai dan lejar</b>. ' +
     'Gunakan ini hanya jika item <b>tersalah masuk</b> — contohnya alat yang sama ' +
     'didaftarkan dua kali.</div>';
 
@@ -2754,46 +2766,133 @@ function openDeleteItem(id) {
     (it.asset_tag ? ' · <span class="mono">' + esc(it.asset_tag) + '</span>' : '') +
     '<br>' + esc(TYPE_LABEL[it.item_type] || '') + ' · ' + esc(locName(it.location_id)) +
     (it.item_type === 'consumable' ? '<br>Baki semasa: <b class="mono">' + it.quantity_available + '</b>' : '') +
+    '<br>Rekod lejar yang akan dipadam: <b class="mono">' + rows.length + '</b>' +
     '</div>';
 
-  if (moves > 0) {
-    b += '<div class="err-box"><b>Item ini ada ' + moves + ' pergerakan direkodkan.</b><br>' +
-      'Ia bukan sekadar tersalah masuk — ada stok dikeluarkan atau dipinjam daripadanya. ' +
+  if (real > 0) {
+    b += '<div class="err-box"><b>Amaran: ' + real + ' daripadanya ialah pergerakan sebenar.</b><br>' +
+      'Stok pernah dikeluarkan atau dipinjam daripada item ini. Memadamnya akan ' +
+      'membuang rekod itu <b>secara kekal</b> — ia tidak boleh dipulihkan.<br><br>' +
       'Jika barang ini memang wujud tetapi sudah rosak atau hilang, gunakan ' +
       '<b>Lupuskan</b> supaya rekodnya kekal dalam daftar.</div>';
   }
 
-  b += field('Sebab Padam', input('delReason', 'text', moves > 0 ? '' : 'Tersalah masuk / berulang',
+  b += field('Sebab Padam', input('delReason', 'text', real > 0 ? '' : 'Tersalah masuk / berulang',
       'placeholder="cth. didaftarkan dua kali"'),
-    'Disimpan dalam Sheet supaya sebabnya kekal diketahui', true);
+    'Untuk rekod anda sendiri sebelum ia dipadam', true);
 
-  b += '<div class="info-box" style="margin-bottom:0">' + icon('i-shield', 14) +
-    ' Rekod lejar item ini <b>tidak dipadam</b> — ia hanya disembunyikan daripada ' +
-    'senarai. Boleh dipulihkan dengan mengosongkan lajur <span class="mono">deleted_at</span> ' +
-    'dalam Google Sheet.</div>';
+  if (real > 0) {
+    b += '<label class="ackrow"><span class="ck" id="delAckBox" onclick="toggleDelAck()">' +
+      icon('i-check', 11) + '</span>' +
+      '<span>Saya faham ' + real + ' rekod pergerakan sebenar akan dipadam kekal.</span></label>';
+  }
 
   openDrawer('Padam dari Senarai', (it.asset_tag ? it.asset_tag + ' · ' : '') + it.name, b,
     '<button class="btn" onclick="closeDrawer()">Batal</button>' +
-    (moves > 0
+    (real > 0
       ? '<button class="btn" onclick="closeDrawer();openDecommission(' + id + ')">Lupuskan sebaliknya</button>'
       : '') +
-    '<button class="btn btn-danger" onclick="doDeleteItem(this,' + id + ')">' +
-      icon('i-trash', 15) + ' Padam</button>');
+    '<button class="btn btn-danger" onclick="doDeleteItem(this,' + id + ',' + real + ')">' +
+      icon('i-trash', 15) + ' Padam Kekal</button>');
 }
 
-function doDeleteItem(btn, id) {
+function toggleDelAck() {
+  var el = $('delAckBox');
+  if (el) el.classList.toggle('on');
+}
+
+function doDeleteItem(btn, id, real) {
   var reason = val('delReason');
   if (!reason) { drawerErr('Sila nyatakan sebab padam.'); return; }
+  // The server refuses this too; the checkbox exists so the admin cannot
+  // destroy real history without having read the warning.
+  var ack = $('delAckBox') && $('delAckBox').classList.contains('on');
+  if (real > 0 && !ack) { drawerErr('Sila tandakan pengesahan sebelum memadam rekod sebenar.'); return; }
+
   busy(btn, 'Memadam…');
-  api('DeleteItem', { id: id, reason: reason }, function (res) {
+  api('DeleteItem', { id: id, reason: reason, confirm_history: !!ack }, function (res) {
     refresh(function () {
       unbusy(btn); closeDrawer();
-      toast('“' + ((res && res.name) || 'Item') + '” dipadam dari senarai.', 'ok');
+      toast('“' + ((res && res.name) || 'Item') + '” dipadam · ' +
+        ((res && res.ledger_removed) || 0) + ' rekod lejar dibuang.', 'ok');
     });
   }, function (e) { unbusy(btn); drawerErr(e); });
 }
 
-// ── Audit ─────────────────────────────────────────────────────────────
+// ── Cari Pendua ───────────────────────────────────────────────────────
+// Duplicates are matched on a normalised name — trimmed, lowercased,
+// inner whitespace collapsed — so "Pen  Biru" and "pen biru" group
+// together. Deliberately not fuzzy: a near-match guess that silently
+// grouped two genuinely different items would be worse than missing one.
+function normName(n) {
+  return String(n || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function duplicateGroups(type) {
+  var by = {};
+  (D.items || []).forEach(function (i) {
+    if (type && i.item_type !== type) return;
+    var k = normName(i.name);
+    if (!k) return;
+    (by[k] = by[k] || []).push(i);
+  });
+  return Object.keys(by).filter(function (k) { return by[k].length > 1; })
+    .map(function (k) {
+      var rows = by[k].slice().sort(function (a, b) { return (a.id || 0) - (b.id || 0); });
+      return { name: rows[0].name, items: rows };
+    })
+    .sort(function (a, b) { return b.items.length - a.items.length; });
+}
+
+function openDuplicates(type) {
+  var groups = duplicateGroups(type);
+  var label = type === 'consumable' ? 'Alat Tulis' : 'Aset Alih';
+
+  if (!groups.length) {
+    openDrawer('Cari Pendua', label,
+      '<div class="empty" style="padding:34px 10px">' + icon('i-check', 30) +
+      '<p style="margin:0">Tiada nama berulang dijumpai dalam ' + esc(label) + '.</p></div>',
+      '<button class="btn btn-primary" onclick="closeDrawer()">Tutup</button>');
+    return;
+  }
+
+  var total = groups.reduce(function (n, g) { return n + g.items.length; }, 0);
+  var b = '<div class="info-box">' + groups.length + ' nama berulang · ' + total + ' rekod. ' +
+    'Item yang <b>tiada pergerakan</b> selamat dipadam — ia hanya pernah didaftarkan.</div>';
+
+  b += groups.map(function (g) {
+    return '<fieldset class="fs"><legend>' + esc(g.name) + ' × ' + g.items.length + '</legend>' +
+      g.items.map(function (i) {
+        var moves = (D.transactions || []).filter(function (t) {
+          return Number(t.item_id) === Number(i.id) && t.action_type !== 'stock_add';
+        }).length;
+        var held = !!i.open_loan;
+        return '<div class="alert-row">' +
+          '<div style="min-width:0">' +
+            '<div class="t-name" style="font-size:13px">' +
+              (i.asset_tag ? '<span class="mono">' + esc(i.asset_tag) + '</span> · ' : '') +
+              esc(locName(i.location_id)) + '</div>' +
+            '<div class="t-sub">Didaftar ' + fmtDate(i.date_acquired) +
+              (i.item_type === 'consumable' ? ' · baki ' + i.quantity_available : '') +
+              ' · ' + (moves ? moves + ' pergerakan' : 'tiada pergerakan') + '</div>' +
+          '</div><div class="spacer"></div>' +
+          (held
+            ? '<span class="pill pill-info"><i></i>Dipinjam</span>'
+            : (moves
+                ? '<span class="pill pill-warn"><i></i>Ada rekod</span>'
+                : '<span class="pill pill-ok"><i></i>Selamat</span>')) +
+          (held ? '' :
+            ' <button class="btn btn-sm btn-ghost" style="color:var(--err)" ' +
+            'onclick="closeDrawer();openDeleteItem(' + i.id + ')">' + icon('i-trash', 14) + '</button>') +
+          '</div>';
+      }).join('') + '</fieldset>';
+  }).join('');
+
+  openDrawer('Cari Pendua', label + ' · ' + groups.length + ' nama berulang', b,
+    '<button class="btn btn-primary" onclick="closeDrawer()">Tutup</button>');
+}
+
+// ── Audit ─// ── Audit ─────────────────────────────────────────────────────────────
 function openAudit(id) {
   var it = itemById(id);
   if (!it) return;
