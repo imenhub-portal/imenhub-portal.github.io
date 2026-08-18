@@ -293,6 +293,14 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **The `maintenance` status renders as "Perhatian" for Alat Tulis and
+  "Penyelenggaraan" for Aset Alih.** The status itself is set purely by quantity reaching
+  zero, and that reads completely differently per category: a projector really can be away
+  for servicing, but a pen at zero has simply run out. `pill(status, type)` takes an
+  optional type, and `statusLabel()` gives the CSV the same text so the export never
+  disagrees with the screen. The Laporan status breakdown counts both categories under one
+  heading, so it passes no type and keeps the neutral label.
+
 - **The duplicate finder matches on a normalised name** — trimmed, lowercased, inner
   whitespace collapsed — so "Pen  Biru" and "pen biru" group together. Deliberately **not**
   fuzzy: a near-match that silently grouped two genuinely different items would be worse

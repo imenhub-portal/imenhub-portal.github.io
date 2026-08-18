@@ -957,9 +957,16 @@ var STATUS_META = {
   decommissioned: { cls: 'pill-err',  label: 'Dilupuskan' },
   disposed:       { cls: 'pill-err',  label: 'Dibuang' }
 };
-function pill(status) {
+// `type` is optional. The `maintenance` status is set by quantity reaching
+// zero, which reads very differently per category: an Aset Alih really can
+// be away for servicing, but a pen at zero has simply run out — calling that
+// "Penyelenggaraan" is meaningless, so Alat Tulis says "Perhatian" instead.
+// Callers without an item in hand (the Laporan status breakdown) pass no
+// type and get the neutral label.
+function pill(status, type) {
   var m = STATUS_META[status] || { cls: 'pill-mute', label: status || '—' };
-  return '<span class="pill ' + m.cls + '"><i></i>' + esc(m.label) + '</span>';
+  var label = (status === 'maintenance' && type === 'consumable') ? 'Perhatian' : m.label;
+  return '<span class="pill ' + m.cls + '"><i></i>' + esc(label) + '</span>';
 }
 
 // The two categories the office recognises, and they are not
@@ -970,6 +977,12 @@ function pill(status) {
 //                issued and never returned, no tag
 // The DB enum stays fixed_asset/consumable; only the labels are Malay.
 var TYPE_LABEL = { fixed_asset: 'Aset Alih', consumable: 'Alat Tulis' };
+
+// The plain-text form of what pill() renders, for the CSV export.
+function statusLabel(status, type) {
+  if (status === 'maintenance' && type === 'consumable') return 'Perhatian';
+  return (STATUS_META[status] || {}).label || status;
+}
 var ACTION_LABEL = {
   stock_add: 'Tambah Stok', stock_remove: 'Keluar Stok', check_out: 'Daftar Keluar',
   check_in: 'Daftar Masuk', decommission: 'Pelupusan', audit_adjust: 'Pelarasan Audit'
@@ -1880,7 +1893,7 @@ function itemsTable(rows) {
         '<div class="t-sub">' + esc(TYPE_LABEL[i.item_type] || i.item_type) +
         (i.serial_number ? ' · <span class="mono">' + esc(i.serial_number) + '</span>' : '') + '</div></td>' +
       '<td><span style="font-size:12.5px">' + esc(locName(i.location_id)) + '</span></td>' +
-      '<td>' + pill(i.status) +
+      '<td>' + pill(i.status, i.item_type) +
         (loan ? '<div class="t-sub" style="margin-top:3px">' + esc(custName(loan.custodian_id)) +
                 (loan.is_overdue ? ' · <b style="color:var(--err)">lewat</b>' : ' · ' + fmtDate(loan.expected_return_date)) + '</div>' : '') +
       '</td>' +
@@ -2973,7 +2986,7 @@ function renderHistory(it, txns) {
   var host = $('histBody');
   if (!host) return;
   var h = '<fieldset class="fs"><legend>Ringkasan</legend>' +
-    kvRow('Status', pill(it.status)) +
+    kvRow('Status', pill(it.status, it.item_type)) +
     kvRow('Jenis', esc(TYPE_LABEL[it.item_type] || it.item_type)) +
     kvRow('Lokasi', esc(locName(it.location_id))) +
     (it.serial_number ? kvRow('Nombor Siri', '<span class="mono">' + esc(it.serial_number) + '</span>') : '') +
@@ -3268,7 +3281,7 @@ function renderPalette() {
       '<span style="color:var(--muted-2)">' + icon('i-box', 16) + '</span>' +
       '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(i.name) + '</div>' +
       '<div class="t-sub mono">' + esc(i.asset_tag) + ' · ' + esc(locName(i.location_id)) + '</div></div>' +
-      '<div class="t-sub">' + pill(i.status) + '</div></div>';
+      '<div class="t-sub">' + pill(i.status, i.item_type) + '</div></div>';
   }).join('');
 }
 
@@ -3906,7 +3919,7 @@ function exportCSV() {
   filteredItems().forEach(function (i) {
     rows.push([
       i.asset_tag, i.name, TYPE_LABEL[i.item_type] || i.item_type, catName(i.category_id), locName(i.location_id),
-      i.serial_number, (STATUS_META[i.status] || {}).label || i.status,
+      i.serial_number, statusLabel(i.status, i.item_type),
       i.item_type === 'fixed_asset' ? (String(i.is_portable) === 'FALSE' ? 'Tidak' : 'Ya') : '',
       i.quantity_available, i.quantity_total, i.min_stock_alert,
       fmtDate(i.date_acquired), fmtDate(i.date_last_maintained),
