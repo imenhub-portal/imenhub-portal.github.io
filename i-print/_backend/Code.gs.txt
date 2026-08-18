@@ -147,8 +147,9 @@ function doPost(e) {
       case 'getAllocationLedger':  result = getAllocationLedger(args[0]);           break;
       case 'recomputeLedger':      result = recomputeLedger(args[0]);               break;
       case 'addPurchase':          result = addPurchase(args[0], args[1], args[2], args[3]); break;
-      case 'getPurchases':         result = getPurchases(args[0]);                  break;
-      case 'deletePurchase':       result = deletePurchase(args[0], args[1]);       break;
+      case 'getPurchases':         result = getPurchases(args[0]);                   break;
+      case 'deletePurchase':       result = deletePurchase(args[0], args[1]);        break;
+      case 'sendSebutHargaEmail':  result = sendSebutHargaEmail(args[0], args[1], args[2], args[3]); break;
       default: throw new Error('Unknown API function: ' + req.fn);
     }
     payload = { ok: true, result: result };
@@ -929,4 +930,44 @@ function _ext(mime) {
   if (mime.includes('png'))  return 'png';
   if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
   return 'pdf';
+}
+
+// ------------------------------------------------------------
+// SEBUT HARGA EMAIL — notify Puan Faeizah (eija@ukm.edu.my) with a link
+// that re-opens the quotation page pre-filled with this order's data.
+// The link carries base64(JSON) in ?d= so no server-side storage needed.
+// Gated by the admin password like the other admin endpoints.
+// ------------------------------------------------------------
+function sendSebutHargaEmail(pass, linkUrl, namaPemohon, jumlahRM) {
+  if (pass !== _adminPassword_()) return 'UNAUTHORIZED';
+  if (!linkUrl) return { status: 'error', message: 'Pautan tidak sah.' };
+
+  const to      = 'eija@ukm.edu.my';
+  const subject = 'Sebut Harga i-Print — ' + (namaPemohon || 'Tempahan');
+  const esc = function (s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#0f172a;">' +
+      '<p>Salam sejahtera Puan Faeizah,</p>' +
+      '<p>Sebut harga cetakan poster i-Print untuk <b>' + esc(namaPemohon || '-') + '</b>' +
+      (jumlahRM ? ' (Jumlah: <b>RM ' + esc(jumlahRM) + '</b>)' : '') +
+      ' kini sedia untuk semakan &amp; cetakan:</p>' +
+      '<p style="margin:26px 0;"><a href="' + esc(linkUrl) + '" ' +
+        'style="background:#0f172a;color:#ffffff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">' +
+        '🧾 Buka Sebut Harga (PDF)</a></p>' +
+      '<p style="font-size:12px;color:#64748b;">Jika butang tidak berfungsi, salin pautan ini ke pelayar:<br>' +
+        '<a href="' + esc(linkUrl) + '">' + esc(linkUrl) + '</a></p>' +
+      '<p style="font-size:12px;color:#94a3b8;">— Dijana automatik oleh Sistem i-Print IMEN</p>' +
+    '</div>';
+
+  const plain = 'Sebut harga i-Print untuk ' + (namaPemohon || '-') +
+    (jumlahRM ? ' (Jumlah: RM ' + jumlahRM + ')' : '') + '. Buka: ' + linkUrl;
+
+  const ok = _sendMail_(to, subject, html, plain);
+  return ok
+    ? { status: 'success', message: 'Emel sebut harga dihantar ke eija@ukm.edu.my' }
+    : { status: 'error',   message: 'Emel gagal dihantar. Sila semak log Apps Script.' };
 }

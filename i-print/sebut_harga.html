@@ -228,6 +228,14 @@
     (function () {
         var raw;
         try { raw = localStorage.getItem('imen_sh_data'); } catch (e) {}
+        // Email links carry the order data in ?d= (base64 JSON) since the
+        // recipient's browser has no shared localStorage with the admin.
+        if (!raw) {
+            var m = location.search.match(/[?&]d=([^&]+)/);
+            if (m) {
+                try { raw = decodeURIComponent(escape(atob(decodeURIComponent(m[1])))); } catch (e) {}
+            }
+        }
         if (!raw) return;
         var d;
         try { d = JSON.parse(raw); } catch (e) { return; }

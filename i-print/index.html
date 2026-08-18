@@ -16,7 +16,7 @@
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
   var API_URL = 'https://script.google.com/macros/s/AKfycbwjO97_YWugdYIRpV6bT3Uv4uTbmM6Ob1axw9ASpk668ugB40O1DAxzBn2jTRp9rLxKTg/exec';
-  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus','deleteRow', 'getAdminData', 'checkUserStatus', 'getPrices', 'getAllocationConfig', 'saveAllocationConfig', 'getAllocationLedger', 'recomputeLedger', 'addPurchase', 'getPurchases', 'deletePurchase'];
+  var API_FNS = ['startResumableUpload', 'processForm', 'updatePosterStatus','deleteRow', 'getAdminData', 'checkUserStatus', 'getPrices', 'getAllocationConfig', 'saveAllocationConfig', 'getAllocationLedger', 'recomputeLedger', 'addPurchase', 'getPurchases', 'deletePurchase', 'sendSebutHargaEmail'];
   function makeRunner() {
     var onOk = function(){}; var onErr = function(e){ console.error('[API] ', e); };
     var runner = {
@@ -438,6 +438,16 @@
     .act-btn-file{ background:var(--paper-2); border:1px solid var(--border); text-decoration:none; } .act-btn-file:hover{ background:var(--paper-3); border-color:var(--border-2); }
     .act-btn-del{ background:transparent; color:#fca5a5; font-size:11px; font-weight:800; width:22px; height:22px; border:none; } .act-btn-del:hover{ background:#fef2f2; color:#dc2626; }
     .act-sep{ width:1px; height:18px; background:var(--border); margin:0 2px; align-self:center; display:inline-block; }
+    /* Labelled action buttons — smart pill style */
+    .act-lbl{ display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 11px; border-radius:999px; font-size:11.5px; font-weight:800; font-family:var(--disp); letter-spacing:.01em; cursor:pointer; border:1px solid var(--border); background:var(--paper); transition:all .16s var(--ease); white-space:nowrap; text-decoration:none; }
+    .act-lbl:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); }
+    .act-lbl:active{ transform:scale(.96); }
+    .act-lbl.sh{ background:#fef3c7; border-color:#fde68a; color:#92400e; }
+    .act-lbl.sh:hover{ background:#fde68a; }
+    .act-lbl.em{ background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+    .act-lbl.em:hover{ background:#dbeafe; }
+    .act-lbl.fv{ background:var(--paper-2); border-color:var(--border); color:var(--ink-3); }
+    .act-lbl.fv:hover{ background:var(--paper-3); }
     .contact-box{ display:flex; flex-direction:column; gap:3px; margin-top:5px; }
     .contact-link{ font-size:11px; color:var(--accent); text-decoration:none; font-weight:600; word-break:break-all; }
     .contact-link:hover{ color:var(--accent-2); text-decoration:underline; }
@@ -779,7 +789,9 @@
               <span style="width:1px; height:16px; background:#e2e8f0; display:inline-block;"></span>
               <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#e6fffa; color:#128C7E; border-radius:7px; font-size:10px;">💬</span> <span data-bm="WA tab baru" data-bi="WA new tab">WA tab baru</span></span>
               <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#f1f5f9; border-radius:7px; font-size:10px;">📞</span> Call</span>
-              <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:7px;">📄</span> <span data-bm="Fail" data-bi="File">Fail</span></span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="height:22px; padding:0 8px; display:inline-flex; align-items:center; justify-content:center; background:#fef3c7; border:1px solid #fde68a; border-radius:999px; font-size:10px; font-weight:800; color:#92400e;">🧾 <span data-bm="Sebut Harga" data-bi="Quotation">Sebut Harga</span></span></span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="height:22px; padding:0 8px; display:inline-flex; align-items:center; justify-content:center; background:#eff6ff; border:1px solid #bfdbfe; border-radius:999px; font-size:10px; font-weight:800; color:#1d4ed8;">📧 <span data-bm="Emel ke Puan Faeizah" data-bi="Email to Puan Faeizah">Emel ke Puan Faeizah</span></span></span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="height:22px; padding:0 8px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:999px; font-size:10px; font-weight:800; color:#334155;">📄 <span data-bm="Fail" data-bi="File">Fail</span></span></span>
               <span style="display:flex; align-items:center; gap:4px;"><span style="width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:#fca5a5; border-radius:7px; font-weight:800;">✕</span> <span data-bm="Padam" data-bi="Delete">Padam</span></span>
             </div>
             <div style="overflow-x:auto;"><table id="tbl"></table></div>
@@ -1250,10 +1262,11 @@ function _renderAdminTable(tableId, rows){
       acts+='<button class="act-btn act-btn-green" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Tanda Siap — Dah Boleh Collect','Mark Ready to Collect')+'">✅</button>';
       if(st==='Dah Boleh Collect'){ acts+='<button class="act-btn act-btn-collected" onclick="updStatus(\''+eid+'\',\'Sudah Diambil\',\'\')" title="'+T('Sudah Diambil — alih ke Sejarah','Collected — move to History')+'">📦</button>'; }
       acts+='<button class="act-btn act-btn-red" onclick="rejectRow(\''+eid+'\')" title="'+T('Tolak','Reject')+'">❌</button><span class="act-sep"></span>';
-      acts+='<button class="act-btn" style="background:#fef3c7;border-color:#fde68a;" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾</button>';
-      acts+='<a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam','Delete')+'">✕</button></div>';
+      acts+='<button class="act-lbl sh" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾 '+T('Sebut Harga','Quotation')+'</button>';
+      acts+='<button class="act-lbl em" onclick="emailSebutHarga('+i+')" title="'+T('Hantar pautan sebut harga ke eija@ukm.edu.my','Email quotation link to eija@ukm.edu.my')+'">📧 '+T('Emel','Email')+'</button>';
+      acts+='<a href="'+esc(r[10])+'" target="_blank" class="act-lbl fv" title="'+T('Lihat Fail','View File')+'">📄 '+T('Fail','File')+'</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam','Delete')+'">✕</button></div>';
     } else {
-      acts+='<div class="act-group"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Kembalikan ke Siap (Aktif)','Restore to Ready (Active)')+'">↩️</button><button class="act-btn" style="background:#fef3c7;border-color:#fde68a;" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾</button><a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam Kekal','Delete Permanently')+'">✕</button></div>';
+      acts+='<div class="act-group"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Kembalikan ke Siap (Aktif)','Restore to Ready (Active)')+'">↩️</button><button class="act-lbl sh" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾 '+T('Sebut Harga','Quotation')+'</button><button class="act-lbl em" onclick="emailSebutHarga('+i+')" title="'+T('Hantar pautan sebut harga ke eija@ukm.edu.my','Email quotation link to eija@ukm.edu.my')+'">📧 '+T('Emel','Email')+'</button><a href="'+esc(r[10])+'" target="_blank" class="act-lbl fv" title="'+T('Lihat Fail','View File')+'">📄 '+T('Fail','File')+'</a><button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam Kekal','Delete Permanently')+'">✕</button></div>';
     }
     html+='<tr><td style="color:#94a3b8;font-weight:700;">'+r._no+'</td><td><div style="font-weight:700;">'+namaEsc+'</div>'+tajukCell+contact+'<div style="font-size:10px;color:#94a3b8;margin-top:2px;">'+esc(r[1])+'</div></td><td style="font-size:12px;">'+penyelia+'</td><td><b>'+esc(r[6])+'</b><br><small style="color:#64748b;">'+esc(r[7])+' ×'+esc(r[16])+'</small></td><td><b>RM '+tot+'</b><br><small style="color:#94a3b8;">@RM'+unitP+' ×'+qty+'</small></td><td><span class="badge '+cls+'">'+esc(statusLabel(st))+'</span></td><td>'+bayaranCell+'</td><td>'+acts+'</td></tr>';
   }
@@ -1283,8 +1296,9 @@ function _renderHistCards(rows){
     h+='</div>';
     h+='<div class="hist-foot"><span class="hist-pay">'+payLabel+'</span>';
     h+='<span class="hist-acts"><button class="act-btn act-btn-restore" onclick="updStatus(\''+eid+'\',\'Dah Boleh Collect\',\'\')" title="'+T('Kembalikan ke Siap (Aktif)','Restore to Ready (Active)')+'">↩️</button>';
-    h+='<button class="act-btn" style="background:#fef3c7;border-color:#fde68a;" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾</button>';
-    h+='<a href="'+esc(r[10])+'" target="_blank" class="act-btn act-btn-file" title="'+T('Lihat Fail','View File')+'">📄</a>';
+    h+='<button class="act-lbl sh" onclick="openSebutHarga('+i+')" title="'+T('Jana Sebut Harga (PDF)','Generate Quotation (PDF)')+'">🧾 '+T('Sebut Harga','Quotation')+'</button>';
+    h+='<button class="act-lbl em" onclick="emailSebutHarga('+i+')" title="'+T('Hantar pautan sebut harga ke eija@ukm.edu.my','Email quotation link to eija@ukm.edu.my')+'">📧 '+T('Emel','Email')+'</button>';
+    h+='<a href="'+esc(r[10])+'" target="_blank" class="act-lbl fv" title="'+T('Lihat Fail','View File')+'">📄 '+T('Fail','File')+'</a>';
     h+='<button class="act-btn act-btn-del" onclick="delRow(\''+eid+'\')" title="'+T('Padam Kekal','Delete Permanently')+'">✕</button></span>';
     h+='</div></div>';
   }
@@ -1322,20 +1336,45 @@ function updStatus(id, status, reason){
   google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){ ld(false); if(res.startsWith('ERROR')) myAlert(res, true); else loadAdmin(); }).updatePosterStatus(id, status, reason, _adminPass);
 }
 // ── Sebut Harga: kumpul data tempahan → localStorage → buka template A4 ──
-function openSebutHarga(idx){
-  var d=_admRowsCache; if(!d || !d[idx]){ myAlert(T('Data tempahan tidak dijumpai.','Order data not found.'), true); return; }
+function _shDataFor(idx){
+  var d=_admRowsCache; if(!d || !d[idx]) return null;
   var r=d[idx];
   var unitP=parseFloat(r[8])||0; var qty=parseInt(r[16],10)||1; var total=(unitP*qty).toFixed(2);
   var tarikh=''; try{ var dt=new Date(r[1]); if(!isNaN(dt)){ var dd=('0'+dt.getDate()).slice(-2), mm=('0'+(dt.getMonth()+1)).slice(-2); tarikh=dd+'/'+mm+'/'+dt.getFullYear(); } }catch(e){}
   if(!tarikh) tarikh=String(r[1]||'');
   var penyelia=String(r[17]||''); if(penyelia==='-') penyelia='';
-  var data={
+  return {
     nama: r[2], ptj: r[5], tel: String(r[4]||'').replace(/^'+/,''), emel: r[13],
     tarikh: tarikh, media: r[7], tajuk: r[15], penyelia: penyelia,
     saiz: r[6], qty: qty, price: unitP.toFixed(2), total: total
   };
+}
+function openSebutHarga(idx){
+  var data=_shDataFor(idx);
+  if(!data){ myAlert(T('Data tempahan tidak dijumpai.','Order data not found.'), true); return; }
   try{ localStorage.setItem('imen_sh_data', JSON.stringify(data)); }catch(e){ myAlert(T('Gagal simpan data sementara.','Failed to stage data.'), true); return; }
   window.open('sebut_harga.html','_blank');
+}
+// Hantar pautan sebut harga (data dalam ?d=base64) ke eija@ukm.edu.my melalui backend.
+function emailSebutHarga(idx){
+  var data=_shDataFor(idx);
+  if(!data){ myAlert(T('Data tempahan tidak dijumpai.','Order data not found.'), true); return; }
+  var b64;
+  try{
+    var json=JSON.stringify(data);
+    b64=btoa(unescape(encodeURIComponent(json)));
+  }catch(e){ myAlert(T('Gagal enkod data sebut harga.','Failed to encode quotation data.'), true); return; }
+  var base=location.href.substring(0, location.href.lastIndexOf('/')+1);
+  var link=base+'sebut_harga.html?d='+encodeURIComponent(b64);
+  myConfirm(T('Hantar pautan sebut harga untuk <b>'+esc(data.nama)+'</b> ke eija@ukm.edu.my?','Email the quotation link for <b>'+esc(data.nama)+'</b> to eija@ukm.edu.my?'), function(){
+    ld(true);
+    google.script.run.withFailureHandler(function(e){ ld(false); myAlert(e.toString(), true); }).withSuccessHandler(function(res){
+      ld(false);
+      if(res==='UNAUTHORIZED'){ myAlert(T('Tidak sah','Unauthorized'), true); return; }
+      if(res && res.status==='error'){ myAlert(res.message, true); return; }
+      myAlert(res && res.message ? res.message : T('Emel dihantar.','Email sent.'));
+    }).sendSebutHargaEmail(_adminPass, link, data.nama, 'RM '+data.total);
+  });
 }
 function rejectRow(id){ myPrompt(T('Nyatakan sebab penolakan (wajib):','State the reason for rejection (required):'), function(reason){ if(reason) updStatus(id, 'Ditolak', reason); }); }
 function delRow(id){
