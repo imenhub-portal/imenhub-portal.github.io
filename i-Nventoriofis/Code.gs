@@ -111,7 +111,7 @@ const SCHEMA = {
     // Return-proof state for the CURRENT loan only. All three are cleared at
     // check-in, which is what kills the token.
     'return_token', 'return_photo_url', 'return_claimed_at',
-    'created_at', 'updated_at', 'deleted_at'
+    'created_at', 'updated_at', 'deleted_at', 'deleted_reason'
   ],
 
   // Requests raised by staff from the public page. Unlike Transactions
@@ -1098,16 +1098,45 @@ function svcUpdateItem(p) {
 }
 
 // Soft delete. The row and its whole ledger history stay in the sheet.
+// Removes an item that should never have been registered — a duplicate, or
+// a typo. This is NOT the same as svcDecommission: that records the disposal
+// of something which genuinely existed and keeps it in the register.
+//
+// A SOFT delete. The row stays in the sheet with deleted_at set and every
+// read filters it out, so the ledger keeps pointing at something real and a
+// mistaken deletion is undone by clearing one cell in the Sheet.
 function svcDeleteItem(p) {
-  const item = _findById_(_readTable_('Items'), p.id);
+  const v = _validate_({
+    id:     { required: true, type: 'number', label: 'Item' },
+    reason: { required: true, max: 200, label: 'Sebab' }
+  }, p);
+
+  const item = _findById_(_readTable_('Items'), v.id);
   if (!item) throw new Error('Item tidak dijumpai.');
-  if (item.open_loan || _openLoans_(_readTable_('Transactions')).some(function (l) {
+
+  // Somebody is physically holding this. Deleting it would strand the loan
+  // with nothing to return to.
+  if (_openLoans_(_readTable_('Transactions')).some(function (l) {
     return Number(l.item_id) === Number(item.id);
   })) {
     throw new Error('Item masih dipinjam. Daftar masuk dahulu sebelum memadam.');
   }
-  _update_('Items', item._row, { deleted_at: new Date(), updated_at: new Date() });
-  return { id: item.id };
+
+  // Movements beyond the registration row mean this item had a real life.
+  // Deleting is still allowed — the admin may have issued stock from a
+  // duplicate before noticing — but the count is returned so the UI can say
+  // exactly what is being hidden.
+  const moves = _readTable_('Transactions').filter(function (t) {
+    return Number(t.item_id) === Number(item.id) && t.action_type !== 'stock_add';
+  }).length;
+
+  const now = new Date();
+  _update_('Items', item._row, {
+    deleted_at: now,
+    deleted_reason: v.reason,
+    updated_at: now
+  });
+  return { id: item.id, name: item.name, asset_tag: item.asset_tag || '', movements: moves };
 }
 
 // ── Consumable stock in/out ─────────────────────────────────

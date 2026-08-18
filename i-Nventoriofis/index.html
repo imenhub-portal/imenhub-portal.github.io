@@ -1916,7 +1916,12 @@ function rowMenu(ev, id) {
   h += mi('i-qr', 'Kod QR', 'openQR(' + id + ')');
   h += mi('i-history', 'Sejarah Item', 'openHistory(' + id + ')');
   h += mi('i-edit', 'Sunting', 'openItemDrawer(' + id + ')');
-  if (!isGone) { h += '<hr>' + mi('i-trash', 'Lupuskan', 'openDecommission(' + id + ')', true); }
+  h += '<hr>';
+  // Two different things, deliberately worded apart:
+  //   Lupuskan — it existed, now it is disposed of. Stays in the register.
+  //   Padam    — it should never have been here. Leaves the list.
+  if (!isGone) h += mi('i-trash', 'Lupuskan', 'openDecommission(' + id + ')', true);
+  h += mi('i-x', 'Padam dari Senarai', 'openDeleteItem(' + id + ')', true);
   pop.innerHTML = h;
 
   ev.target.closest('.rowmenu').appendChild(pop);
@@ -2726,6 +2731,66 @@ function doDecom(btn, id) {
     id: id, reason: val('dReason'), date_decommissioned: val('dDate'),
     status: val('dStatus'), reason_notes: val('dNote')
   }, 'Aset telah dilupuskan.');
+}
+
+// ── Padam (mis-entry) ─────────────────────────────────────────────────
+// Separate from Lupuskan on purpose. This is for a duplicate or a typo —
+// something that should never have been in the list at all.
+function openDeleteItem(id) {
+  var it = itemById(id);
+  if (!it) return;
+
+  // Anything beyond the registration row means this item had a real life,
+  // and the admin should see that before hiding it.
+  var moves = (D.transactions || []).filter(function (t) {
+    return Number(t.item_id) === Number(id) && t.action_type !== 'stock_add';
+  }).length;
+
+  var b = '<div class="err-box">Padam item ini daripada senarai. ' +
+    'Gunakan ini hanya jika item <b>tersalah masuk</b> — contohnya alat yang sama ' +
+    'didaftarkan dua kali.</div>';
+
+  b += '<div class="info-box"><b>' + esc(it.name) + '</b>' +
+    (it.asset_tag ? ' · <span class="mono">' + esc(it.asset_tag) + '</span>' : '') +
+    '<br>' + esc(TYPE_LABEL[it.item_type] || '') + ' · ' + esc(locName(it.location_id)) +
+    (it.item_type === 'consumable' ? '<br>Baki semasa: <b class="mono">' + it.quantity_available + '</b>' : '') +
+    '</div>';
+
+  if (moves > 0) {
+    b += '<div class="err-box"><b>Item ini ada ' + moves + ' pergerakan direkodkan.</b><br>' +
+      'Ia bukan sekadar tersalah masuk — ada stok dikeluarkan atau dipinjam daripadanya. ' +
+      'Jika barang ini memang wujud tetapi sudah rosak atau hilang, gunakan ' +
+      '<b>Lupuskan</b> supaya rekodnya kekal dalam daftar.</div>';
+  }
+
+  b += field('Sebab Padam', input('delReason', 'text', moves > 0 ? '' : 'Tersalah masuk / berulang',
+      'placeholder="cth. didaftarkan dua kali"'),
+    'Disimpan dalam Sheet supaya sebabnya kekal diketahui', true);
+
+  b += '<div class="info-box" style="margin-bottom:0">' + icon('i-shield', 14) +
+    ' Rekod lejar item ini <b>tidak dipadam</b> — ia hanya disembunyikan daripada ' +
+    'senarai. Boleh dipulihkan dengan mengosongkan lajur <span class="mono">deleted_at</span> ' +
+    'dalam Google Sheet.</div>';
+
+  openDrawer('Padam dari Senarai', (it.asset_tag ? it.asset_tag + ' · ' : '') + it.name, b,
+    '<button class="btn" onclick="closeDrawer()">Batal</button>' +
+    (moves > 0
+      ? '<button class="btn" onclick="closeDrawer();openDecommission(' + id + ')">Lupuskan sebaliknya</button>'
+      : '') +
+    '<button class="btn btn-danger" onclick="doDeleteItem(this,' + id + ')">' +
+      icon('i-trash', 15) + ' Padam</button>');
+}
+
+function doDeleteItem(btn, id) {
+  var reason = val('delReason');
+  if (!reason) { drawerErr('Sila nyatakan sebab padam.'); return; }
+  busy(btn, 'Memadam…');
+  api('DeleteItem', { id: id, reason: reason }, function (res) {
+    refresh(function () {
+      unbusy(btn); closeDrawer();
+      toast('“' + ((res && res.name) || 'Item') + '” dipadam dari senarai.', 'ok');
+    });
+  }, function (e) { unbusy(btn); drawerErr(e); });
 }
 
 // ── Audit ─────────────────────────────────────────────────────────────

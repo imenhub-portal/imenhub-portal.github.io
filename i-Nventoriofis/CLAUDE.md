@@ -264,6 +264,18 @@ Each of these looks like an oversight and is not.
 - **Asset tags widen past 9999** (`AST-2026-10000`) rather than wrapping, which would
   collide with `AST-2026-0001`. Soft-deleted items keep their tag reserved.
 
+- **Padam and Lupuskan are two different things, worded apart on purpose.**
+  *Lupuskan* (`svcDecommission`) records the disposal of something that genuinely
+  existed — it stays in the register with a ledger row. *Padam* (`svcDeleteItem`) removes
+  an item that should never have been registered: a duplicate or a typo. Padam is a
+  **soft** delete — `deleted_at` is set, every read filters it out, and the ledger keeps
+  pointing at a row that still exists, so a mistaken deletion is undone by clearing one
+  cell in the Sheet. A reason is **required** and stored in `deleted_reason`, so the sheet
+  still explains itself. An item on open loan cannot be deleted, and the returned
+  `movements` count (ledger rows beyond the registration `stock_add`) is what lets the UI
+  warn that an item had a real life and should probably be Lupuskan-ed instead. A deleted
+  item keeps its asset tag reserved — the number is never reused.
+
 ### The ledger
 
 - **`Transactions` is immutable mechanically, not by convention.** `_update_()` **throws**

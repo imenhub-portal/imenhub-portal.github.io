@@ -1256,6 +1256,105 @@ section('19. Topping up Alat Tulis records when and from where');
   eq('no ledger row was edited or deleted', S.__test.ledgerMutations, []);
 }
 
+section('20. Padam — removing an item that should never have existed');
+{
+  const S = fresh();
+  const mkPen = (name) => S._txn_(() => S.svcAddItem({
+    name: name, location_id: 2, item_type: 'consumable',
+    quantity_total: 10, min_stock_alert: 2, date_acquired: '2026-01-10'
+  })).result.id;
+
+  // The scenario this exists for: the same thing entered twice.
+  const realId = mkPen('Pen Biru');
+  const dupId  = mkPen('Pen Biru');
+  eq('both duplicates are in the list', S._readTable_('Items').length, 2);
+
+  // ── Gated ──
+  eq('deleting without the admin password is denied',
+    S.handleAction('DeleteItem', { id: dupId, reason: 'Berulang' }).success, false);
+
+  // ── A reason is required — the Sheet must still explain itself ──
+  const noReason = S.handleAction('DeleteItem', { __pass: 'rahsia', id: dupId });
+  eq('a delete with no reason is refused', noReason.success, false);
+  ok('naming the missing field', /Sebab/i.test(noReason.error), noReason.error);
+
+  // ── The duplicate goes ──
+  const del = S.handleAction('DeleteItem', {
+    __pass: 'rahsia', id: dupId, reason: 'Tersalah masuk / berulang'
+  });
+  ok('an admin can delete it', del.success, del.error);
+  eq('it reports what went', del.result.name, 'Pen Biru');
+  eq('and that it had no real movements', del.result.movements, 0);
+
+  const visible = S._readTable_('Items');
+  eq('it is gone from the list', visible.length, 1);
+  eq('and the surviving one is the original', visible[0].id, realId);
+
+  // ── Soft, not destructive ──
+  const withTrashed = S._readTable_('Items', true);
+  eq('the row is still in the sheet', withTrashed.length, 2);
+  const gone = withTrashed.filter((i) => Number(i.id) === Number(dupId))[0];
+  ok('stamped with a delete time', isDate(gone.deleted_at));
+  eq('and the reason is kept', gone.deleted_reason, 'Tersalah masuk / berulang');
+
+  // Its registration row is untouched, so the ledger still points at
+  // something real.
+  eq('its ledger row survives',
+    S._readTable_('Transactions').filter((t) => Number(t.item_id) === Number(dupId)).length, 1);
+  eq('and the ledger was never edited', S.__test.ledgerMutations, []);
+
+  // Deleting the same thing twice is a no-op rather than a crash.
+  eq('a deleted item cannot be deleted again',
+    S.handleAction('DeleteItem', { __pass: 'rahsia', id: dupId, reason: 'Lagi' }).success, false);
+
+  // ── An item someone is holding cannot be deleted ──
+  const projId = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', location_id: 3, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+  S._txn_(() => S.svcCheckOut({
+    id: projId, recipient_name: 'Farah', recipient_email: 'farah@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(5))
+  }));
+  const onLoan = S.handleAction('DeleteItem', {
+    __pass: 'rahsia', id: projId, reason: 'Cuba padam'
+  });
+  eq('an item on loan is refused', onLoan.success, false);
+  ok('telling the admin to check it in first', /Daftar masuk dahulu/i.test(onLoan.error), onLoan.error);
+
+  // Once returned, it can go.
+  S._txn_(() => S.svcCheckIn({ id: projId }));
+  ok('and can be deleted after check-in', S.handleAction('DeleteItem', {
+    __pass: 'rahsia', id: projId, reason: 'Tersalah masuk'
+  }).success);
+
+  // ── An item with real movement still deletes, but says so ──
+  const usedId = mkPen('Pen Merah');
+  S._txn_(() => S.svcStockChange(
+    { id: usedId, quantity: 3, custodian_id: 1, reason_notes: 'Bekalan' }, 'stock_remove'));
+  const used = S.handleAction('DeleteItem', {
+    __pass: 'rahsia', id: usedId, reason: 'Rekod salah'
+  });
+  ok('an item with history can still be deleted', used.success, used.error);
+  eq('and the movement count is reported so the UI can warn', used.result.movements, 1);
+
+  // ── A deleted tag stays reserved — no reuse, no collision ──
+  const S2 = fresh();
+  const a1 = S2._txn_(() => S2.svcAddItem({
+    name: 'Kamera', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-03-01'
+  }));
+  eq('first asset tag', a1.result.asset_tag, 'AST-2026-0001');
+  S2.handleAction('DeleteItem', { __pass: 'rahsia', id: a1.result.id, reason: 'Berulang' });
+  const a2 = S2._txn_(() => S2.svcAddItem({
+    name: 'Kamera Baharu', location_id: 1, item_type: 'fixed_asset', date_acquired: '2026-03-02'
+  }));
+  eq('a deleted item does not free its tag for reuse', a2.result.asset_tag, 'AST-2026-0002');
+
+  // ── Deleted items stay out of the public catalog ──
+  const cat = S2.getPublicCatalog();
+  eq('the public catalog only shows the survivor', cat.items.length, 1);
+  eq('and it is the right one', cat.items[0].name, 'Kamera Baharu');
+}
+
 // ══════════════════════════════════════════════════════════════════════
 console.log('\n' + '─'.repeat(60));
 if (failures.length) {
