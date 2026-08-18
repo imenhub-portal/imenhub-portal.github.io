@@ -124,6 +124,38 @@ check('no external stylesheet beyond Google Fonts', links.length === 0, links.jo
 check('QR generator is lazy-loaded', /loadLib\('qr'/.test(allJs));
 check('QR scanner is lazy-loaded', /loadLib\('scan'/.test(allJs));
 
+// ── 5b. Row-menu handlers must survive being put in an attribute ──────
+// mi(icon, label, fn) drops `fn` into an onclick attribute delimited by
+// double quotes. A double quote inside `fn` therefore closes the attribute
+// early and the browser keeps a truncated fragment — `openStock(1,` — so the
+// menu entry becomes a silent no-op: no console error, nothing happens, until
+// somebody clicks it. Tambah Stok and Keluar Stok shipped that way, because
+// they are the only entries that pass a string argument.
+//
+// A static scan cannot catch this: the attribute template lives in mi() and
+// the argument lives at the call site. So the call sites are evaluated here
+// and the resulting attribute is checked the way a browser would read it.
+{
+  const broken = [];
+  const call = /\bmi\(\s*'[^']*'\s*,\s*'[^']*'\s*,\s*([^;]+?)(?:,\s*true)?\s*\)\s*\)?;/g;
+  let m, seen = 0;
+  while ((m = call.exec(allJs)) !== null) {
+    let fn;
+    try { fn = new Function('id', 'return ' + m[1])(1); }
+    catch (e) { continue; }            // not a literal we can evaluate
+    if (typeof fn !== 'string') continue;
+    seen++;
+    // What the browser keeps: everything up to the first double quote.
+    const kept = fn.indexOf('"') === -1 ? fn : fn.slice(0, fn.indexOf('"'));
+    const opens = (kept.match(/\(/g) || []).length;
+    const closes = (kept.match(/\)/g) || []).length;
+    if (kept !== fn || opens !== closes) broken.push(m[1].trim() + '  →  kept: ' + kept);
+  }
+  check('every row-menu handler survives the attribute (' + seen + ' checked)',
+    seen > 0 && broken.length === 0,
+    broken.length ? broken.join('\n        ') : 'no mi() call sites found — regex is stale');
+}
+
 // ── 6. Deployment placeholders ────────────────────────────────────────
 const hasPlaceholder = /PASTE_EXEC_URL_HERE/.test(html);
 console.log('\nDeployment placeholder present: ' + (hasPlaceholder ? 'yes (still needs the /exec URL)' : 'no'));

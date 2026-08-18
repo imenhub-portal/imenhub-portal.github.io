@@ -293,10 +293,19 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
-- **Restocking has a button on the Alat Tulis row itself, not only in the ⋮ menu.**
-  Topping up is the single most common thing done to a consumable, and burying the one
-  action the list exists for behind a three-dot menu made it read as missing. Aset Alih
-  gets no such button — it is borrowed, not topped up.
+- **Handler strings passed to `mi()` must not contain a double quote.** `mi()` drops the
+  handler into an onclick attribute delimited by double quotes, so a quote inside closes
+  the attribute early and the browser keeps a truncated fragment — `openStock(1,` — giving
+  a menu entry that silently does nothing, with no console error. Tambah Stok and Keluar
+  Stok shipped that way for a while, because they are the only entries that pass a string
+  argument. `check_html.js` now evaluates every `mi()` call site and reads the result the
+  way a browser would; the check is proven to fail when the quoting is reverted. A static
+  scan cannot catch this — the attribute template is in `mi()` and the argument is at the
+  call site — which is why the guard evaluates rather than greps.
+
+- **Stock actions live only in the row's ⋮ menu.** An inline row button was tried and
+  removed at the owner's request: with the menu working there were two Tambah Stok
+  controls on the same row.
 
 - **An Alat Tulis cannot be borrowed.** `svcCheckOut` refuses `item_type === 'consumable'`
   outright and the row menu no longer offers Daftar Keluar for one. A consumable goes out
