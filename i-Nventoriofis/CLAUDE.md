@@ -293,6 +293,16 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **Alat Tulis shows one number: the current balance.** The list used to read `48/50`,
+  but `quantity_total` and `quantity_available` move together in every path that touches
+  them — registration sets both, stock add/remove applies the same delta to both, and the
+  audit adjust moves both by the same variance — so for a consumable the two are always
+  equal and the pair was printing the same number twice. The balance is what the system is
+  for: 50 in, 2 used, 48 left; add 5, it is 53. `quantity_total` still exists in the sheet
+  and is still maintained — nothing in the ledger changed — it is simply no longer shown.
+  Removed from the items table, the item history, the CSV export, and the registration
+  form (which now asks for **Stok Semasa**, the opening balance).
+
 - **Handler strings passed to `mi()` must not contain a double quote.** `mi()` drops the
   handler into an onclick attribute delimited by double quotes, so a quote inside closes
   the attribute early and the browser keeps a truncated fragment — `openStock(1,` — giving

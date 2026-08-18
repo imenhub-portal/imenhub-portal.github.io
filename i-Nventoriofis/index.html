@@ -1899,7 +1899,7 @@ function itemsTable(rows) {
       '</td>' +
       '<td class="t-num mono" style="' + (lowFlag ? 'color:var(--warn);font-weight:700' : '') + '">' +
         (i.quantity_available == null ? '—' : i.quantity_available) +
-        (i.item_type === 'consumable' ? '<span style="color:var(--muted-3)">/' + (i.quantity_total || 0) + '</span>' : '') + '</td>' +
+        '</td>' +
       '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + fmtDate(i.date_acquired) + '</td>' +
       '<td>' + rowMenuBtn(i.id) + '</td></tr>';
   }).join('');
@@ -2443,9 +2443,10 @@ function openItemDrawer(id, presetType) {
 
   b += '<fieldset class="fs"><legend>Kuantiti &amp; Pergerakan</legend>' +
     '<div class="row-2" id="qtyRow">' +
-      field('Kuantiti' + (it ? ' (dikunci)' : ''),
-        input('fQty', 'number', it ? it.quantity_total : 1, 'min="0" step="1"' + (it ? ' disabled' : '')),
-        it ? 'Ubah kuantiti melalui Tambah/Keluar Stok supaya lejar kekal tepat.' : null) +
+      field('Stok Semasa' + (it ? ' (dikunci)' : ''),
+        input('fQty', 'number', it ? it.quantity_available : 1, 'min="0" step="1"' + (it ? ' disabled' : '')),
+        it ? 'Ubah melalui Tambah/Keluar Stok supaya lejar kekal tepat.'
+           : 'Baki pembukaan — tambah kemudian melalui Tambah Stok') +
       field('Amaran Stok Minimum', input('fMin', 'number', it ? it.min_stock_alert : 5, 'min="0" step="1"'), 'Amaran dicetuskan pada paras ini') +
     '</div>' +
     '</fieldset>';
@@ -3000,7 +3001,9 @@ function renderHistory(it, txns) {
     kvRow('Jenis', esc(TYPE_LABEL[it.item_type] || it.item_type)) +
     kvRow('Lokasi', esc(locName(it.location_id))) +
     (it.serial_number ? kvRow('Nombor Siri', '<span class="mono">' + esc(it.serial_number) + '</span>') : '') +
-    kvRow('Baki / Jumlah', '<span class="mono">' + it.quantity_available + ' / ' + it.quantity_total + '</span>') +
+    (it.item_type === 'consumable'
+      ? kvRow('Baki Semasa', '<span class="mono">' + it.quantity_available + '</span>')
+      : '') +
     (it.item_type === 'fixed_asset'
       ? kvRow('Mudah Alih', String(it.is_portable) === 'FALSE' ? 'Tidak — kekal di lokasi' : 'Ya — boleh dipinjam')
       : '') +
@@ -3922,7 +3925,7 @@ function downloadCSV(filename, rows) {
 function exportCSV() {
   var rows = [[
     'Tag Aset', 'Nama', 'Jenis', 'Kategori', 'Lokasi', 'Nombor Siri', 'Status',
-    'Mudah Alih', 'Baki', 'Jumlah', 'Min Stok',
+    'Mudah Alih', 'Baki', 'Min Stok',
     'Diperoleh', 'Penyelenggaraan Terakhir', 'Pemeriksaan Seterusnya',
     'Audit Terakhir', 'Dilupuskan', 'Penjaga Semasa', 'Catatan'
   ]];
@@ -3931,7 +3934,7 @@ function exportCSV() {
       i.asset_tag, i.name, TYPE_LABEL[i.item_type] || i.item_type, catName(i.category_id), locName(i.location_id),
       i.serial_number, statusLabel(i.status, i.item_type),
       i.item_type === 'fixed_asset' ? (String(i.is_portable) === 'FALSE' ? 'Tidak' : 'Ya') : '',
-      i.quantity_available, i.quantity_total, i.min_stock_alert,
+      i.quantity_available, i.min_stock_alert,
       fmtDate(i.date_acquired), fmtDate(i.date_last_maintained),
       fmtDate(i.date_next_inspection), fmtDate(i.date_last_audited), fmtDate(i.date_decommissioned),
       i.open_loan ? custName(i.open_loan.custodian_id) : '', i.notes
