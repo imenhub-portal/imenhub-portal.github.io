@@ -655,6 +655,10 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 .reqmeta{font-size:12px; color:var(--muted); margin-bottom:12px}
 
+/* Row action cell — inline button beside the ⋮ menu */
+.t-act{white-space:nowrap; text-align:right}
+.t-act .rowmenu{display:inline-block; vertical-align:middle; margin-left:4px}
+
 /* Acknowledgement row on a destructive confirm */
 .ackrow{
   display:flex; align-items:flex-start; gap:10px; padding:12px 13px; margin-bottom:14px;
@@ -1878,7 +1882,7 @@ function itemsTable(rows) {
     th('name', 'Nama Item') +
     th('location_id', 'Lokasi') + th('status', 'Status') +
     th('quantity_available', 'Baki', 't-num') + th('date_acquired', 'Diperoleh') +
-    '<th style="width:40px"></th></tr></thead><tbody>';
+    '<th style="width:150px"></th></tr></thead><tbody>';
 
   h += rows.map(function (i) {
     var loan = i.open_loan;
@@ -1901,7 +1905,16 @@ function itemsTable(rows) {
         (i.quantity_available == null ? '—' : i.quantity_available) +
         (i.item_type === 'consumable' ? '<span style="color:var(--muted-3)">/' + (i.quantity_total || 0) + '</span>' : '') + '</td>' +
       '<td class="mono" style="font-size:12.5px;color:var(--muted)">' + fmtDate(i.date_acquired) + '</td>' +
-      '<td>' + rowMenuBtn(i.id) + '</td></tr>';
+      // Restocking is the single most common thing done to an Alat Tulis,
+      // so it gets a button on the row itself. Hiding it in the ⋮ menu meant
+      // the one action the list exists for was the one you had to go hunting
+      // for. Aset Alih has no equivalent — it is borrowed, not topped up.
+      '<td class="t-act">' +
+        (i.item_type === 'consumable' && i.status !== 'decommissioned' && i.status !== 'disposed'
+          ? '<button class="btn btn-sm" onclick="event.stopPropagation();openStock(' + i.id + ',\'StockAdd\')">' +
+              icon('i-plus', 13) + ' Tambah Stok</button>'
+          : '') +
+        rowMenuBtn(i.id) + '</td></tr>';
   }).join('');
 
   return h + '</tbody></table></div>';
@@ -1926,8 +1939,13 @@ function rowMenu(ev, id) {
 
   var h = '';
   if (!isGone) {
-    if (i.open_loan) h += mi('i-in', 'Daftar Masuk', 'openCheckIn(' + id + ')');
-    else h += mi('i-out', 'Daftar Keluar', 'openCheckOut(' + id + ')');
+    // Borrow-and-return is the Aset Alih cycle. Alat Tulis is consumed:
+    // it goes out and does not come back, so offering "Daftar Keluar" on a
+    // pen invited a loan that could never be closed.
+    if (i.item_type !== 'consumable') {
+      if (i.open_loan) h += mi('i-in', 'Daftar Masuk', 'openCheckIn(' + id + ')');
+      else h += mi('i-out', 'Daftar Keluar', 'openCheckOut(' + id + ')');
+    }
     if (i.item_type === 'consumable') {
       h += mi('i-plus', 'Tambah Stok', 'openStock(' + id + ',"StockAdd")');
       h += mi('i-layers', 'Keluar Stok', 'openStock(' + id + ',"StockRemove")');

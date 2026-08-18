@@ -293,6 +293,17 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **Restocking has a button on the Alat Tulis row itself, not only in the ⋮ menu.**
+  Topping up is the single most common thing done to a consumable, and burying the one
+  action the list exists for behind a three-dot menu made it read as missing. Aset Alih
+  gets no such button — it is borrowed, not topped up.
+
+- **An Alat Tulis cannot be borrowed.** `svcCheckOut` refuses `item_type === 'consumable'`
+  outright and the row menu no longer offers Daftar Keluar for one. A consumable goes out
+  and does not come back, so a loan against it could never be closed by a return and would
+  sit open for ever; Keluar Stok is the correct route. The server enforces this rather than
+  trusting the hidden button — the UI is not a guard.
+
 - **The `maintenance` status renders as "Perhatian" for Alat Tulis and
   "Penyelenggaraan" for Aset Alih.** The status itself is set purely by quantity reaching
   zero, and that reads completely differently per category: a projector really can be away

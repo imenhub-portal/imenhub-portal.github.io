@@ -1270,6 +1270,11 @@ function svcCheckOut(p) {
   if (item.status === 'decommissioned' || item.status === 'disposed') {
     throw new Error('Item telah dilupuskan dan tidak boleh dipinjam.');
   }
+  // Alat Tulis is consumed, not borrowed. A loan against one could never be
+  // closed by a return, so it would sit open for ever. Use Keluar Stok.
+  if (item.item_type === 'consumable') {
+    throw new Error('Alat Tulis tidak boleh dipinjam — gunakan Keluar Stok untuk mengeluarkan bekalan.');
+  }
 
   const custodian = _resolveRecipient_(v);
 

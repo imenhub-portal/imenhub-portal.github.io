@@ -1375,6 +1375,42 @@ section('20. Padam — a mis-entry is removed outright, ledger and all');
 
 // ══════════════════════════════════════════════════════════════════════
 console.log('\n' + '─'.repeat(60));
+section('21. Alat Tulis is consumed, not borrowed');
+{
+  const S = fresh();
+  const pen = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', location_id: 2, item_type: 'consumable',
+    quantity_total: 10, min_stock_alert: 2, date_acquired: '2026-01-10'
+  })).result.id;
+
+  // The UI no longer offers this, but the UI is not the guard. A loan on a
+  // consumable could never be closed by a return — it would stay open for ever.
+  const out = S.handleAction('CheckOut', {
+    __pass: 'rahsia', id: pen, recipient_name: 'Farah',
+    recipient_email: 'farah@ukm.edu.my', expected_return_date: iso(daysFromNow(3))
+  });
+  eq('borrowing an Alat Tulis is refused', out.success, false);
+  ok('and it points to the right action instead', /Keluar Stok/.test(out.error), out.error);
+  eq('no loan was opened', S._openLoans_(S._readTable_('Transactions')).length, 0);
+
+  // The legitimate route still works and still leaves the balance right.
+  const iss = S.handleAction('StockRemove', {
+    __pass: 'rahsia', id: pen, quantity: 3, custodian_id: 1, reason_notes: 'Bekalan'
+  });
+  ok('issuing stock is unaffected', iss.success, iss.error);
+  eq('and the balance drops', iss.result.quantity_available, 7);
+
+  // Aset Alih keeps the borrow cycle untouched.
+  const proj = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', location_id: 3, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+  ok('an Aset Alih can still be borrowed', S.handleAction('CheckOut', {
+    __pass: 'rahsia', id: proj, recipient_name: 'Farah',
+    recipient_email: 'farah@ukm.edu.my', expected_return_date: iso(daysFromNow(3))
+  }).success);
+}
+
+
 if (failures.length) {
   console.log(passed + ' passed, ' + failures.length + ' FAILED\n');
   failures.forEach((f) => console.log('  FAIL  ' + f));
