@@ -33,6 +33,10 @@ const SPREADSHEET_ID = '1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E';
 const FOLDER_ID      = '1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7';
 const ADMIN_EMAIL    = 'imenmakmal@gmail.com';
 const APP_NAME       = 'i-Nventori Ofis';
+// How the system identifies itself in every notification it sends.
+// Separate from APP_NAME: that is what the app calls itself on screen,
+// this is what a recipient sees in their inbox.
+const MAIL_SENDER    = 'i-Nventori Pejabat IMEN';
 
 // Where doGet fetches the live UI from (single source of truth: the repo).
 const UI_RAW_URL   = 'https://raw.githubusercontent.com/imenhub-portal/imenhub-portal.github.io/main/i-Nventoriofis/index.html';
@@ -1599,11 +1603,29 @@ function _esc_(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// Every outgoing notification goes through here.
+//
+// MailApp defaults the sender's display name to the owning account's own
+// name, which is why recipients were seeing the raw Gmail address instead of
+// anything meaningful. `name` replaces that display name.
+//
+// The ADDRESS itself cannot be changed from here — Apps Script always sends
+// as the account that owns the script — so a recipient who expands the header
+// still sees it. Only the name is ours to set.
+//
+// Routing every send through one function is deliberate: a new notification
+// added later cannot quietly ship without the sender name, because there is
+// nowhere else to send from. tests assert that no call site bypasses it.
+function _sendMail_(opts) {
+  opts.name = MAIL_SENDER;
+  MailApp.sendEmail(opts);
+}
+
 function _emailLayout_(title, inner) {
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">' +
-    '<div style="background:#0f172a;color:#ffffff;padding:16px 20px;font-size:15px;font-weight:bold;">i-Nventori Ofis — ' + _esc_(title) + '</div>' +
+    '<div style="background:#0f172a;color:#ffffff;padding:16px 20px;font-size:15px;font-weight:bold;">' + _esc_(MAIL_SENDER) + ' — ' + _esc_(title) + '</div>' +
     '<div style="padding:20px;color:#1e293b;font-size:14px;line-height:1.6;">' + inner + '</div>' +
-    '<div style="padding:12px 20px;background:#f8fafc;color:#94a3b8;font-size:11px;">i-Nventori Ofis &middot; IMEN, UKM &middot; Emel automatik, jangan balas.</div>' +
+    '<div style="padding:12px 20px;background:#f8fafc;color:#94a3b8;font-size:11px;">' + _esc_(MAIL_SENDER) + ' &middot; IMEN, UKM &middot; Emel automatik, jangan balas.</div>' +
   '</div>';
 }
 
@@ -1666,9 +1688,9 @@ function _mailCheckOut_(item, custodian, expected, qty, txnId, loc, cat, returnT
       : '') +
     '<p style="font-size:12px;color:#64748b;">Simpan emel ini sebagai rekod penerimaan anda.</p>'
   );
-  MailApp.sendEmail({
+  _sendMail_({
     to: custodian.email, cc: [_adminEmail_(), _adminCc_()].filter(Boolean).join(','),
-    subject: '[i-Nventori Ofis] Aset ' + item.asset_tag + ' didaftar keluar kepada anda',
+    subject: '[' + MAIL_SENDER + '] Aset ' + item.asset_tag + ' didaftar keluar kepada anda',
     htmlBody: body
   });
 }
@@ -1706,9 +1728,9 @@ function _mailCheckIn_(item, custodian, loan, returned, txnId, loc, cat) {
       : 'Aset dipulangkan dalam tempoh yang ditetapkan. Terima kasih.') + '</p>' +
     '<p style="font-size:12px;color:#64748b;">Simpan emel ini sebagai bukti pemulangan anda.</p>'
   );
-  MailApp.sendEmail({
+  _sendMail_({
     to: custodian.email, cc: [_adminEmail_(), _adminCc_()].filter(Boolean).join(','),
-    subject: '[i-Nventori Ofis] Aset ' + item.asset_tag + ' telah dipulangkan',
+    subject: '[' + MAIL_SENDER + '] Aset ' + item.asset_tag + ' telah dipulangkan',
     htmlBody: body
   });
 }
@@ -1763,9 +1785,9 @@ function _mailRequestReceived_(lines, v, groupId) {
     ['Dihantar Pada', _fmtDateTime_(now)]
   ];
 
-  MailApp.sendEmail({
+  _sendMail_({
     to: v.requester_email,
-    subject: '[i-Nventori Ofis] Permohonan diterima — ' + lines.length + ' barang',
+    subject: '[' + MAIL_SENDER + '] Permohonan diterima — ' + lines.length + ' barang',
     htmlBody: _emailLayout_('Permohonan Diterima',
       '<p>Salam <b>' + _esc_(v.requester_name) + '</b>,</p>' +
       '<p>Permohonan anda telah diterima dan sedang <b>menunggu kelulusan</b>.</p>' +
@@ -1775,9 +1797,9 @@ function _mailRequestReceived_(lines, v, groupId) {
       '<p style="font-size:12px;color:#64748b;">Anda akan menerima emel sebaik permohonan ini diluluskan atau ditolak.</p>')
   });
 
-  MailApp.sendEmail({
+  _sendMail_({
     to: _adminEmail_(), cc: _adminCc_(),
-    subject: '[i-Nventori Ofis] Permohonan baharu — ' + _esc_(v.requester_name) + ' (' + lines.length + ' barang)',
+    subject: '[' + MAIL_SENDER + '] Permohonan baharu — ' + _esc_(v.requester_name) + ' (' + lines.length + ' barang)',
     htmlBody: _emailLayout_('Permohonan Baharu Menunggu',
       '<p>Permohonan baharu daripada <b>' + _esc_(v.requester_name) + '</b> (' +
         _esc_(v.requester_email) + '):</p>' +
@@ -1789,10 +1811,10 @@ function _mailRequestReceived_(lines, v, groupId) {
 
 function _mailRequestDecided_(item, req, decision, notes) {
   const approved = decision === 'approved';
-  MailApp.sendEmail({
+  _sendMail_({
     to: req.requester_email,
     cc: [_adminEmail_(), _adminCc_()].filter(Boolean).join(','),
-    subject: '[i-Nventori Ofis] Permohonan ' + (approved ? 'DILULUSKAN' : 'DITOLAK') + ' — ' + item.name,
+    subject: '[' + MAIL_SENDER + '] Permohonan ' + (approved ? 'DILULUSKAN' : 'DITOLAK') + ' — ' + item.name,
     htmlBody: _emailLayout_(approved ? 'Permohonan Diluluskan' : 'Permohonan Ditolak',
       '<p>Salam <b>' + _esc_(req.requester_name) + '</b>,</p>' +
       '<p>Permohonan anda telah <b>' + (approved ? 'diluluskan' : 'ditolak') + '</b>.</p>' +
@@ -1879,9 +1901,9 @@ function checkDates(skipMail) {
   }
 
   try {
-    MailApp.sendEmail({
+    _sendMail_({
       to: _adminEmail_(), cc: _adminCc_(),
-      subject: '[i-Nventori Ofis] ' + total + ' amaran inventori — ' + _fmtDate_(today),
+      subject: '[' + MAIL_SENDER + '] ' + total + ' amaran inventori — ' + _fmtDate_(today),
       htmlBody: _emailLayout_('Amaran Harian', html)
     });
     summary.mailed = true;
@@ -2040,9 +2062,9 @@ function svcSubmitReturnProof(p) {
 }
 
 function _mailReturnClaimed_(item, url, when) {
-  MailApp.sendEmail({
+  _sendMail_({
     to: _adminEmail_(), cc: _adminCc_(),
-    subject: '[i-Nventori Ofis] Bukti pemulangan diterima — ' + (item.asset_tag || item.name),
+    subject: '[' + MAIL_SENDER + '] Bukti pemulangan diterima — ' + (item.asset_tag || item.name),
     htmlBody: _emailLayout_('Bukti Pemulangan Diterima',
       '<p>Peminjam telah menghantar bukti pemulangan:</p>' +
       _kvRows_([

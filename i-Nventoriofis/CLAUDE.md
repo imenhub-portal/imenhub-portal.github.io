@@ -293,6 +293,18 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **Every notification is sent under `MAIL_SENDER` = "i-Nventori Pejabat IMEN", and
+  `_sendMail_()` is the only place that touches `MailApp`.** MailApp defaults the sender's
+  display name to the owning account's own name, so recipients were seeing the raw Gmail
+  address. The helper sets `name` on every send; the subject prefix and the email header
+  and footer use the same constant, so the From line and the body cannot disagree.
+  **The address cannot be changed from code** — Apps Script always sends as the account
+  that owns the script — so `imenmakmal@gmail.com` is still there for anyone who expands
+  the header. Hiding it needs a Gmail "Send mail as" alias on that account, which is
+  configured in Gmail, not here. Tests assert every sent mail carries the name and that
+  exactly one call site references `MailApp` directly; the check is proven to fail when a
+  send bypasses the helper.
+
 - **Alat Tulis shows one number: the current balance.** The list used to read `48/50`,
   but `quantity_total` and `quantity_available` move together in every path that touches
   them — registration sets both, stock add/remove applies the same delta to both, and the

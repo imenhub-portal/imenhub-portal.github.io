@@ -1411,6 +1411,61 @@ section('21. Alat Tulis is consumed, not borrowed');
 }
 
 
+section('22. Every notification identifies itself by name, not by address');
+{
+  const S = fresh();
+  const proj = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', location_id: 3, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+
+  // Exercise the paths that actually send: hand-over, return, and a request
+  // with its approval.
+  S._txn_(() => S.svcCheckOut({
+    id: proj, recipient_name: 'Farah', recipient_email: 'farah@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(3))
+  }));
+  S._txn_(() => S.svcCheckIn({ id: proj }));
+
+  const pen = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', location_id: 2, item_type: 'consumable',
+    quantity_total: 10, min_stock_alert: 2, date_acquired: '2026-01-10'
+  })).result.id;
+  const req = S.handleAction('SubmitRequest', {
+    requester_name: 'Aiman', requester_email: 'aiman@ukm.edu.my',
+    purpose: 'Bekalan pejabat', lines: [{ item_id: pen, quantity: 2 }]
+  });
+  ok('the request went in', req.success, req.error);
+
+  const mail = S.__test.sentMail;
+  ok('several notifications were sent', mail.length >= 4, 'sent ' + mail.length);
+
+  const unnamed = mail.filter((m) => m.name !== 'i-Nventori Pejabat IMEN');
+  eq('every one is sent under the system name', unnamed.map((m) => m.subject), []);
+
+  // The point of the change: a recipient sees a name in the From line. The
+  // address is still the owning account's — Apps Script cannot change that —
+  // so this asserts the name is set, not that the address is hidden.
+  ok('the name is a name, not an address',
+    mail.every((m) => m.name && m.name.indexOf('@') === -1));
+
+  // Subject and body agree with the From line, so nothing reads as a
+  // different sender once the mail is open.
+  ok('subjects carry the same name',
+    mail.every((m) => m.subject.indexOf('i-Nventori Pejabat IMEN') !== -1),
+    mail.map((m) => m.subject).join(' | '));
+  ok('and so does the layout',
+    mail.every((m) => m.htmlBody.indexOf('i-Nventori Pejabat IMEN') !== -1));
+
+  // The guard that keeps this true: there is exactly one place that talks to
+  // MailApp, so a notification added later cannot ship without the name.
+  const src = fs.readFileSync(CODE_PATH, 'utf8');
+  const raw = (src.match(/MailApp\.sendEmail/g) || []).length;
+  eq('exactly one call site touches MailApp directly', raw, 1);
+  ok('and it is inside the _sendMail_ helper',
+    /function _sendMail_\(opts\) \{\s*opts\.name = MAIL_SENDER;\s*MailApp\.sendEmail\(opts\);/.test(src));
+}
+
+
 if (failures.length) {
   console.log(passed + ' passed, ' + failures.length + ' FAILED\n');
   failures.forEach((f) => console.log('  FAIL  ' + f));
