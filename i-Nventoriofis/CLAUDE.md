@@ -328,6 +328,20 @@ Each of these looks like an oversight and is not.
   `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
   script fails at the user's double-click, where there is nobody to debug it.
 
+- **INTERIM: the Pages build redirects to /exec.** The live deployment answers every
+  ContentService response with Google's "Page not found" — both `doPost` and
+  `doGet?format=json`, at any content type — while the HtmlService page itself serves
+  fine. So the API is unreachable from Pages, and the Pages build loads to an empty shell.
+  Served from `/exec` the same file works, because Apps Script provides
+  `google.script.run` natively and that RPC channel (`POST .../callback`) never touches
+  `doPost`. The redirect is guarded on `location.hostname` containing `github.io`, not on
+  feature detection, so it cannot fire inside Apps Script (served from
+  `googleusercontent.com`) and cannot loop.
+
+  **Remove that block once POST works again** — it gives up the instant-load behaviour
+  that Pages hosting exists for. The fix is on the deployment, not in the code: the code
+  is unchanged and correct, and the same file worked through `doPost` earlier the same day.
+
 - **A 404 from the API means the deployed script has no `doPost`, or the /exec URL is
   stale.** Apps Script answers a POST it cannot route with an HTML "Page not found" page,
   not a JSON error. Tell the two apart by whether a plain GET of the /exec URL still
