@@ -717,6 +717,14 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 .reqmeta{font-size:12px; color:var(--muted); margin-bottom:12px}
 
+/* Diagnostic readout */
+.diag{
+  text-align:left; margin:14px auto 0; max-width:600px; padding:12px 14px;
+  border-radius:10px; background:rgba(127,127,127,.10); border:1px solid rgba(127,127,127,.25);
+  font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; line-height:1.8;
+  white-space:pre-wrap; word-break:break-word;
+}
+
 /* Sync failure banner. Lives outside #content so render() cannot wipe it. */
 .sync-err{
   display:flex; align-items:flex-start; gap:10px;
@@ -1168,6 +1176,53 @@ function clearSyncErr() {
   if (el) el.classList.add('hide');
 }
 
+// Asks the server the same three questions in increasing order of payload
+// size, using only functions the deployed script already has, so it runs
+// without a redeploy. The point is to separate possibilities that look
+// identical from outside: the password not being accepted, the backend
+// being unreachable, or specifically the large payload not coming back.
+// Each line reports what actually returned, never what was expected.
+function runDiag(btn) {
+  var out = $('diagOut');
+  if (!out) return;
+  out.classList.remove('hide');
+  out.textContent = 'Menjalankan...\n';
+  if (btn) btn.disabled = true;
+
+  var steps = [
+    ['1. adminLogin       (kecil)', function (ok, err) {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(err).adminLogin(PASS); }],
+    ['2. getPublicCatalog (sederhana)', function (ok, err) {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(err).getPublicCatalog(); }],
+    ['3. getInitialData   (besar)', function (ok, err) {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(err).getInitialData(PASS); }]
+  ];
+
+  var i = 0;
+  (function next() {
+    if (i >= steps.length) {
+      out.textContent += '\nSelesai. Salin teks ini dan hantar kepada saya.';
+      if (btn) btn.disabled = false;
+      return;
+    }
+    var name = steps[i][0], call = steps[i][1], t0 = Date.now();
+    call(function (r) {
+      var size;
+      try { size = String(JSON.stringify(r) || '').length + ' aksara'; }
+      catch (e) { size = 'tidak boleh JSON'; }
+      out.textContent += name + ' -> ' +
+        (r === null ? 'NULL' : (typeof r === 'undefined' ? 'UNDEFINED' : typeof r)) +
+        ' | ' + size + ' | ' + (Date.now() - t0) + 'ms' +
+        (r && r.items ? ' | items=' + r.items.length : '') +
+        (r && typeof r.is_admin !== 'undefined' ? ' | is_admin=' + r.is_admin : '') + '\n';
+      i++; next();
+    }, function (e) {
+      out.textContent += name + ' -> RALAT: ' + ((e && e.message) || e) + '\n';
+      i++; next();
+    });
+  })();
+}
+
 // ── Stale-while-revalidate cache ──────────────────────────────────────
 // Paint from localStorage immediately, then replace with live data when
 // it lands. Display-only: every write still goes to the server.
@@ -1386,7 +1441,9 @@ function render() {
         '<p>Data tidak diterima daripada pelayan.</p>' +
         '<p style="font-size:12.5px;color:var(--muted)">Cuba muat semula. Jika berulang, ' +
         'pelayan menerima permintaan tetapi memulangkan jawapan kosong.</p>' +
-        '<button class="btn btn-primary" style="margin-top:12px" onclick="refresh()">Cuba lagi</button>' +
+        '<button class="btn btn-primary" style="margin-top:12px" onclick="refresh()">Cuba lagi</button> ' +
+        '<button class="btn" style="margin-top:12px" onclick="runDiag(this)">Jalankan diagnostik</button>' +
+        '<pre id="diagOut" class="diag hide"></pre>' +
         '</div>';
     }
     return;
