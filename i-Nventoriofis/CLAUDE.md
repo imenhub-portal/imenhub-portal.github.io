@@ -145,10 +145,21 @@ covered by tests (§9), and the same `doPost` served live traffic earlier the sa
 not go looking for a truncated paste or a missing function; that theory was chased and
 disproved.
 
-The fix is a **new deployment** (Deploy → New deployment → Web app → Execute as: *Me*,
-Who has access: *Anyone*), which mints a different `/exec` URL. When that happens:
-update `API_URL` in `index.html`, delete the embed block described below, and re-check
-with the same two commands.
+**This does not need a new deployment, and the `/exec` URL does not change.** POST worked
+on this exact URL earlier the same day — a full round trip of `AddItem`, `StockAdd`,
+`StockRemove` and `DeleteItem` went through it — so the deployment and the URL are sound.
+What is wrong is the *published version*. Republishing the existing deployment
+(**Manage deployments → ✏️ Edit → Version: New version**) is the fix, and it keeps the URL
+that `API_URL` already points at.
+
+An earlier version of this file recommended creating a **new** deployment. That was wrong
+and cost the owner real time: it was a guess made after a few failed attempts, not a
+conclusion from evidence. Do not repeat it. If a session ever does deliberately replace the
+deployment, `API_URL` in `index.html` must be updated to match the new URL in the same
+commit.
+
+Once POST answers again: delete the embed block described below and re-check with the two
+commands above.
 
 ### Workaround 1 — the Pages build embeds `/exec` in a full-page iframe
 
@@ -271,6 +282,20 @@ newer than the deployed `Code.gs`. The page detects `Unknown API function` speci
 says so, naming the redeploy steps — do not replace that with a generic "please reload".
 If the message is a **404** or the data is simply empty, that is a different problem: see
 §4 before assuming a stale backend.
+
+### Division of labour — agreed with the owner, do not change it
+
+**The owner deploys `Code.gs` and manages deployments. Claude does not.** Pasting into the
+Apps Script editor and publishing versions is deliberately a human step, and that stays.
+
+So do **not** propose or build a GitHub Action that runs clasp on push. It was offered and
+declined. It would also mean storing Google OAuth tokens as a secret in a public repo,
+which is the owner's call to make and they have made it.
+
+`tools/2-DEPLOY.cmd` exists as a convenience for the owner to run, not as automation for
+Claude to trigger. What Claude does is: change `Code.gs`, run the tests, commit, push, and
+then **say plainly that a deploy is needed** — never imply the backend is live when only
+the repo has moved.
 
 ### The tooling, and why it is `.cmd` and not `.ps1`
 
