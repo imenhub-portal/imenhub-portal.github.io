@@ -293,6 +293,21 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **`Code.gs` is deployed with `tools/deploy.ps1`, not by pasting.** This is the one
+  genuinely manual step the stack used to have, and it is worth understanding why it
+  existed: GitHub Pages serves `index.html` directly out of the repo, so a push *is* the
+  frontend deploy — but Apps Script has no connection to the repo at all. It never clones,
+  pulls or watches; it runs only the copy in its own editor, frozen at the last published
+  version. So a push can never reach the backend on its own.
+
+  `deploy.ps1` closes that with clasp: it pushes `Code.gs`, republishes **the existing
+  deployment by ID** — never a new one, since that would mint a fresh /exec URL and break
+  the published page — and then POSTs a `Ping` to prove `doPost` actually answers before
+  reporting success. `.claspignore` keeps everything except `Code.gs` and `appsscript.json`
+  out of the script project. `tools/setup-clasp.ps1` does the one-time login and writes
+  `.clasp.json`. clasp's OAuth tokens live in `.clasprc.json`, which is gitignored — the
+  repo is public.
+
 - **A 404 from the API means the deployed script has no `doPost`, or the /exec URL is
   stale.** Apps Script answers a POST it cannot route with an HTML "Page not found" page,
   not a JSON error. Tell the two apart by whether a plain GET of the /exec URL still

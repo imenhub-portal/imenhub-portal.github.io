@@ -1,2 +1,6 @@
 *.DS_Store
 .claude/
+
+# clasp OAuth tokens — never commit, the repo is public
+.clasprc.json
+**/.clasprc.json

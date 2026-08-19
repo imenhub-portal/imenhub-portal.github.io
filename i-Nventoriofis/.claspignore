@@ -1,0 +1,9 @@
+# Only the backend belongs in the Apps Script project.
+#
+# index.html is served by GitHub Pages and fetched by doGet at run time, so
+# pushing a 200KB copy into the script project would just be a second copy
+# to drift out of date. Tests and tooling are Node-side and mean nothing
+# to Apps Script.
+**/**
+!Code.gs
+!appsscript.json
