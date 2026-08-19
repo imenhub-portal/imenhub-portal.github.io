@@ -293,6 +293,17 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **`doPost` is covered by tests, and the mock `TextOutput` is faithful.** It was not,
+  for a long time: every test called `handleAction` directly, so the one function the
+  entire frontend goes through was never exercised. That is the worst possible gap,
+  because a missing `doPost` leaves `doGet` working — the app loads normally and only its
+  API calls fail, which reads as a network fault rather than a missing function. Section 23
+  asserts the round-trip, that every API name the page can call is routed, that thrown
+  errors come back as a normal `{ok:false}` envelope rather than a transport failure, that
+  malformed input is answered rather than crashing, and that the response declares JSON
+  (the shim calls `r.json()` on it). It bails immediately with a named error if `doPost` is
+  absent, rather than dying with a stack trace.
+
 - **`Code.gs` is deployed with `tools/deploy.ps1`, not by pasting.** This is the one
   genuinely manual step the stack used to have, and it is worth understanding why it
   existed: GitHub Pages serves `index.html` directly out of the repo, so a push *is* the

@@ -150,7 +150,20 @@ function loadBackend(opts) {
       newTrigger: () => ({ timeBased: () => ({ everyDays: () => ({ atHour: () => ({ create: () => {} }) }) }) }),
       deleteTrigger: () => {}
     },
-    ContentService: { createTextOutput: (t) => ({ setMimeType: () => t }), MimeType: { JSON: 'json' } },
+    // A faithful TextOutput: doPost's callers read getContent(), and the
+    // frontend shim calls r.json() on the response, so the declared mime
+    // type is part of the contract and worth being able to assert.
+    ContentService: {
+      createTextOutput: (t) => {
+        const out = {
+          __text: t, __mimeType: null,
+          getContent: () => out.__text,
+          setMimeType: (m) => { out.__mimeType = m; return out; }
+        };
+        return out;
+      },
+      MimeType: { JSON: 'JSON' }
+    },
     HtmlService: {
       createHtmlOutput: (h) => ({ setTitle: function () { return this; }, addMetaTag: function () { return this; }, setXFrameOptionsMode: function () { return h; } }),
       XFrameOptionsMode: { ALLOWALL: 1 }
@@ -1463,6 +1476,61 @@ section('22. Every notification identifies itself by name, not by address');
   eq('exactly one call site touches MailApp directly', raw, 1);
   ok('and it is inside the _sendMail_ helper',
     /function _sendMail_\(opts\) \{\s*opts\.name = MAIL_SENDER;\s*MailApp\.sendEmail\(opts\);/.test(src));
+}
+
+
+section('23. doPost — the entry point the whole frontend goes through');
+{
+  // This was never covered, and it is the one function whose absence takes
+  // the entire app down while leaving doGet working, so the failure looks
+  // like a network fault rather than a missing function.
+  const S = fresh();
+  const post = (body) => JSON.parse(
+    S.doPost({ postData: { contents: JSON.stringify(body) } }).getContent());
+
+  // Checked first and hard-stopped on, because every assertion below calls
+  // it: without this the suite dies with a stack trace instead of naming
+  // the one thing that is wrong.
+  ok('doPost exists', typeof S.doPost === 'function');
+  if (typeof S.doPost !== 'function') {
+    throw new Error('doPost is missing from Code.gs — the whole API is unreachable');
+  }
+
+  const ping = post({ fn: 'handleAction', args: ['Ping', {}] });
+  eq('a Ping round-trips', ping.ok, true);
+  eq('and answers pong', ping.result.result, 'pong');
+
+  // Every function the frontend can call must be routed. A name missing
+  // from the switch fails only at run time, in production.
+  const API_FNS = ['getInitialData', 'getPublicCatalog', 'getReturnContext',
+    'startReturnUpload', 'handleAction', 'adminLogin', 'getItemHistory',
+    'startResumableUpload'];
+  const unrouted = API_FNS.filter((fn) =>
+    /Unknown API function/.test(JSON.stringify(post({ fn: fn, args: [] }))));
+  eq('every API function the page calls is routed', unrouted, []);
+
+  // The frontend's shim reads {ok, result} / {ok, error}, so the envelope
+  // matters as much as the payload.
+  const bad = post({ fn: 'noSuchThing', args: [] });
+  eq('an unknown function is reported, not thrown', bad.ok, false);
+  ok('naming what was asked for', /noSuchThing/.test(bad.error), bad.error);
+
+  // A thrown service error must come back as a normal envelope too,
+  // otherwise the page sees a transport failure instead of the reason.
+  const denied = post({ fn: 'handleAction', args: ['AddItem', { name: 'X' }] });
+  eq('an unauthenticated write returns ok:true with success:false', denied.ok, true);
+  eq('and the action itself reports the refusal', denied.result.success, false);
+
+  // Malformed input must not take the endpoint down.
+  const junk = JSON.parse(S.doPost({ postData: { contents: 'not json' } }).getContent());
+  eq('malformed JSON is answered, not crashed', junk.ok, false);
+  const empty = JSON.parse(S.doPost({}).getContent());
+  eq('an empty request is answered too', empty.ok, false);
+
+  // The response must be JSON — the shim calls r.json() on it.
+  eq('the response is declared as JSON',
+    S.doPost({ postData: { contents: '{"fn":"getPublicCatalog","args":[]}' } }).__mimeType,
+    'JSON');
 }
 
 
