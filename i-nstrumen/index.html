@@ -272,6 +272,9 @@
             reportSelectedEq: 'All',
             reportSelectedYear: new Date().getFullYear(),
             reportSelectedMonth: new Date().getMonth(),
+            analyticsSection: 'usage',        // 'usage' | 'maintenance'
+            maintSelectedLab: 'All',
+            maintExpandedEq: null,            // equipmentName of expanded row in maintenance history
 
             logs: [],
             equipment: [],
@@ -310,6 +313,23 @@
                 .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.js'))
                 .catch(e => { _pdfMakePromise = null; throw e; }); // allow retry after a network failure
             return _pdfMakePromise;
+        }
+
+        // ── SheetJS lazy loader (real .xlsx export) — same pattern as ensurePdfMake.
+        // ~900KB loaded ONLY on first maintenance-history export, never at boot.
+        let _sheetJSPromise = null;
+        function ensureSheetJS() {
+            if (window.XLSX && window.XLSX.utils) return Promise.resolve();
+            if (_sheetJSPromise) return _sheetJSPromise;
+            showToast('Preparing Excel engine…', 'info');
+            _sheetJSPromise = new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                s.onload = () => window.XLSX && window.XLSX.utils ? resolve() : reject(new Error('XLSX loaded but unavailable'));
+                s.onerror = () => { _sheetJSPromise = null; reject(new Error('Failed to load XLSX library')); };
+                document.head.appendChild(s);
+            });
+            return _sheetJSPromise;
         }
 
         function checkUrlParams() {
@@ -2310,6 +2330,7 @@
                                         </td>
                                         <td class="px-6 py-4 text-right space-x-1">
                                             <button onclick="openModal('${eq.id}', 'EditEquipment')" class="w-8 h-8 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition border border-transparent hover:border-emerald-100" title="Edit"><i class="ph-bold ph-pencil-simple text-lg"></i></button>
+                                            ${eq.status === 'Maintenance' || eq.status === 'Attention' ? `<button onclick="openResolveModal('${eq.id}')" class="w-8 h-8 rounded-lg text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition border border-emerald-100" title="Mark Resolved / Record Corrective Action"><i class="ph-bold ph-check-circle text-lg"></i></button>` : ''}
                                             <button onclick="deleteEquipment('${eq.id}')" class="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition border border-transparent hover:border-red-100" title="Delete"><i class="ph-bold ph-trash text-lg"></i></button>
                                         </td>
                                     </tr>`
@@ -2451,6 +2472,26 @@
         }
 
         function renderReports() {
+            // ── Sub-tab: Usage Analytics (existing) | Maintenance History (new) ──
+            const section = state.analyticsSection || 'usage';
+            const sectionToggle = `
+                <div class="max-w-6xl mx-auto mb-6">
+                    <div class="inline-flex rounded-xl bg-slate-100 border border-slate-200 p-1 text-xs font-bold">
+                        <button onclick="state.analyticsSection='usage'; renderApp()"
+                            class="px-4 py-2 rounded-lg transition flex items-center gap-1.5 ${section === 'usage' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}">
+                            <i class="ph-bold ph-chart-bar"></i> Usage Analytics
+                        </button>
+                        <button onclick="state.analyticsSection='maintenance'; renderApp()"
+                            class="px-4 py-2 rounded-lg transition flex items-center gap-1.5 ${section === 'maintenance' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}">
+                            <i class="ph-bold ph-wrench"></i> Maintenance History
+                        </button>
+                    </div>
+                </div>
+            `;
+            if (section === 'maintenance') {
+                return sectionToggle + renderMaintenanceHistory();
+            }
+
             // 1. Manage Selection State
             if (!state.reportSelectedLab) state.reportSelectedLab = 'All';
             if (!state.reportSelectedEq) state.reportSelectedEq = 'All';
@@ -2578,6 +2619,7 @@
             }
 
             return `
+                ${sectionToggle}
                 <div class="fade-in max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <!-- CONTROLS -->
                     <div class="lg:col-span-1">
@@ -2704,6 +2746,337 @@
                     </div>
                 </div>
             `;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // MAINTENANCE HISTORY — Analytics sub-tab
+        // Full breakdown/misconduct/resolution timeline per equipment, lab filter,
+        // stat cards, and Excel/CSV export. All dates shown (no month filter).
+        // ══════════════════════════════════════════════════════════════════════
+
+        // Build the incident model: every Report/Flagged/Resolved log per equipment,
+        // each incident paired with its resolution (next Resolved log after it that
+        // isn't consumed by an earlier open incident of the same equipment).
+        function _buildMaintenanceModel(labFilter) {
+            const rel = state.logs.filter(l =>
+                (l.action === 'Report' || l.action === 'Flagged' || l.action === 'Resolved') &&
+                (labFilter === 'All' || l.lab === labFilter)
+            );
+            // Group by equipmentName
+            const byEq = {};
+            rel.forEach(l => {
+                const k = l.equipmentName || '(unknown)';
+                (byEq[k] = byEq[k] || []).push(l);
+            });
+
+            const eqMap = {};   // equipmentName -> { eq, incidents, resolvedCount, openCount, lastIncidentTs, downtimes[] }
+            Object.keys(byEq).forEach(name => {
+                const logs = byEq[name].slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                const eq = state.equipment.find(e => e.name === name && (!labFilter || labFilter === 'All' || e.lab === labFilter));
+                const incidents = [];
+                let openPtr = 0;   // pointer to earliest still-open incident index
+
+                logs.forEach(l => {
+                    if (l.action === 'Report' || l.action === 'Flagged') {
+                        const parts = String(l.userName || '').match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+                        incidents.push({
+                            ts: l.timestamp,
+                            type: l.action === 'Report' ? 'Breakdown' : 'Misconduct',
+                            byName: parts ? parts[1] : (l.userName || '-'),
+                            byEmail: l.userEmail || (parts ? parts[2] : ''),
+                            details: l.issueDetails || '-',
+                            resolvedBy: null, resolvedTs: null, corrective: null, downtimeMs: null
+                        });
+                    } else if (l.action === 'Resolved') {
+                        // Attach to the earliest open incident (openPtr).
+                        while (openPtr < incidents.length && incidents[openPtr].resolvedTs) openPtr++;
+                        const parts = String(l.userName || '').match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+                        if (openPtr < incidents.length) {
+                            const inc = incidents[openPtr];
+                            inc.resolvedTs = l.timestamp;
+                            inc.resolvedBy = parts ? parts[1] : (l.userName || '-');
+                            inc.resolvedByEmail = l.userEmail || (parts ? parts[2] : '');
+                            inc.corrective = l.issueDetails || '';
+                            inc.downtimeMs = new Date(l.timestamp) - new Date(inc.ts);
+                        }
+                        // A resolve with no open incident still counts (e.g. manual status fix) — ignore silently.
+                    }
+                });
+
+                if (incidents.length === 0) return;
+                const openCount = incidents.filter(i => !i.resolvedTs).length;
+                const downtimes = incidents.filter(i => i.downtimeMs != null).map(i => i.downtimeMs);
+                eqMap[name] = {
+                    eq: eq || null,
+                    lab: (eq && eq.lab) || (logs[0] && logs[0].lab) || '?',
+                    incidents: incidents.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts)),
+                    resolvedCount: incidents.length - openCount,
+                    openCount: openCount,
+                    lastIncidentTs: incidents.reduce((m, i) => i.ts > m ? i.ts : m, ''),
+                    downtimes: downtimes
+                };
+            });
+
+            const list = Object.values(eqMap).sort((a, b) => new Date(b.lastIncidentTs) - new Date(a.lastIncidentTs));
+            const allIncidents = list.flatMap(e => e.incidents);
+            const allDowntimes = list.flatMap(e => e.downtimes);
+            return {
+                equipmentList: list,
+                stats: {
+                    total: allIncidents.length,
+                    breakdowns: allIncidents.filter(i => i.type === 'Breakdown').length,
+                    misconduct: allIncidents.filter(i => i.type === 'Misconduct').length,
+                    resolved: allIncidents.filter(i => i.resolvedTs).length,
+                    open: allIncidents.filter(i => !i.resolvedTs).length,
+                    avgDowntimeMs: allDowntimes.length ? allDowntimes.reduce((s, d) => s + d, 0) / allDowntimes.length : null
+                }
+            };
+        }
+
+        function _fmtDowntime(ms) {
+            if (ms == null) return '—';
+            if (ms < 0) ms = 0;
+            const hrs = ms / 36e5;
+            if (hrs < 1) return Math.round(ms / 6e4) + ' min';
+            if (hrs < 24) return (hrs < 10 ? hrs.toFixed(1) : Math.round(hrs)) + ' hrs';
+            return (hrs / 24).toFixed(1) + ' days';
+        }
+
+        function renderMaintenanceHistory() {
+            const labFilter = state.maintSelectedLab || 'All';
+            const model = _buildMaintenanceModel(labFilter);
+            const s = model.stats;
+
+            const labPills = ['All', ...state.labs].map(l =>
+                `<button onclick="state.maintSelectedLab='${l}'; state.maintExpandedEq=null; renderApp()"
+                    class="px-3 py-1.5 rounded-full text-xs font-bold transition border ${labFilter === l ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}">
+                    ${l === 'All' ? 'All Labs' : l}
+                </button>`).join('');
+
+            const statCards = [
+                { label: 'Total Incidents', val: s.total,        icon: 'ph-clipboard-text',   bg: 'bg-slate-50',  tx: 'text-slate-800' },
+                { label: 'Breakdowns',      val: s.breakdowns,   icon: 'ph-warning-octagon',  bg: 'bg-red-50',    tx: 'text-red-600' },
+                { label: 'Misconduct',      val: s.misconduct,   icon: 'ph-flag',             bg: 'bg-amber-50',  tx: 'text-amber-600' },
+                { label: 'Resolved',        val: s.resolved,     icon: 'ph-check-circle',     bg: 'bg-emerald-50',tx: 'text-emerald-600' },
+                { label: 'Still Open',      val: s.open,         icon: 'ph-prohibit',         bg: 'bg-orange-50', tx: 'text-orange-600' },
+                { label: 'Avg Downtime',    val: _fmtDowntime(s.avgDowntimeMs), icon: 'ph-timer', bg: 'bg-indigo-50', tx: 'text-indigo-600', small: true },
+            ].map(c => `
+                <div class="${c.bg} border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm flex items-center gap-2.5">
+                    <i class="ph-duotone ${c.icon} text-lg ${c.tx}"></i>
+                    <div class="min-w-0">
+                        <div class="${c.small ? 'text-base' : 'text-xl'} font-bold ${c.tx} leading-none truncate">${c.val}</div>
+                        <div class="text-[9px] font-bold uppercase tracking-wide text-slate-400 mt-0.5">${c.label}</div>
+                    </div>
+                </div>`).join('');
+
+            const eqRows = model.equipmentList.length === 0
+                ? `<div class="text-center py-14 text-slate-400">
+                       <i class="ph-duotone ph-shield-check text-5xl block mb-3 text-slate-300"></i>
+                       <p class="text-sm font-semibold">No maintenance history recorded${labFilter === 'All' ? '' : ' for ' + labFilter}</p>
+                       <p class="text-xs mt-1">Equipment breakdown reports and resolutions will appear here.</p>
+                   </div>`
+                : model.equipmentList.map(e => {
+                    const isOpen = state.maintExpandedEq === e.eq?.name;
+                    const curStatus = e.eq ? e.eq.status : '?';
+                    const statusBadge = curStatus === 'Maintenance'
+                        ? '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-600 border border-red-200">Maintenance</span>'
+                        : curStatus === 'Attention'
+                        ? '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-600 border border-amber-200">Attention</span>'
+                        : '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-600 border border-emerald-200">Active</span>';
+
+                    const timeline = e.incidents.map(inc => {
+                        const dt = new Date(inc.ts);
+                        const dateStr = dt.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+                        const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const isBreakdown = inc.type === 'Breakdown';
+                        const typeBadge = isBreakdown
+                            ? '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-50 text-red-600 border border-red-100"><i class="ph-fill ph-warning-octagon"></i> Breakdown</span>'
+                            : '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100"><i class="ph-fill ph-flag"></i> Misconduct</span>';
+                        const statusTag = inc.resolvedTs
+                            ? '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100"><i class="ph-fill ph-check-circle"></i> Resolved</span>'
+                            : '<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-orange-50 text-orange-600 border border-orange-100"><i class="ph-fill ph-prohibit"></i> Open</span>';
+                        const escapedDetails = String(inc.details).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                        const escapedCorrective = inc.corrective ? String(inc.corrective).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+
+                        return `
+                        <div class="relative pl-6 pb-5 last:pb-0 border-l-2 ${inc.resolvedTs ? 'border-emerald-200' : 'border-red-200'} ml-2">
+                            <span class="absolute -left-[7px] top-1 w-3 h-3 rounded-full ${inc.resolvedTs ? 'bg-emerald-400' : 'bg-red-400'} border-2 border-white shadow"></span>
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                ${typeBadge} ${statusTag}
+                                <span class="text-[10px] font-mono text-slate-400">${dateStr} · ${timeStr}</span>
+                                ${inc.downtimeMs != null ? `<span class="text-[10px] font-bold text-indigo-500"><i class="ph-bold ph-timer"></i> ${_fmtDowntime(inc.downtimeMs)}</span>` : ''}
+                            </div>
+                            <div class="text-xs text-slate-700 leading-relaxed">${escapedDetails}</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Reported by: ${inc.byName}${inc.byEmail ? ' · ' + inc.byEmail : ''}</div>
+                            ${inc.resolvedTs ? `
+                            <div class="mt-2 p-2.5 bg-emerald-50/60 border border-emerald-100 rounded-lg">
+                                <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                                    <span class="text-[9px] font-bold uppercase tracking-wide text-emerald-600">Corrective Action</span>
+                                    <span class="text-[10px] font-mono text-slate-400">${new Date(inc.resolvedTs).toLocaleDateString([], { day:'numeric', month:'short', year:'numeric' })}</span>
+                                </div>
+                                <div class="text-xs text-emerald-900 leading-relaxed">${escapedCorrective}</div>
+                                <div class="text-[10px] text-slate-400 mt-1">Fixed by: ${inc.resolvedBy}${inc.resolvedByEmail ? ' · ' + inc.resolvedByEmail : ''}</div>
+                            </div>` : ''}
+                        </div>`;
+                    }).join('');
+
+                    const needsResolve = e.eq && (e.eq.status === 'Maintenance' || e.eq.status === 'Attention');
+                    const nameKey = e.eq ? e.eq.name : (e.lab + '|' + e.incidents[0].details).replace(/'/g, "\\'");
+
+                    return `
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                        <div onclick="state.maintExpandedEq = state.maintExpandedEq === '${nameKey}' ? null : '${nameKey}'; renderApp()"
+                             class="px-4 py-3.5 flex items-center gap-3 cursor-pointer hover:bg-slate-50/70 transition select-none">
+                            <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                                ${e.eq && e.eq.imageUrl ? `<img src="${e.eq.imageUrl}" class="w-full h-full object-cover" onerror="this.style.display='none'">` : '<i class="ph-duotone ph-flask text-slate-300"></i>'}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-bold text-sm text-slate-800 truncate">${e.eq ? e.eq.name : '?'}</span>
+                                    ${statusBadge}
+                                    ${e.eq && e.eq.assetId && e.eq.assetId !== '-' ? `<span class="text-[9px] font-mono text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">${e.eq.assetId}</span>` : ''}
+                                </div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">${e.lab} · last incident ${e.lastIncidentTs ? new Date(e.lastIncidentTs).toLocaleDateString([], { day:'numeric', month:'short', year:'numeric' }) : '-'}</div>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                                <div class="text-right hidden sm:block">
+                                    <div class="text-[10px] text-slate-400">Incidents</div>
+                                    <div class="text-sm font-bold text-slate-700">${e.incidents.length}</div>
+                                </div>
+                                ${e.openCount > 0 ? `<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-orange-100 text-orange-600 border border-orange-200">${e.openCount} open</span>` : ''}
+                            </div>
+                            <i class="ph-bold ph-caret-${isOpen ? 'up' : 'down'} text-slate-300"></i>
+                        </div>
+                        ${isOpen ? `
+                        <div class="border-t border-slate-100 bg-slate-50/50 px-4 py-4">
+                            ${needsResolve ? `
+                            <button onclick="event.stopPropagation(); openResolveModal('${e.eq.id}')"
+                                class="mb-4 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+                                <i class="ph-bold ph-check-circle"></i> Mark Resolved / Record Corrective Action
+                            </button>` : ''}
+                            <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-3 px-1">Incident Timeline (${e.incidents.length})</div>
+                            <div class="max-h-96 overflow-y-auto pr-2">${timeline}</div>
+                        </div>` : ''}
+                    </div>`;
+                }).join('');
+
+            return `
+                <div class="fade-in max-w-6xl mx-auto">
+                    <!-- Header -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="ph-duotone ph-wrench text-red-500"></i> Maintenance History</h2>
+                            <p class="text-xs text-slate-400 mt-0.5">All recorded breakdowns, misconduct reports &amp; corrective actions — full history, all dates</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="downloadMaintenanceLog('xlsx')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5">
+                                <i class="ph-bold ph-microsoft-excel-logo"></i> Excel
+                            </button>
+                            <button onclick="downloadMaintenanceLog('csv')" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5">
+                                <i class="ph-bold ph-file-csv"></i> CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lab filter pills -->
+                    <div class="flex flex-wrap gap-2 mb-5">${labPills}</div>
+
+                    <!-- Stat cards -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-6">${statCards}</div>
+
+                    <!-- Equipment list -->
+                    <div class="space-y-3">${eqRows}</div>
+                </div>
+            `;
+        }
+
+        // ── Maintenance History export: real .xlsx (SheetJS) or CSV ──
+        function downloadMaintenanceLog(format) {
+            const labFilter = state.maintSelectedLab || 'All';
+            const model = _buildMaintenanceModel(labFilter);
+            const labLabel = labFilter === 'All' ? 'All Labs' : labFilter;
+
+            if (model.equipmentList.length === 0) {
+                showToast('No maintenance history to export.', 'error');
+                return;
+            }
+
+            const safe = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+            const esc = v => String(v == null ? '' : v);
+            const dt = ts => ts ? new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+
+            // ── Sheet 1: Maintenance Log — one row per incident, newest first ──
+            const logHeaders = ['Date', 'Type', 'Lab', 'Equipment', 'Asset ID', 'Reported By', 'Email', 'Issue Details', 'Status', 'Corrective Action', 'Fixed By', 'Fixed Date', 'Downtime'];
+            const logRows = [];
+            model.equipmentList.forEach(e => {
+                e.incidents.forEach(inc => {
+                    logRows.push([
+                        dt(inc.ts), inc.type, e.lab, e.eq ? e.eq.name : '?',
+                        e.eq && e.eq.assetId ? e.eq.assetId : '-',
+                        inc.byName, inc.byEmail || '-', inc.details,
+                        inc.resolvedTs ? 'Resolved' : 'Open',
+                        inc.corrective || '-',
+                        inc.resolvedBy || '-', inc.resolvedTs ? dt(inc.resolvedTs) : '-',
+                        inc.downtimeMs != null ? _fmtDowntime(inc.downtimeMs) : '-'
+                    ]);
+                });
+            });
+
+            // ── Sheet 2: Equipment Summary — one row per equipment ──
+            const sumHeaders = ['Lab', 'Equipment', 'Asset ID', 'Current Status', 'Total Incidents', 'Breakdowns', 'Misconduct', 'Resolved', 'Open', 'Last Incident', 'Avg Downtime'];
+            const sumRows = model.equipmentList.map(e => {
+                const br = e.incidents.filter(i => i.type === 'Breakdown').length;
+                const ms = e.incidents.filter(i => i.type === 'Misconduct').length;
+                const avg = e.downtimes.length ? e.downtimes.reduce((s, d) => s + d, 0) / e.downtimes.length : null;
+                return [
+                    e.lab, e.eq ? e.eq.name : '?', e.eq && e.eq.assetId ? e.eq.assetId : '-',
+                    e.eq ? e.eq.status : '?', e.incidents.length, br, ms,
+                    e.resolvedCount, e.openCount,
+                    e.lastIncidentTs ? dt(e.lastIncidentTs) : '-',
+                    avg != null ? _fmtDowntime(avg) : '-'
+                ];
+            });
+
+            const filename = `IMEN_Maintenance_${labFilter === 'All' ? 'AllLabs' : labFilter.replace(/\W+/g, '')}_${localDayStr(new Date())}`;
+
+            if (format === 'csv') {
+                const csvLines = [logHeaders.map(safe).join(',')];
+                logRows.forEach(r => csvLines.push(r.map(safe).join(',')));
+                const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvLines.join('\n'));
+                showDialog(buildDownloadDialog(dataUri, filename + '.csv',
+                    `Maintenance log ready — ${logRows.length} incident${logRows.length !== 1 ? 's' : ''} · ${model.equipmentList.length} equipment`), 'alert');
+                return;
+            }
+
+            // .xlsx — real Excel via SheetJS
+            ensureSheetJS()
+                .then(() => {
+                    const wb = XLSX.utils.book_new();
+
+                    const ws1 = XLSX.utils.aoa_to_sheet([logHeaders, ...logRows]);
+                    ws1['!cols'] = [
+                        { wch: 17 }, { wch: 11 }, { wch: 16 }, { wch: 26 }, { wch: 10 },
+                        { wch: 18 }, { wch: 24 }, { wch: 46 }, { wch: 10 },
+                        { wch: 46 }, { wch: 18 }, { wch: 17 }, { wch: 10 }
+                    ];
+                    XLSX.utils.book_append_sheet(wb, ws1, 'Maintenance Log');
+
+                    const ws2 = XLSX.utils.aoa_to_sheet([sumHeaders, ...sumRows]);
+                    ws2['!cols'] = [
+                        { wch: 16 }, { wch: 26 }, { wch: 10 }, { wch: 13 }, { wch: 9 },
+                        { wch: 11 }, { wch: 11 }, { wch: 9 }, { wch: 6 }, { wch: 17 }, { wch: 12 }
+                    ];
+                    XLSX.utils.book_append_sheet(wb, ws2, 'Equipment Summary');
+
+                    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                    const base64 = btoa(String.fromCharCode(...new Uint8Array(wbout)));
+                    const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + base64;
+                    showDialog(buildDownloadDialog(dataUri, filename + '.xlsx',
+                        `Excel ready — Sheet 1: ${logRows.length} incidents · Sheet 2: ${sumRows.length} equipment summary`), 'alert');
+                })
+                .catch(err => {
+                    showToast('Excel engine failed to load — try again, or use CSV. ' + (err.message || ''), 'error');
+                });
         }
 
         function prepareReport() {
@@ -4778,7 +5151,7 @@
         // must match Code.gs's ADMIN_ONLY_ACTIONS + LAB_SCOPED_ACTIONS.
         const ADMIN_GATED_ACTIONS = [
             'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
-            'EditCoordinator', 'EditTechStaff', 'Archive', 'UpdateBooking'
+            'EditCoordinator', 'EditTechStaff', 'Archive', 'UpdateBooking', 'ResolveMaintenance'
         ];
 
         function backgroundSync(actionType, payload) {
@@ -6159,6 +6532,135 @@
             _cancelTargetBookingId = null;
             closeModal();
             renderApp();
+        }
+
+        // ── MAINTENANCE RESOLVE MODAL ─────────────────────────────────────────
+        let _resolveTargetEqId = null;
+
+        function openResolveModal(eqId) {
+            const eq = state.equipment.find(e => e.id === eqId);
+            if (!eq) { showToast('Equipment not found.', 'error'); return; }
+
+            const maintInfo = parseMaintenanceInfo(eq);
+            const caps = Array.isArray(eq.processCapabilities) ? eq.processCapabilities : [];
+            const troubled = caps.filter(c => c && c.status && ['maintenance', 'disabled', 'attention'].includes(c.status));
+
+            const processCbs = troubled.map(c => `
+                <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-2 hover:bg-slate-50 rounded-lg transition border border-slate-100">
+                    <input type="checkbox" class="resolve-process-cb text-emerald-600 focus:ring-emerald-500 rounded" value="${c.name}">
+                    <span>${c.name}</span>
+                    <span class="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold ${c.status === 'maintenance' ? 'bg-red-100 text-red-600' : c.status === 'attention' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}">${c.status}</span>
+                </label>`).join('');
+
+            const overlay = getById('modal-overlay');
+            const content = getById('modal-content');
+            content.innerHTML = `
+                <div class="bg-emerald-600 text-white p-6 relative overflow-hidden">
+                    <div class="absolute -right-6 -top-6 w-24 h-24 bg-emerald-300 rounded-full blur-2xl opacity-50"></div>
+                    <h3 class="text-xl font-bold relative z-10">Record Corrective Action</h3>
+                    <p class="text-emerald-100 text-sm relative z-10">${eq.name} · ${eq.lab}</p>
+                </div>
+                <form onsubmit="submitResolve(event, '${eq.id}')" class="p-6 space-y-4">
+                    <!-- Current state -->
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div class="flex items-center gap-2 text-xs font-bold text-amber-800 mb-1">
+                            <i class="ph-fill ph-warning"></i> Current status: ${eq.status}
+                        </div>
+                        <div class="text-xs text-amber-700 leading-relaxed">${maintInfo.isPartial
+                            ? 'Partial — processes affected: ' + maintInfo.processes.join(', ') + (maintInfo.reason ? '<br>Reason: ' + maintInfo.reason : '')
+                            : (eq.maintenanceReason || 'No reason recorded.')}</div>
+                    </div>
+
+                    ${troubled.length > 0 ? `
+                    <!-- Per-process selection -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Processes to Reactivate <span class="text-red-500">*</span></label>
+                        <label class="flex items-center gap-2 text-sm font-bold text-slate-800 cursor-pointer p-2 hover:bg-emerald-50 rounded-lg transition mb-1.5 border border-emerald-100 bg-emerald-50/40">
+                            <input type="checkbox" id="resolve-all-cb" onchange="document.querySelectorAll('.resolve-process-cb').forEach(cb => { cb.checked = this.checked; })" class="text-emerald-600 focus:ring-emerald-500 rounded">
+                            Whole equipment (reactivate all)
+                        </label>
+                        <div class="space-y-1.5 ml-2">${processCbs}</div>
+                        <p class="text-[10px] text-slate-400 mt-1">Leave everything unchecked to resolve the whole equipment.</p>
+                    </div>` : ''}
+
+                    <!-- Corrective action -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Corrective Action <span class="text-red-500">*</span></label>
+                        <textarea id="resolve-corrective-input" required placeholder="Describe what was done to fix the issue — parts replaced, calibration, cleaning, reset, etc."
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-400 text-sm text-slate-700 h-24 resize-none"></textarea>
+                    </div>
+
+                    <div class="pt-2 flex gap-3">
+                        <button type="button" onclick="closeModal()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-lg transition">Cancel</button>
+                        <button type="submit" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-lg shadow-lg hover:bg-emerald-500 transition flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-check-circle"></i> Confirm Resolution
+                        </button>
+                    </div>
+                </form>`;
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                content.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+            _resolveTargetEqId = eqId;
+        }
+
+        function submitResolve(e, eqId) {
+            e.preventDefault();
+            if (demoBlockWrite()) return;
+            const btn = e.target.querySelector('button[type="submit"]');
+            setLoading(btn, true);
+
+            const corrective = (getById('resolve-corrective-input').value || '').trim();
+            if (!corrective) { showToast('Please describe the corrective action.', 'error'); setLoading(btn, false); return; }
+
+            // Gather selected processes (empty array = whole equipment)
+            const selected = [...document.querySelectorAll('.resolve-process-cb:checked')].map(cb => cb.value);
+
+            setTimeout(() => {
+                const eq = state.equipment.find(x => x.id === eqId);
+                if (!eq) { showToast('Equipment not found.', 'error'); setLoading(btn, false); return; }
+
+                const actorName = state.picName || 'PIC';
+                const actorEmail = state.picEmail || '';
+                const detail = (selected.length === 0 ? '[Whole equipment] ' : '[Processes: ' + selected.join(', ') + '] ') + corrective;
+
+                // Optimistic local equipment update
+                const caps = Array.isArray(eq.processCapabilities) ? eq.processCapabilities.map(c => ({ ...c })) : [];
+                if (selected.length === 0) {
+                    caps.forEach(c => { c.status = 'active'; });
+                    eq.status = 'Active';
+                    eq.maintenanceReason = '';
+                } else {
+                    caps.forEach(c => { if (selected.includes(c.name)) c.status = 'active'; });
+                    const stillTroubled = caps.some(c => ['maintenance', 'disabled', 'attention'].includes(c.status || ''));
+                    if (!stillTroubled) { eq.status = 'Active'; eq.maintenanceReason = ''; }
+                }
+                eq.processCapabilities = caps;
+
+                // Optimistic local log entry
+                state.logs.unshift({
+                    id: 'log-' + Date.now(), timestamp: new Date().toISOString(),
+                    equipmentId: eq.id, equipmentName: eq.name, lab: eq.lab,
+                    userName: actorName + (actorEmail ? ' (' + actorEmail + ')' : ''),
+                    userEmail: actorEmail, affiliation: '', action: 'Resolved',
+                    duration: '-', samples: '-', materials: '-', issueDetails: detail,
+                    sessionEnded: false, paymentType: '', paymentRef: '', unit: ''
+                });
+
+                showToast('Resolution recorded — equipment restored.', 'success');
+                setLoading(btn, false);
+                closeModal();
+                renderApp();
+
+                backgroundSync('ResolveMaintenance', {
+                    equipmentId: eqId,
+                    correctiveAction: corrective,
+                    resolveProcesses: selected
+                });
+            }, 600);
         }
 
         function verifyCheckIn(bookingId, equipmentId) {

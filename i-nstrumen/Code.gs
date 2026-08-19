@@ -45,7 +45,7 @@ const ADMIN_TOKEN_PREFIX = 'admintok_';
 // today's actual behavior — no per-lab restriction on these in the UI).
 const ADMIN_ONLY_ACTIONS = [
   'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
-  'EditCoordinator', 'EditTechStaff', 'Archive'
+  'EditCoordinator', 'EditTechStaff', 'Archive', 'ResolveMaintenance'
 ];
 // Actions that require a valid session AND (Master OR the booking's own lab)
 // — matches the existing UI intent (pending-approvals list is already
@@ -353,6 +353,7 @@ function handleFrontendAction(actionType, payload) {
       case 'EditTechStaff':
         return saveConfig({ techStaff: payload.allTechStaff });
       case 'Archive': return archiveSystem();
+      case 'ResolveMaintenance': return resolveMaintenance(payload, true);
       case 'CancelBooking': return cancelBooking(payload);
       case 'FindMyBookings': return findMyBookings(payload);
       case 'GetSmartMatch': return getSmartMatchEquipment(payload);
@@ -1744,6 +1745,124 @@ function _parseMatchResponse(raw) {
     return { error: false, reply: text, matches: [] };
   }
   return { error: false, reply: text, matches: [] };
+}
+
+// ── MAINTENANCE RESOLUTION ──────────────────────────────────────────────────
+// Records a corrective action when equipment is fixed. Writes a 'Resolved' log
+// entry AND restores the equipment row in one atomic operation:
+//   - resolveProcesses == null (or omitted) → whole equipment: status → Active,
+//     maintenanceReason CLEARED (fixes the stale-reason bug where the old reason
+//     text/JSON persisted after a manual status flip), every processCapabilities
+//     entry status → 'active'.
+//   - resolveProcesses = ['Process A', ...] → partial: only those processes are
+//     reactivated (cap.status → 'active', removed from partial JSON); if no
+//     trouble-listed processes remain, the equipment is fully resolved instead.
+// The actor (who fixed it) comes from the validated admin session, not the payload.
+function resolveMaintenance(payload, fromFrontend) {
+  const eqId        = String((payload && payload.equipmentId) || '').trim();
+  const corrective  = String((payload && payload.correctiveAction) || '').trim();
+  const procSelRaw  = payload && payload.resolveProcesses;
+  const isFull      = !Array.isArray(procSelRaw) || procSelRaw.length === 0;
+  const procSel     = (procSelRaw || []).map(function(p) { return String(p).trim(); }).filter(Boolean);
+
+  if (!eqId)   return { success: false, error: 'Missing equipment id.' };
+  if (!corrective) return { success: false, error: 'Corrective action description is required.' };
+
+  const eqSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.EQUIPMENT);
+  const eqData  = eqSheet.getDataRange().getValues();
+  let rowIdx = -1;
+  for (let i = 1; i < eqData.length; i++) {
+    if (String(eqData[i][0]).trim() === eqId) { rowIdx = i + 1; break; }
+  }
+  if (rowIdx === -1) return { success: false, error: 'Equipment not found.' };
+
+  const eq = {
+    id: String(eqData[rowIdx-1][0]), assetId: eqData[rowIdx-1][1], name: eqData[rowIdx-1][2],
+    lab: eqData[rowIdx-1][3], description: eqData[rowIdx-1][4], imageUrl: eqData[rowIdx-1][5],
+    status: String(eqData[rowIdx-1][6] || 'Active'), maintenanceReason: eqData[rowIdx-1][7],
+    accessMode: eqData[rowIdx-1][8], trackingUnit: eqData[rowIdx-1][9], calibrationDate: eqData[rowIdx-1][10],
+    picEmail: eqData[rowIdx-1][11], processCapabilities: eqData[rowIdx-1][12], materialsOptions: eqData[rowIdx-1][13]
+  };
+
+  // Parse capabilities JSON (accept object or string; tolerate legacy strings).
+  let caps = [];
+  try { caps = typeof eq.processCapabilities === 'string' ? JSON.parse(eq.processCapabilities || '[]') : (eq.processCapabilities || []); }
+  catch (e) { caps = []; }
+  if (!Array.isArray(caps)) caps = [];
+
+  let resolvedProcesses = [];   // what this resolution actually reactivated
+  let becameFull = false;
+
+  if (isFull) {
+    // Whole-equipment resolution: everything back to active, reason cleared.
+    caps.forEach(function(c) { if (c && typeof c === 'object') { if (c.status && c.status !== 'active') resolvedProcesses.push(c.name || '(unnamed)'); c.status = 'active'; } });
+    becameFull = true;
+    eq.status = 'Active';
+    eq.maintenanceReason = '';
+    resolvedProcesses = resolvedProcesses.length ? resolvedProcesses : ['Whole equipment'];
+  } else {
+    // Partial: reactivate only the selected processes.
+    caps.forEach(function(c) {
+      if (!c || typeof c !== 'object') return;
+      const nm = c.name || '(unnamed)';
+      if (procSel.indexOf(nm) !== -1) {
+        resolvedProcesses.push(nm);
+        c.status = 'active';
+      }
+    });
+    // Any trouble processes left after this resolution?
+    const stillTroubled = caps.some(function(c) {
+      return c && typeof c === 'object' && c.status && ['maintenance', 'disabled', 'attention'].indexOf(c.status) !== -1;
+    });
+    // Also honour the legacy partial-JSON reason format.
+    let partial = null;
+    try { partial = typeof eq.maintenanceReason === 'string' && eq.maintenanceReason.trim().indexOf('{') === 0 ? JSON.parse(eq.maintenanceReason) : null; } catch (e) { partial = null; }
+    if (!stillTroubled && !partial) {
+      becameFull = true;
+      eq.status = 'Active';
+      eq.maintenanceReason = '';
+    } else if (partial && Array.isArray(partial.processes)) {
+      partial.processes = partial.processes.filter(function(p) { return procSel.indexOf(String(p).trim()) === -1; });
+      if (partial.processes.length === 0) {
+        becameFull = true;
+        eq.status = 'Active';
+        eq.maintenanceReason = '';
+      } else {
+        eq.maintenanceReason = JSON.stringify(partial);
+      }
+    } else if (!stillTroubled && partial === null && eq.status !== 'Active') {
+      // No per-process trouble and no partial JSON — treat as full resolve.
+      becameFull = true;
+      eq.status = 'Active';
+      eq.maintenanceReason = '';
+    }
+    if (!resolvedProcesses.length) resolvedProcesses = procSel.slice();
+  }
+
+  // Write the equipment row back (same 14-col order as saveEquipment).
+  const procStr = JSON.stringify(caps);
+  const matStr  = typeof eq.materialsOptions === 'object' ? JSON.stringify(eq.materialsOptions) : (eq.materialsOptions || '');
+  eqSheet.getRange(rowIdx, 1, 1, 14).setValues([[
+    eq.id, eq.assetId, eq.name, eq.lab, eq.description, eq.imageUrl,
+    eq.status, eq.maintenanceReason, eq.accessMode, eq.trackingUnit,
+    eq.calibrationDate, eq.picEmail, procStr, matStr
+  ]]);
+
+  // Write the resolution log entry.
+  const actor = (payload && payload.__session) || { displayName: 'PIC', email: '' };
+  const detail = (becameFull ? '[Whole equipment] ' : '[Processes: ' + resolvedProcesses.join(', ') + '] ') + corrective;
+  const logRow = [
+    'log-' + Date.now(), new Date().toISOString(), eqId, eq.name, eq.lab,
+    actor.displayName + (actor.email ? ' (' + actor.email + ')' : ''), '', 'Resolved', '-',
+    '-', '-', detail, false, '', '',
+    actor.email || '', ''
+  ];
+  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.LOGS);
+  if (logSheet.getRange(1, 16).getValue() === '') logSheet.getRange(1, 16).setValue('userEmail');
+  if (logSheet.getRange(1, 17).getValue() === '') logSheet.getRange(1, 17).setValue('unit');
+  logSheet.appendRow(logRow);
+
+  return { success: true, resolvedFull: becameFull, resolvedProcesses: resolvedProcesses };
 }
 
 function saveEquipment(eqObj) {
