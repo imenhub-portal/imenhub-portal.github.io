@@ -1534,6 +1534,55 @@ section('23. doPost — the entry point the whole frontend goes through');
 }
 
 
+section('24. The client payload carries no capability tokens and no dead columns');
+{
+  const S = fresh();
+  const proj = S._txn_(() => S.svcAddItem({
+    name: 'Projektor', location_id: 3, item_type: 'fixed_asset', date_acquired: '2026-01-10'
+  })).result.id;
+  S._txn_(() => S.svcCheckOut({
+    id: proj, recipient_name: 'Farah', recipient_email: 'farah@ukm.edu.my',
+    expected_return_date: iso(daysFromNow(3))
+  }));
+
+  // The loan is open, so this item genuinely has a return_token on the sheet.
+  const onSheet = S._readTable_('Items').filter((i) => Number(i.id) === Number(proj))[0];
+  ok('the token exists server-side', !!onSheet.return_token, 'no token was issued');
+
+  const payload = S.getInitialData('rahsia');
+  eq('the admin payload is returned', payload.is_admin, true);
+  const sent = payload.items.filter((i) => Number(i.id) === Number(proj))[0];
+  ok('and the item is in it', !!sent);
+
+  // The token is what lets a borrower upload proof without logging in. It
+  // has no use on the page, so it must not be handed out with the payload.
+  eq('return_token never reaches the client', sent.return_token, undefined);
+  ok('no item in the payload carries one',
+    payload.items.every((i) => i.return_token === undefined));
+
+  // Retired financial columns and bookkeeping the UI never reads.
+  ['unit_cost', 'salvage_value', 'useful_life_years', 'date_warranty_expiry',
+   'updated_at', 'deleted_at'].forEach(function (f) {
+    eq('dropped from the wire: ' + f, sent[f], undefined);
+  });
+
+  // Everything the UI does read must survive the trim.
+  ['id', 'asset_tag', 'name', 'item_type', 'status', 'location_id',
+   'quantity_available', 'min_stock_alert', 'date_acquired', 'open_loan'].forEach(function (f) {
+    ok('kept for the UI: ' + f, f in sent, f + ' was stripped by mistake');
+  });
+
+  // Stripping is for the wire only — the sheet still holds the token, or
+  // the borrower's upload link would stop working.
+  ok('the sheet still has the token after building the payload',
+    !!S._readTable_('Items').filter((i) => Number(i.id) === Number(proj))[0].return_token);
+
+  // And the token still resolves, which is the behaviour that matters.
+  const ctx = S.getReturnContext(onSheet.return_token);
+  ok('the borrower link still works', !!ctx && !!ctx.name, JSON.stringify(ctx));
+}
+
+
 if (failures.length) {
   console.log(passed + ' passed, ' + failures.length + ' FAILED\n');
   failures.forEach((f) => console.log('  FAIL  ' + f));

@@ -568,7 +568,7 @@ function _buildPayload_() {
   });
 
   return {
-    items:        items,
+    items:        items.map(_itemForClient_),
     categories:   cats,
     locations:    locs,
     custodians:   custs,
@@ -598,6 +598,36 @@ function _buildPayload_() {
       removal_reasons: REMOVAL_REASONS
     }
   };
+}
+
+// Strips fields the client never reads before they go over the wire.
+//
+// Two reasons, and the second is the important one:
+//
+//   * Size. The Items rows carry columns from the retired financial model
+//     (unit_cost, salvage_value, useful_life_years, date_warranty_expiry)
+//     plus bookkeeping the UI never touches. On a real inventory that was
+//     roughly a fifth of the whole payload, sent on every single load.
+//
+//   * `return_token` is a CAPABILITY. It is what lets a borrower upload
+//     return proof without logging in, and it was being handed to every
+//     client that asked for the payload even though nothing on the page
+//     uses it. A token that never leaves the server cannot leak from it.
+//
+// Deliberately a denylist, not an allowlist: a column added to the sheet
+// should reach the client by default, because the alternative is a new
+// field silently missing from the UI with nothing to explain why.
+const CLIENT_HIDDEN_ITEM_FIELDS = [
+  'unit_cost', 'salvage_value', 'useful_life_years', 'date_warranty_expiry',
+  'updated_at', 'deleted_at', 'return_token'
+];
+
+function _itemForClient_(it) {
+  const out = {};
+  Object.keys(it).forEach(function (k) {
+    if (CLIENT_HIDDEN_ITEM_FIELDS.indexOf(k) === -1) out[k] = it[k];
+  });
+  return out;
 }
 
 function _alertRef_(i) {

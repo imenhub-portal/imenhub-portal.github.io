@@ -1112,13 +1112,26 @@ function api(action, payload, onOk, onErr) {
 // Reload the payload from the server and re-render the current view.
 // `silent` suppresses the failure toast — used by the background refresh
 // on boot, where a warm cache means a network blip is not worth a banner.
+// Set once per boot, so an empty answer is retried exactly once and never
+// turns into a loop.
+var EMPTY_RETRIED = false;
+
 function refresh(cb) {
   var silent = (cb === true);
   var done = (typeof cb === 'function') ? cb : null;
   google.script.run
     .withSuccessHandler(function (d) {
-      if (d) { D = d; saveCache(d); clearSyncErr(); }
-      else showSyncErr('Pelayan menjawab tanpa data.');
+      if (d) { D = d; saveCache(d); clearSyncErr(); render(); if (done) done(); return; }
+      // The call succeeded but carried nothing back. That is not the same as
+      // a failure and is worth one more attempt: the first request can land
+      // while the transport is still settling, particularly when the page is
+      // framed. Once only — a second empty answer is a real answer.
+      if (!EMPTY_RETRIED) {
+        EMPTY_RETRIED = true;
+        setTimeout(function () { refresh(done || undefined); }, 900);
+        return;
+      }
+      showSyncErr('Pelayan menjawab tanpa data.');
       render();
       if (done) done();
     })
@@ -1362,7 +1375,22 @@ function setTheme(t) {
 }
 
 function render() {
-  if (!D) return;
+  // Without data there is nothing to draw — but returning silently left the
+  // boot placeholder ("Memuatkan data inventori…") on screen for ever, so a
+  // payload that never arrived was indistinguishable from one still on its
+  // way. Say which it is.
+  if (!D) {
+    var host = $('content');
+    if (host) {
+      host.innerHTML = '<div class="empty">' + icon('i-warn', 30) +
+        '<p>Data tidak diterima daripada pelayan.</p>' +
+        '<p style="font-size:12.5px;color:var(--muted)">Cuba muat semula. Jika berulang, ' +
+        'pelayan menerima permintaan tetapi memulangkan jawapan kosong.</p>' +
+        '<button class="btn btn-primary" style="margin-top:12px" onclick="refresh()">Cuba lagi</button>' +
+        '</div>';
+    }
+    return;
+  }
   renderBadges();
   var el = $('content');
   if (VIEW === 'dashboard')      el.innerHTML = viewDashboard();

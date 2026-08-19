@@ -328,6 +328,25 @@ Each of these looks like an oversight and is not.
   `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
   script fails at the user's double-click, where there is nobody to debug it.
 
+- **`return_token` never leaves the server, and dead columns never reach the wire.**
+  `_itemForClient_()` strips seven fields from every item in the payload. Six are dead
+  weight — retired financial columns (`unit_cost`, `salvage_value`, `useful_life_years`,
+  `date_warranty_expiry`) plus `updated_at`/`deleted_at` — about a fifth of the payload on
+  a real inventory, sent on every load. The seventh matters more: `return_token` is the
+  capability that lets a borrower upload return proof **without logging in**, and it was
+  being handed to every client that requested the payload despite nothing on the page
+  reading it. It stays on the sheet, so borrower links keep working; it just never goes
+  out. Deliberately a denylist — a new sheet column should reach the client by default,
+  because the alternative is a field silently missing from the UI with nothing to explain
+  why.
+
+- **An empty response is retried once.** `getInitialData` returning nothing is not the same
+  as failing, and the first request can land while the transport is still settling —
+  especially when the page is framed. `refresh()` retries once, then reports. `render()`
+  also no longer returns silently when `D` is null: it used to leave the boot placeholder
+  ("Memuatkan data inventori…") on screen for ever, so a payload that never arrived looked
+  identical to one still in flight.
+
 - **A failed `<head>` prefetch retries; it is not a dead end.** `boot()` used to call
   `accept(null)` when the prefetch came back empty and stop there — no retry, no real error,
   just "Tidak dapat memuatkan data". But that prefetch fires from `<head>`, before the body
