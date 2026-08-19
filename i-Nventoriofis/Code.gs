@@ -569,11 +569,18 @@ function _buildPayload_() {
 
   return {
     items:        items.map(_itemForClient_),
-    categories:   cats,
-    locations:    locs,
-    custodians:   custs,
-    transactions: txns,
-    requests: reqs.slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); }),
+    categories:   _stripRows_(cats),
+    locations:    _stripRows_(locs),
+    custodians:   _stripRows_(custs),
+    // The ledger is deliberately NOT here. On a real inventory it was a
+    // third of a 141KB payload that took nine seconds and then failed to
+    // come back at all, while a 24KB call over the same channel succeeded.
+    // Two moderate responses beat one large one, and the app is usable the
+    // moment the items land — the ledger only feeds Laporan, the Log tab and
+    // a few counts, none of which are on screen at boot. getLedger() serves
+    // it, and the client merges it in a moment later.
+    tx_total:     txns.length,
+    requests: _stripRows_(reqs.slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); })),
     config: _config_(),
     alerts: {
       inspection: items.filter(function (i) { return SCOPES.inspectionDue(i, today); }).map(_alertRef_),
@@ -622,9 +629,28 @@ const CLIENT_HIDDEN_ITEM_FIELDS = [
   'updated_at', 'deleted_at', 'return_token'
 ];
 
+// Sheet row numbers are a server-side addressing detail — _update_ needs
+// them, the client never has. Sending them leaked the sheet's physical
+// layout and cost bytes on every row of every table.
+function _stripRows_(rows) {
+  return rows.map(function (r) {
+    const o = {};
+    Object.keys(r).forEach(function (k) { if (k !== '_row') o[k] = r[k]; });
+    return o;
+  });
+}
+
+// Returns the full ledger on its own, so the initial payload stays small.
+// Admin-gated: the ledger names who took what.
+function getLedger(adminPass) {
+  if (!_isAdmin_(adminPass)) return { ok: false, error: 'Akses ditolak.' };
+  return { ok: true, transactions: _stripRows_(_readTable_('Transactions')) };
+}
+
 function _itemForClient_(it) {
   const out = {};
   Object.keys(it).forEach(function (k) {
+    if (k === '_row') return;
     if (CLIENT_HIDDEN_ITEM_FIELDS.indexOf(k) === -1) out[k] = it[k];
   });
   return out;
@@ -2163,6 +2189,7 @@ function doPost(e) {
       case 'handleAction':         result = handleAction(args[0], args[1]); break;
       case 'adminLogin':           result = adminLogin(args[0]); break;
       case 'getItemHistory':       result = getItemHistory(args[0], args[1]); break;
+      case 'getLedger':            result = getLedger(args[0]); break;
       case 'startResumableUpload': result = startResumableUpload(args[0], args[1], args[2], args[3]); break;
       default: throw new Error('Unknown API function: ' + req.fn);
     }

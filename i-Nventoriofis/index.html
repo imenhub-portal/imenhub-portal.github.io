@@ -63,7 +63,8 @@ if (window.__EMBED) {
   if (window.google && window.google.script && window.google.script.run) return;
   var API_URL = 'https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec';
   var API_FNS = ['getInitialData', 'getPublicCatalog', 'getReturnContext', 'startReturnUpload',
-                 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload'];
+                 'handleAction', 'adminLogin', 'getItemHistory', 'startResumableUpload',
+                 'getLedger'];
   function makeRunner() {
     var onOk = function () {};
     var onErr = function (e) { console.error('[API]', e); };
@@ -1129,7 +1130,12 @@ function refresh(cb) {
   var done = (typeof cb === 'function') ? cb : null;
   google.script.run
     .withSuccessHandler(function (d) {
-      if (d) { D = d; saveCache(d); clearSyncErr(); render(); if (done) done(); return; }
+      if (d) {
+        D = d; saveCache(d); clearSyncErr(); render();
+        fetchLedger();                      // the rest arrives shortly after
+        if (done) done();
+        return;
+      }
       // The call succeeded but carried nothing back. That is not the same as
       // a failure and is worth one more attempt: the first request can land
       // while the transport is still settling, particularly when the page is
@@ -1221,6 +1227,32 @@ function runDiag(btn) {
       i++; next();
     });
   })();
+}
+
+// The ledger is fetched separately from the rest of the payload, and merged
+// in when it lands. Splitting them was not an optimisation for its own sake:
+// as one response the payload reached 141KB, took nine seconds and came back
+// null, while a 24KB call over the same channel succeeded seconds earlier.
+//
+// Nothing else needed changing, because every consumer already reads
+// `(D.transactions || [])` — before this lands they see an empty ledger,
+// which is the same thing they saw during the original load anyway. The
+// screens that actually need it (Laporan, Log, the duplicate finder) are
+// never the first thing on screen.
+function fetchLedger() {
+  if (!PASS || !D) return;
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || !r.ok || !r.transactions) return;   // leave the empty array in place
+      D.transactions = r.transactions;
+      saveCache(D);
+      render();
+    })
+    .withFailureHandler(function (e) {
+      // Not fatal: the inventory is already usable without it.
+      console.warn('[ledger]', e);
+    })
+    .getLedger(PASS);
 }
 
 // ── Stale-while-revalidate cache ──────────────────────────────────────
@@ -1316,8 +1348,12 @@ function boot() {
   function accept(d) {
     if (d && d.is_admin) {
       var changed = !painted || JSON.stringify(d) !== JSON.stringify(cached);
+      // A cached ledger stays usable until the fresh one lands, so the
+      // Laporan charts do not blank out on every boot.
+      if (!d.transactions && cached && cached.transactions) d.transactions = cached.transactions;
       D = d;
       saveCache(d);
+      fetchLedger();
       // Skip the repaint entirely when nothing moved, so a background
       // refresh can never flicker the view the user is reading.
       if (changed) render();
@@ -2487,7 +2523,10 @@ function viewSettings() {
     '<div class="t-sub">Trigger Apps Script 07:00 — waranti, pinjaman lewat, pemeriksaan, audit, stok rendah.</div></div>' +
     '<div class="spacer"></div><button class="btn btn-sm" onclick="runDateCheck(this)">Jalankan Sekarang</button></div>' +
     '<div class="alert-row"><div><div class="t-name" style="font-size:13px">Lejar tidak boleh diubah</div>' +
-    '<div class="t-sub">' + (D.transactions || []).length + ' transaksi. Tiada laluan kod menyunting atau memadam rekod lejar.</div></div>' +
+    // tx_total comes with the initial payload, so this reads correctly even
+    // in the moment before the ledger itself arrives.
+    '<div class="t-sub">' + (D.tx_total != null ? D.tx_total : (D.transactions || []).length) +
+      ' transaksi. Tiada laluan kod menyunting atau memadam rekod lejar.</div></div>' +
     '<div class="spacer"></div><button class="btn btn-sm" onclick="goSub(\'aset\',\'log\',\'all\')">Lihat Log</button></div>' +
     '</div></div>';
   return h;

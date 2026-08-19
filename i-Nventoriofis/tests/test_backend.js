@@ -1583,6 +1583,56 @@ section('24. The client payload carries no capability tokens and no dead columns
 }
 
 
+section('25. The ledger travels separately from the initial payload');
+{
+  const S = fresh();
+  const pen = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', location_id: 2, item_type: 'consumable',
+    quantity_total: 10, min_stock_alert: 2, date_acquired: '2026-01-10'
+  })).result.id;
+  S._txn_(() => S.svcStockChange(
+    { id: pen, quantity: 3, custodian_id: 1, reason_notes: 'Bekalan' }, 'stock_remove'));
+
+  const payload = S.getInitialData('rahsia');
+  eq('the admin payload still comes back', payload.is_admin, true);
+  ok('with the items in it', payload.items.length > 0);
+
+  // The whole point: one large response became two moderate ones.
+  eq('the ledger is not in the initial payload', payload.transactions, undefined);
+  eq('but its size is reported', payload.tx_total, S._readTable_('Transactions').length);
+
+  // Sheet row numbers are a server-side addressing detail.
+  ok('no item carries _row', payload.items.every((i) => i._row === undefined));
+  ok('no location carries _row', payload.locations.every((l) => l._row === undefined));
+  ok('no custodian carries _row', payload.custodians.every((c) => c._row === undefined));
+
+  // The ledger, on its own, gated.
+  const denied = S.getLedger('salah');
+  eq('the ledger refuses a wrong password', denied.ok, false);
+  ok('nothing leaks with the refusal', denied.transactions === undefined);
+
+  const led = S.getLedger('rahsia');
+  eq('an admin gets it', led.ok, true);
+  eq('and it is complete', led.transactions.length, S._readTable_('Transactions').length);
+  ok('with the fields the UI reads',
+    led.transactions.every((t) => 'item_id' in t && 'action_type' in t && 'quantity' in t));
+  ok('and no _row', led.transactions.every((t) => t._row === undefined));
+
+  // Both halves together must still describe the same history.
+  const removals = led.transactions.filter((t) => t.action_type === 'stock_remove');
+  eq('the issue is in the ledger', removals.length, 1);
+  eq('with the right quantity', Number(removals[0].quantity), -3);
+
+  // And it is reachable through the API the page actually calls.
+  const viaApi = S.doPost({ postData: { contents: JSON.stringify(
+    { fn: 'getLedger', args: ['rahsia'] }) } });
+  const parsed = JSON.parse(viaApi.getContent());
+  eq('getLedger is routed in doPost', parsed.ok, true);
+  eq('and returns the ledger', parsed.result.transactions.length,
+     S._readTable_('Transactions').length);
+}
+
+
 if (failures.length) {
   console.log(passed + ' passed, ' + failures.length + ' FAILED\n');
   failures.forEach((f) => console.log('  FAIL  ' + f));

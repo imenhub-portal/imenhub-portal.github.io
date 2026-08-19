@@ -328,6 +328,22 @@ Each of these looks like an oversight and is not.
   `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
   script fails at the user's double-click, where there is nobody to debug it.
 
+- **The ledger is fetched separately from the initial payload.** As one response the admin
+  payload reached 141KB against a real inventory, took nine seconds, and came back `null` —
+  while `getPublicCatalog` (24KB) succeeded over the same channel seconds earlier and
+  `adminLogin` (11 bytes) was instant. Small responses arrived, the large one did not.
+  `getInitialData` now omits `transactions` and reports `tx_total` instead; `getLedger()`
+  serves the ledger on its own, admin-gated, and the client merges it in and re-renders a
+  moment later. That puts ~90KB on the critical path instead of 141KB, and the app is
+  usable as soon as the items land — the ledger only feeds Laporan, the Log tab and a few
+  counts, none of which are on screen at boot.
+
+  No consumer needed changing: they all already read `(D.transactions || [])`, so before
+  the merge they see an empty ledger, which is what they saw during loading anyway. The one
+  exception is the Tetapan transaction count, which reads `tx_total` so it is correct in
+  the gap. `_row` — a sheet coordinate the client never used — is now stripped from every
+  table on the way out.
+
 - **`return_token` never leaves the server, and dead columns never reach the wire.**
   `_itemForClient_()` strips seven fields from every item in the payload. Six are dead
   weight — retired financial columns (`unit_cost`, `salvage_value`, `useful_life_years`,
