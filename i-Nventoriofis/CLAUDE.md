@@ -360,8 +360,11 @@ Each of these looks like an oversight and is not.
   point of hosting it there. An iframe keeps the URL on `github.io` and bookmarks intact;
   `doGet` already sets `XFrameOptionsMode.ALLOWALL`, which is what permits the framing.
   `allow="camera"` is passed through so the return-proof capture still works inside the
-  frame. The document is replaced via `document.open()`/`write()`/`close()` so the shim and
-  the head prefetch never run against an endpoint that cannot answer.
+  frame. It sets `window.__EMBED` and swaps the body for the iframe at
+  `DOMContentLoaded`; the head prefetch and `boot()` both check that flag and stand
+  down, so nothing runs against an endpoint that cannot answer. An earlier version used
+  `document.open()`/`write()`/`close()` and left the original head in place — mid-parse
+  document replacement was not reliable, a flag is.
 
   Guarded on `location.hostname` containing `github.io`, not feature detection, so it
   cannot fire inside Apps Script (served from `googleusercontent.com`) and cannot nest.

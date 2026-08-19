@@ -18,42 +18,39 @@
 
 <script>
 // ── PAGES → APPS SCRIPT EMBED (interim) ───────────────────────────────
-// The Pages build reaches the backend only over doPost, and this
-// deployment rejects every ContentService response — POST and
-// doGet?format=json alike, at any content type — while serving the
-// HtmlService page fine. So the API is unreachable from here.
+// The Pages build reaches the backend only over doPost, and this deployment
+// rejects every ContentService response — POST and doGet?format=json alike,
+// at any content type — while serving the HtmlService page fine. So the API
+// is unreachable from here.
 //
-// Served from /exec the same file works, because Apps Script provides
-// google.script.run natively and that RPC channel never touches doPost.
-// This embeds that page instead of redirecting to it, so the address bar
-// stays on github.io and bookmarks keep working. doGet already sets
-// XFrameOptionsMode.ALLOWALL, which is what makes framing permitted.
+// Served from /exec the same file works: Apps Script provides
+// google.script.run natively and that RPC channel never touches doPost. So
+// the page embeds /exec rather than redirecting to it, which keeps the
+// address bar on github.io and bookmarks intact. doGet already sets
+// XFrameOptionsMode.ALLOWALL, which is what permits the framing.
+//
+// A flag rather than document.write: document.open() mid-parse left the
+// original head in place and the outcome varied. Setting a flag here and
+// acting on it at DOMContentLoaded is deterministic, and the two consumers
+// below (the head prefetch, and boot) check it and stand down.
 //
 // Guarded on hostname, not feature detection: inside Apps Script this file
-// is served from googleusercontent.com, so the condition is false there and
-// cannot nest. The document is replaced outright so the shim and the head
-// prefetch below never run against an endpoint that cannot answer.
-//
-// REMOVE this block once POST works again — it costs the instant-load
-// behaviour Pages hosting exists for.
-(function () {
-  if (location.hostname.indexOf('github.io') === -1) return;
-  var src = 'https://script.google.com/macros/s/'
-    + 'AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec'
-    + location.search + location.hash;
-  document.open();
-  document.write(
-    '<!doctype html><html lang="ms"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>i-Nventori Ofis — Inventori & Aset IMEN</title>' +
-    '<style>html,body{margin:0;padding:0;height:100%;background:#f1f2f4}' +
-    'iframe{border:0;width:100%;height:100%;display:block}</style></head>' +
-    '<body><iframe src="' + src + '" ' +
-    'allow="camera;clipboard-write" ' +
-    'referrerpolicy="no-referrer-when-downgrade"></iframe></body></html>'
-  );
-  document.close();
-})();
+// is served from googleusercontent.com, so it is false there and cannot
+// nest. REMOVE once POST works again — it costs the instant load that Pages
+// hosting exists for.
+window.__EMBED = (location.hostname.indexOf('github.io') !== -1);
+if (window.__EMBED) {
+  document.addEventListener('DOMContentLoaded', function () {
+    var src = 'https://script.google.com/macros/s/'
+      + 'AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec'
+      + location.search + location.hash;
+    document.documentElement.style.height = '100%';
+    document.body.style.cssText = 'margin:0;padding:0;height:100vh;overflow:hidden;background:#f1f2f4';
+    document.body.innerHTML =
+      '<iframe src="' + src + '" allow="camera;clipboard-write" ' +
+      'style="border:0;display:block;width:100%;height:100vh"></iframe>';
+  });
+}
 </script>
 
 <script>
@@ -139,6 +136,7 @@ window.__earlyPending = false;
 window.__earlyErr = null;
 (function () {
   try {
+    if (window.__EMBED) return;   // the iframe does its own loading
     var pass = localStorage.getItem('inv_pass') || '';
     window.__earlyPass = pass;
     // Without a stored password this visitor is a requester, not an admin,
@@ -1293,6 +1291,7 @@ function boot() {
 }
 
 window.addEventListener('DOMContentLoaded', function () {
+  if (window.__EMBED) return;   // this document is only a frame host
   var saved = '';
   try { saved = localStorage.getItem('inv_pass') || ''; } catch (e) {}
   if (saved) {
