@@ -119,6 +119,9 @@ window.__earlyPass = null;
 // prefetch that never got issued (the catch below) would leave boot()
 // waiting forever for a result that is never coming.
 window.__earlyPending = false;
+// Why the prefetch failed, if it did. Surfaced in the UI rather than left
+// in the console, so a failure is diagnosable without opening devtools.
+window.__earlyErr = null;
 (function () {
   try {
     var pass = localStorage.getItem('inv_pass') || '';
@@ -134,6 +137,7 @@ window.__earlyPending = false;
       })
       .withFailureHandler(function (e) {
         console.warn('[early]', e); window.__earlyPending = false;
+        window.__earlyErr = (e && e.message) || String(e);
         if (window.__earlyDone) window.__earlyDone(null);
       })
       .getInitialData(pass);
@@ -1221,6 +1225,7 @@ function doLogout() {
 function boot() {
   var cached = loadCache();
   var painted = false;
+  var retried = false;
   if (cached) {
     D = cached;
     render();          // straight to the real UI — nothing to wait for
@@ -1240,13 +1245,24 @@ function boot() {
       // (someone changed ADMIN_PASSWORD server-side). Guarded on PASS being
       // non-empty so an anonymous payload can never trigger a logout.
       doLogout();
-    } else if (!painted) {
-      $('content').innerHTML = '<div class="empty">' + icon('i-warn', 30) +
-        '<p>Tidak dapat memuatkan data. Semak sambungan dan muat semula.</p></div>';
+    } else {
+      // The prefetch came back with nothing. It fires from <head>, before
+      // the body parses and before the transport is necessarily ready, so
+      // its failure says nothing about whether a normal fetch will work —
+      // and the public catalog, which fetches after DOMContentLoaded, was
+      // loading fine while this left the admin on a dead screen. Retry
+      // properly once before giving up.
+      if (!retried) {
+        retried = true;
+        refresh(true);
+        return;
+      }
+      if (!painted) {
+        $('content').innerHTML = '<div class="empty">' + icon('i-warn', 30) +
+          '<p>Tidak dapat memuatkan data. Semak sambungan dan muat semula.</p></div>';
+      }
+      showSyncErr(window.__earlyErr || 'Tiada jawapan daripada pelayan.');
     }
-    // A failed refresh with a warm cache no longer passes unnoticed: the
-    // user keeps the cached view, but is told it could not be refreshed.
-    if (!d) showSyncErr('Tiada jawapan daripada pelayan.');
   }
 
   // Only reuse the <head> prefetch when it was made with the SAME password

@@ -328,6 +328,17 @@ Each of these looks like an oversight and is not.
   `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
   script fails at the user's double-click, where there is nobody to debug it.
 
+- **A failed `<head>` prefetch retries; it is not a dead end.** `boot()` used to call
+  `accept(null)` when the prefetch came back empty and stop there — no retry, no real error,
+  just "Tidak dapat memuatkan data". But that prefetch fires from `<head>`, before the body
+  parses and before the transport is necessarily ready, so its failure says nothing about
+  whether a normal fetch would work. That is precisely why the public catalog (fetched
+  after `DOMContentLoaded`) loaded fine while the admin view sat empty on the same
+  deployment. It now retries once via `refresh(true)` before giving up, and the banner
+  reports `window.__earlyErr` — the actual server message — rather than a generic
+  "no answer". Verified both ways: prefetch-fails-then-succeeds recovers silently, and
+  both-fail stops after exactly one retry with the real error named.
+
 - **A failed refresh is never silent.** `refresh(true)` used to swallow its failure
   whenever the localStorage cache had already painted something, on the reasoning that the
   user still had usable data. In practice that turned every backend outage into "the
