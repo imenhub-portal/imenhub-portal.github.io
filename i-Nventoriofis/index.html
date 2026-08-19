@@ -17,27 +17,42 @@
 <title>i-Nventori Ofis — Inventori & Aset IMEN</title>
 
 <script>
-// ── PAGES → APPS SCRIPT REDIRECT (interim) ────────────────────────────
-// The Pages build talks to the backend over doPost. That deployment is
-// currently answering every ContentService response with Google's "Page
-// not found" page — POST and doGet?format=json both, while the HtmlService
-// page itself serves fine — so the API is unreachable from here and the app
-// loads to an empty shell with a 404 in the gate.
+// ── PAGES → APPS SCRIPT EMBED (interim) ───────────────────────────────
+// The Pages build reaches the backend only over doPost, and this
+// deployment rejects every ContentService response — POST and
+// doGet?format=json alike, at any content type — while serving the
+// HtmlService page fine. So the API is unreachable from here.
 //
 // Served from /exec the same file works, because Apps Script provides
-// google.script.run natively and that RPC channel does not go through
-// doPost at all. So until the deployment is fixed, send Pages visitors
-// there rather than to a page that cannot talk to anything.
+// google.script.run natively and that RPC channel never touches doPost.
+// This embeds that page instead of redirecting to it, so the address bar
+// stays on github.io and bookmarks keep working. doGet already sets
+// XFrameOptionsMode.ALLOWALL, which is what makes framing permitted.
 //
-// Guarded on hostname, not on feature detection: inside Apps Script this
-// file is served from googleusercontent.com, so the condition is false
-// there and cannot loop. REMOVE this block once POST works again — it
-// costs the instant-load behaviour Pages hosting exists for.
+// Guarded on hostname, not feature detection: inside Apps Script this file
+// is served from googleusercontent.com, so the condition is false there and
+// cannot nest. The document is replaced outright so the shim and the head
+// prefetch below never run against an endpoint that cannot answer.
+//
+// REMOVE this block once POST works again — it costs the instant-load
+// behaviour Pages hosting exists for.
 (function () {
   if (location.hostname.indexOf('github.io') === -1) return;
-  location.replace('https://script.google.com/macros/s/'
+  var src = 'https://script.google.com/macros/s/'
     + 'AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec'
-    + location.search + location.hash);
+    + location.search + location.hash;
+  document.open();
+  document.write(
+    '<!doctype html><html lang="ms"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<title>i-Nventori Ofis — Inventori & Aset IMEN</title>' +
+    '<style>html,body{margin:0;padding:0;height:100%;background:#f1f2f4}' +
+    'iframe{border:0;width:100%;height:100%;display:block}</style></head>' +
+    '<body><iframe src="' + src + '" ' +
+    'allow="camera;clipboard-write" ' +
+    'referrerpolicy="no-referrer-when-downgrade"></iframe></body></html>'
+  );
+  document.close();
 })();
 </script>
 
