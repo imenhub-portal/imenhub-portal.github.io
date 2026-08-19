@@ -43,7 +43,27 @@
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ fn: name, args: args })
         })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (r) {
+          // A 404 here is not a network fault and not a bug in this page.
+          // Apps Script answers a POST with "Page not found" in two cases,
+          // and they are told apart by whether the page itself loaded from
+          // the /exec URL:
+          //   * doPost is missing from the deployed script — a GET still
+          //     works, so the app loads and only its API calls fail;
+          //   * the /exec URL no longer resolves at all, which happens when a
+          //     NEW deployment is created instead of a new version of the
+          //     existing one, because that mints a fresh URL.
+          if (r.status === 404) {
+            throw new Error('404 — pelayan menolak permintaan API. ' +
+              'Dua sebab lazim: (1) fungsi doPost tiada dalam skrip yang di-deploy ' +
+              '— pastikan SELURUH Code.gs dipaste, baris terakhirnya ialah fungsi setup(); ' +
+              'atau (2) URL /exec sudah tidak sah kerana deployment BAHARU dicipta ' +
+              '(gunakan Manage deployments → Edit → New version untuk mengekalkan URL). ' +
+              'Selepas membetulkannya, deploy semula sebagai versi baharu.');
+          }
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
         .then(function (d) {
           if (d && d.ok) onOk(d.result);
           else onErr(new Error((d && d.error) || 'Ralat API tidak diketahui'));

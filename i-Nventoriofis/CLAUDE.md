@@ -293,6 +293,17 @@ Each of these looks like an oversight and is not.
 - **`photo_borrower` and `photo_admin` are separate columns**, not one shared photo field,
   so whose evidence a `check_in` row holds is never ambiguous.
 
+- **A 404 from the API means the deployed script has no `doPost`, or the /exec URL is
+  stale.** Apps Script answers a POST it cannot route with an HTML "Page not found" page,
+  not a JSON error. Tell the two apart by whether a plain GET of the /exec URL still
+  returns the app: if it does, the deployment is alive and `doPost` is what is missing —
+  usually because only part of `Code.gs` was pasted. `doPost` sits near the very end of the
+  file (the last function is `setup()`), so a truncated paste takes it out while leaving
+  `doGet` intact, which is exactly the shape of that symptom. If the GET also fails, the
+  URL itself is retired: **Deploy → New deployment mints a brand-new /exec URL**, so always
+  use **Manage deployments → Edit → Version: New version** to keep the published URL
+  working.
+
 - **Every notification is sent under `MAIL_SENDER` = "i-Nventori Pejabat IMEN", and
   `_sendMail_()` is the only place that touches `MailApp`.** MailApp defaults the sender's
   display name to the owning account's own name, so recipients were seeing the raw Gmail
