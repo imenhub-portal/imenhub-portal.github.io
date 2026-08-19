@@ -319,6 +319,15 @@ Each of these looks like an oversight and is not.
   `.clasp.json`. clasp's OAuth tokens live in `.clasprc.json`, which is gitignored — the
   repo is public.
 
+  Both are driven by double-clickable `.cmd` wrappers (`tools/1-SETUP-clasp.cmd`,
+  `tools/2-DEPLOY.cmd`) because `CurrentUser` execution policy is `RemoteSigned`, which
+  blocks right-click-run on an unsigned `.ps1`; the wrapper passes `-ExecutionPolicy
+  Bypass` and pauses so the output stays readable. The `.ps1` files are written CRLF
+  with a BOM and avoid backtick line-continuation and `\"` sequences — both parsed
+  wrong when the files were first generated. Parse them with
+  `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
+  script fails at the user's double-click, where there is nobody to debug it.
+
 - **A 404 from the API means the deployed script has no `doPost`, or the /exec URL is
   stale.** Apps Script answers a POST it cannot route with an HTML "Page not found" page,
   not a JSON error. Tell the two apart by whether a plain GET of the /exec URL still
