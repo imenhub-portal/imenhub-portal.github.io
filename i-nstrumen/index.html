@@ -2757,6 +2757,41 @@
         // Build the incident model: every Report/Flagged/Resolved log per equipment,
         // each incident paired with its resolution (next Resolved log after it that
         // isn't consumed by an earlier open incident of the same equipment).
+        //
+        // ── READ-ONLY smart matching (never writes anything) ──────────────────
+        // Logs store the equipment name AS IT WAS at incident time. When a name in
+        // the Equipment sheet changes later (e.g. "AFM" → "Atomic Force Microscope
+        // (IMN-AFM)"), old logs no longer match by exact name and the panel showed
+        // "?" placeholders. _matchEquipment() bridges that, strictly read-only:
+        //   L1  exact name match                — accepted only if exactly 1 candidate
+        //   L2  core-name match (both sides stripped of ALL "(...)" groups, case-
+        //       insensitive)                    — accepted only if exactly 1 candidate
+        //   L2b core-name within the log's own lab (tiebreak) — only if exactly 1
+        //   fail → null (stays "?")             — NEVER guesses on ambiguity; a wrong
+        //                                           match is worse than no match.
+        function _coreEqName(n) {
+            return String(n || '').toLowerCase()
+                .replace(/\([^)]*\)/g, ' ')
+                .replace(/\s+/g, ' ').trim();
+        }
+
+        function _matchEquipment(logName, logLab) {
+            if (!logName) return null;
+            let m = state.equipment.filter(e => e.name === logName);
+            if (m.length === 1) return m[0];
+            if (m.length === 0) {
+                const core = _coreEqName(logName);
+                if (!core) return null;
+                m = state.equipment.filter(e => _coreEqName(e.name) === core);
+                if (m.length === 1) return m[0];
+                if (m.length > 1 && logLab) {
+                    const byLab = m.filter(e => e.lab === logLab);
+                    if (byLab.length === 1) return byLab[0];
+                }
+            }
+            return null;   // ambiguous or no match — fail safe
+        }
+
         function _buildMaintenanceModel(labFilter) {
             const rel = state.logs.filter(l =>
                 (l.action === 'Report' || l.action === 'Flagged' || l.action === 'Resolved') &&
@@ -2772,7 +2807,7 @@
             const eqMap = {};   // equipmentName -> { eq, incidents, resolvedCount, openCount, lastIncidentTs, downtimes[] }
             Object.keys(byEq).forEach(name => {
                 const logs = byEq[name].slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                const eq = state.equipment.find(e => e.name === name && (!labFilter || labFilter === 'All' || e.lab === labFilter));
+                const eq = _matchEquipment(name, logs.length ? logs[0].lab : null);
                 const incidents = [];
                 let openPtr = 0;   // pointer to earliest still-open incident index
 
@@ -2921,7 +2956,7 @@
                     }).join('');
 
                     const needsResolve = e.eq && (e.eq.status === 'Maintenance' || e.eq.status === 'Attention');
-                    const nameKey = e.eq ? e.eq.name : (e.lab + '|' + e.incidents[0].details).replace(/'/g, "\\'");
+                    const nameKey = String(e.eq ? e.eq.name : (e.lab + '|' + e.incidents[0].details)).replace(/'/g, "\\'");
 
                     return `
                     <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
