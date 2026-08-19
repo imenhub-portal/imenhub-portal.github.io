@@ -700,6 +700,17 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 .reqmeta{font-size:12px; color:var(--muted); margin-bottom:12px}
 
+/* Sync failure banner. Lives outside #content so render() cannot wipe it. */
+.sync-err{
+  display:flex; align-items:flex-start; gap:10px;
+  margin:0 0 14px; padding:12px 14px; border-radius:12px;
+  border:1px solid var(--err-bd); background:var(--err-bg); color:var(--err);
+  font-size:12.5px; line-height:1.55;
+}
+.sync-err b{display:block; margin-bottom:2px}
+.sync-err .spacer{flex:1}
+.sync-err button{flex:0 0 auto}
+
 /* Acknowledgement row on a destructive confirm */
 .ackrow{
   display:flex; align-items:flex-start; gap:10px; padding:12px 13px; margin-bottom:14px;
@@ -905,6 +916,7 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
       <button class="rail-btn" onclick="doLogout()" title="Log keluar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-logout"/></svg></button>
     </aside>
 
+    <div id="syncErr" class="sync-err hide"></div>
     <main id="content"><div id="loading">Memuatkan data inventori…</div></main>
   </div>
 
@@ -1088,15 +1100,42 @@ function refresh(cb) {
   var done = (typeof cb === 'function') ? cb : null;
   google.script.run
     .withSuccessHandler(function (d) {
-      if (d) { D = d; saveCache(d); }
+      if (d) { D = d; saveCache(d); clearSyncErr(); }
+      else showSyncErr('Pelayan menjawab tanpa data.');
       render();
       if (done) done();
     })
     .withFailureHandler(function (e) {
-      if (!silent) toast('Gagal menyegarkan: ' + ((e && e.message) || e), 'err');
+      // `silent` suppresses the toast, never the banner. A silent failure
+      // with a warm cache used to leave the admin looking at stale or empty
+      // data with no indication anything was wrong — which is exactly how a
+      // broken backend came to look like "the database did not load".
+      var msg = (e && e.message) || String(e);
+      if (!silent) toast('Gagal menyegarkan: ' + msg, 'err');
+      showSyncErr(msg);
       if (done) done();
     })
     .getInitialData(PASS);
+}
+
+// Names a failed sync instead of leaving the screen quietly wrong. The
+// counts come from whatever is actually in hand, so "0 item" on screen next
+// to "0 item dimuatkan" reads as a real empty inventory, while stale data
+// next to a failure reads as stale.
+function showSyncErr(msg) {
+  var el = $('syncErr');
+  if (!el) return;
+  var n = (D && D.items) ? D.items.length : 0;
+  el.innerHTML = icon('i-warn', 16) +
+    '<div><b>Data di skrin ini mungkin tidak terkini.</b>' +
+    esc(msg) + ' · ' + n + ' item dalam paparan semasa.</div>' +
+    '<div class="spacer"></div>' +
+    '<button class="btn btn-sm" onclick="refresh()">Cuba lagi</button>';
+  el.classList.remove('hide');
+}
+function clearSyncErr() {
+  var el = $('syncErr');
+  if (el) el.classList.add('hide');
 }
 
 // ── Stale-while-revalidate cache ──────────────────────────────────────
@@ -1205,8 +1244,9 @@ function boot() {
       $('content').innerHTML = '<div class="empty">' + icon('i-warn', 30) +
         '<p>Tidak dapat memuatkan data. Semak sambungan dan muat semula.</p></div>';
     }
-    // A failed refresh with a warm cache is deliberately silent: the user
-    // still has usable data, and writes would surface their own errors.
+    // A failed refresh with a warm cache no longer passes unnoticed: the
+    // user keeps the cached view, but is told it could not be refreshed.
+    if (!d) showSyncErr('Tiada jawapan daripada pelayan.');
   }
 
   // Only reuse the <head> prefetch when it was made with the SAME password

@@ -328,6 +328,15 @@ Each of these looks like an oversight and is not.
   `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
   script fails at the user's double-click, where there is nobody to debug it.
 
+- **A failed refresh is never silent.** `refresh(true)` used to swallow its failure
+  whenever the localStorage cache had already painted something, on the reasoning that the
+  user still had usable data. In practice that turned every backend outage into "the
+  database did not load": stale or empty data on screen, no error, nothing to report. The
+  `silent` flag now suppresses only the transient toast — a banner above the content names
+  the failure, says how many items are actually in the current view, and offers a retry. It
+  lives **outside** `#content` because `render()` rewrites that element wholesale, and it
+  clears on the next successful refresh.
+
 - **INTERIM: the Pages build redirects to /exec.** The live deployment answers every
   ContentService response with Google's "Page not found" — both `doPost` and
   `doGet?format=json`, at any content type — while the HtmlService page itself serves
