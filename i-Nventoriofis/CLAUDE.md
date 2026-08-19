@@ -11,6 +11,10 @@ the same commit — and when you retire a feature, **delete the paragraph descri
 rather than adding a newer one beside it. This document was once patched incrementally
 until it claimed both that `is_portable` had been added and that it had been removed.
 
+> **Start with [§4](#4-known-faults-on-the-live-deployment--read-this-before-debugging).**
+> One deployment-side fault is live, and two things in the code look like mistakes but are
+> workarounds for it. A full session was lost re-deriving that from scratch.
+
 ---
 
 ## 1. What this is
@@ -79,7 +83,7 @@ Already wired in — do not re-enter these:
 |---|---|---|
 | `SPREADSHEET_ID` | `1Xk1aKMmWR3AFTvWlMJDKUmv-5Ik_GSvyZeqXX30j_6E` | `Code.gs` |
 | `FOLDER_ID` | `1NQUV2EHXpQhlWzcCm2aaIEOUvZ4CGOE7` | `Code.gs` |
-| `ADMIN_EMAIL` | `imenmakmal@gmail.com` | `Code.gs` — **fallback only**, see §6 |
+| `ADMIN_EMAIL` | `imenmakmal@gmail.com` | `Code.gs` — **fallback only**, see §7 |
 | `API_URL` (`/exec`) | deployment `AKfycbyY2fSJbt6…` | `index.html`, in the shim |
 
 **Two different URLs, endlessly confused:**
@@ -106,7 +110,97 @@ Current value is `hazde`, set by the owner in **Project Settings → Script Prop
 
 ---
 
-## 4. <a name="sync-model"></a>Sync model — read before assuming a file is "in the repo"
+## 4. Known faults on the live deployment — read this before debugging
+
+**One deployment-side fault is live right now, and two workarounds in the code exist only
+because of it.** A whole session was lost re-deriving this. Do not repeat that: run the two
+commands below first, and believe the result over any theory.
+
+### The fault: this deployment answers no POST, and no ContentService response
+
+```bash
+EXEC='https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec'
+
+# Does POST work? Prints OK only when the reply is JSON, which is the
+# only thing that matters. A broken deployment returns Google's HTML shell.
+R=$(curl -s -L -m 60 -H 'Content-Type: text/plain;charset=utf-8'  -d '{"fn":"handleAction","args":["Ping",{}]}' "$EXEC")
+case "$R" in '{'*) echo "POST OK: $R";; *) echo 'POST BROKEN (HTML, not JSON)';; esac
+
+# Does the page itself still serve? Expect 200 and ~260KB.
+curl -s -o /dev/null -w 'GET %{http_code} %{size_download}\n' -L "$EXEC"
+```
+
+Today those print `POST BROKEN (HTML, not JSON)` and `GET 200 267006`. That is the whole
+shape of it:
+
+| Path | Response type | Result |
+|---|---|---|
+| `GET /exec` | HtmlService | ✅ serves the full app |
+| `GET /exec?format=json` | ContentService | ❌ Page not found |
+| `POST /exec` (any content type) | ContentService | ❌ Page not found |
+
+Both broken paths are ContentService; the working one is HtmlService, and all three live in
+the same deployed file. **The code is not at fault** — `doPost` is present, parses, and is
+covered by tests (§9), and the same `doPost` served live traffic earlier the same day. Do
+not go looking for a truncated paste or a missing function; that theory was chased and
+disproved.
+
+The fix is a **new deployment** (Deploy → New deployment → Web app → Execute as: *Me*,
+Who has access: *Anyone*), which mints a different `/exec` URL. When that happens:
+update `API_URL` in `index.html`, delete the embed block described below, and re-check
+with the same two commands.
+
+### Workaround 1 — the Pages build embeds `/exec` in a full-page iframe
+
+The Pages build reaches the backend only over `doPost`, so with POST dead it cannot load at
+all. Served from `/exec` the same file works, because Apps Script provides
+`google.script.run` natively and that RPC channel never touches `doPost`.
+
+So `index.html` sets `window.__EMBED` when `location.hostname` contains `github.io`, and at
+`DOMContentLoaded` swaps the body for a full-page iframe pointing at `/exec`. The head
+prefetch and `boot()` both check that flag and stand down, so nothing runs against an
+endpoint that cannot answer.
+
+- It embeds rather than **redirects** on purpose: a redirect worked, but moved the address
+  bar to `script.google.com`, so the Pages URL stopped being the app's address — which is
+  the point of hosting it there. `doGet` already sets `XFrameOptionsMode.ALLOWALL`, which
+  is what permits framing. `allow="camera"` is forwarded so return-proof capture still
+  works inside the frame.
+- Guarded on hostname, **not** feature detection: inside Apps Script the file is served
+  from `googleusercontent.com`, so the flag is false there and it cannot nest.
+- An earlier version used `document.open()`/`write()`/`close()`; mid-parse document
+  replacement left the original head in place. A flag is deterministic, that was not.
+- **Delete this block once POST works.** It costs the instant-load behaviour that Pages
+  hosting exists for — every open now goes through Apps Script.
+
+### Workaround 2 — none. The empty admin screen was a real bug, and is fixed
+
+Do not confuse the two. With the embed in place the app loaded but the admin view stayed
+empty, which looked like the same fault and was not. `getInitialData` was returning `null`.
+
+It was diagnosed with the **in-app diagnostic** — the "Jalankan diagnostik" button on the
+no-data screen, which calls three server functions in increasing payload size and prints
+what actually came back. It uses only functions the deployed script already has, so it runs
+without a redeploy. That is the tool to reach for when the backend cannot be called from a
+terminal:
+
+```
+1. adminLogin       (kecil)       -> object | 11 aksara    | 1006ms
+2. getPublicCatalog (sederhana)   -> object | 24587 aksara | 6892ms | items=121
+3. getInitialData   (besar)       -> NULL   | 4 aksara     | 8967ms
+```
+
+Same session, same channel, seconds apart: the small responses arrived, the large one did
+not. The call *succeeded* and took nine seconds — it neither failed nor timed out — but the
+value never came back. The payload was ~141KB for 121 items and 125 ledger rows.
+
+Fixed by splitting it (see §8): the ledger now travels in its own `getLedger()` call, which
+puts ~90KB on the critical path instead of 141KB. **If a payload ever silently returns
+`null` again, suspect its size first.**
+
+---
+
+## 5. <a name="sync-model"></a>Sync model — read before assuming a file is "in the repo"
 
 Run `git ls-files i-Nventoriofis/` to see exactly what syncs. As of this writing:
 
@@ -146,28 +240,54 @@ file contains no literal secrets.
 
 ---
 
-## 5. Deploying a change
+## 6. Deploying a change
 
 Frontend and backend deploy completely differently. Mixing them up wastes an hour, and has.
 
 1. **`index.html`** — commit + push. GitHub Pages publishes it automatically, and Apps
    Script's `doGet` picks it up on the next request. **No redeploy needed.**
-2. **`Code.gs`** — push does **nothing** to the live backend. Paste the file into the Apps
-   Script editor, then **Deploy → Manage deployments → ✏️ Edit existing deployment →
-   Version: New version → Deploy**. ⚠️ **Never "New deployment"** — that mints a *new*
-   `/exec` URL and `API_URL` in `index.html` must keep matching it.
+2. **`Code.gs`** — push does **nothing** to the live backend. Apps Script has no
+   connection to the repo at all: it never clones, pulls or watches, and runs only the copy
+   in its own editor, frozen at the last published version.
+
+   Preferred: double-click **`tools/2-DEPLOY.cmd`**. It pushes `Code.gs` via clasp,
+   republishes **the existing deployment by ID**, then POSTs a `Ping` and confirms the
+   server answers `pong` before reporting success — because deploying and working are not
+   the same thing, and the failure this stack actually hits looks perfectly fine at the
+   deploy step. Run `tools/1-SETUP-clasp.cmd` once first (enables the Apps Script API,
+   `clasp login`, and asks for the Script ID → writes `.clasp.json`).
+
+   By hand, if clasp is not set up: paste into the editor, then **Deploy → Manage
+   deployments → ✏️ Edit → Version: New version → Deploy**. ⚠️ **"New deployment" mints a
+   different `/exec` URL**, and `API_URL` in `index.html` must be updated to match — so use
+   it only when deliberately replacing the deployment (which, per §4, is currently the
+   thing that needs doing).
 
 New sheet tabs and columns appear by themselves on the next request; `ensureSheets_()`
 creates and header-heals but **never deletes**.
 
-**The most common support question** is "the page says it cannot load the list". That is
-almost always `index.html` (published instantly) being newer than the deployed `Code.gs`.
-The page detects `Unknown API function` specifically and says so, naming the redeploy
-steps — do not replace that with a generic "please reload".
+**"The page cannot load the list"** is usually `index.html` (published instantly) being
+newer than the deployed `Code.gs`. The page detects `Unknown API function` specifically and
+says so, naming the redeploy steps — do not replace that with a generic "please reload".
+If the message is a **404** or the data is simply empty, that is a different problem: see
+§4 before assuming a stale backend.
+
+### The tooling, and why it is `.cmd` and not `.ps1`
+
+`CurrentUser` execution policy here is `RemoteSigned`, which blocks right-click-run on an
+unsigned `.ps1`. The `.cmd` wrappers pass `-ExecutionPolicy Bypass` and pause so the output
+stays readable. The `.ps1` files are CRLF with a BOM and avoid backtick line-continuation
+and `\"` sequences — both parsed wrong when first generated, and a broken script fails at
+the user's double-click, where there is nobody to debug it. Parse them with
+`[System.Management.Automation.Language.Parser]::ParseFile` after editing.
+
+`.claspignore` keeps everything except `Code.gs` and `appsscript.json` out of the script
+project, so the only copy of the frontend stays the one Pages serves. clasp's OAuth tokens
+land in `.clasprc.json`, which is gitignored — **this repo is public**.
 
 ---
 
-## 6. Architecture
+## 7. Architecture
 
 ### HTTP entry points
 
@@ -243,7 +363,7 @@ one. Tetapan holds **Lokasi · Pentadbir Inventori**.
 
 ---
 
-## 7. Decisions already taken — do not "fix" these without asking
+## 8. Decisions already taken — do not "fix" these without asking
 
 Each of these looks like an oversight and is not.
 
@@ -304,30 +424,6 @@ Each of these looks like an oversight and is not.
   (the shim calls `r.json()` on it). It bails immediately with a named error if `doPost` is
   absent, rather than dying with a stack trace.
 
-- **`Code.gs` is deployed with `tools/deploy.ps1`, not by pasting.** This is the one
-  genuinely manual step the stack used to have, and it is worth understanding why it
-  existed: GitHub Pages serves `index.html` directly out of the repo, so a push *is* the
-  frontend deploy — but Apps Script has no connection to the repo at all. It never clones,
-  pulls or watches; it runs only the copy in its own editor, frozen at the last published
-  version. So a push can never reach the backend on its own.
-
-  `deploy.ps1` closes that with clasp: it pushes `Code.gs`, republishes **the existing
-  deployment by ID** — never a new one, since that would mint a fresh /exec URL and break
-  the published page — and then POSTs a `Ping` to prove `doPost` actually answers before
-  reporting success. `.claspignore` keeps everything except `Code.gs` and `appsscript.json`
-  out of the script project. `tools/setup-clasp.ps1` does the one-time login and writes
-  `.clasp.json`. clasp's OAuth tokens live in `.clasprc.json`, which is gitignored — the
-  repo is public.
-
-  Both are driven by double-clickable `.cmd` wrappers (`tools/1-SETUP-clasp.cmd`,
-  `tools/2-DEPLOY.cmd`) because `CurrentUser` execution policy is `RemoteSigned`, which
-  blocks right-click-run on an unsigned `.ps1`; the wrapper passes `-ExecutionPolicy
-  Bypass` and pauses so the output stays readable. The `.ps1` files are written CRLF
-  with a BOM and avoid backtick line-continuation and `\"` sequences — both parsed
-  wrong when the files were first generated. Parse them with
-  `[System.Management.Automation.Language.Parser]::ParseFile` after editing; a broken
-  script fails at the user's double-click, where there is nobody to debug it.
-
 - **The ledger is fetched separately from the initial payload.** As one response the admin
   payload reached 141KB against a real inventory, took nine seconds, and came back `null` —
   while `getPublicCatalog` (24KB) succeeded over the same channel seconds earlier and
@@ -382,40 +478,6 @@ Each of these looks like an oversight and is not.
   the failure, says how many items are actually in the current view, and offers a retry. It
   lives **outside** `#content` because `render()` rewrites that element wholesale, and it
   clears on the next successful refresh.
-
-- **INTERIM: the Pages build embeds /exec in a full-page iframe.** The live deployment
-  answers every ContentService response with Google's "Page not found" — both `doPost` and
-  `doGet?format=json`, at any content type — while the HtmlService page itself serves fine,
-  so the API is unreachable from Pages. Served from `/exec` the same file works, because
-  Apps Script provides `google.script.run` natively and that RPC channel never touches
-  `doPost`.
-
-  This was a redirect first, which worked but moved the address bar to
-  `script.google.com` — the Pages URL stopped being the app's address, which is the whole
-  point of hosting it there. An iframe keeps the URL on `github.io` and bookmarks intact;
-  `doGet` already sets `XFrameOptionsMode.ALLOWALL`, which is what permits the framing.
-  `allow="camera"` is passed through so the return-proof capture still works inside the
-  frame. It sets `window.__EMBED` and swaps the body for the iframe at
-  `DOMContentLoaded`; the head prefetch and `boot()` both check that flag and stand
-  down, so nothing runs against an endpoint that cannot answer. An earlier version used
-  `document.open()`/`write()`/`close()` and left the original head in place — mid-parse
-  document replacement was not reliable, a flag is.
-
-  Guarded on `location.hostname` containing `github.io`, not feature detection, so it
-  cannot fire inside Apps Script (served from `googleusercontent.com`) and cannot nest.
-  **Remove this block once POST works again** — it costs the instant-load behaviour Pages
-  hosting exists for. The fix is on the deployment; the code is unchanged and correct.
-
-- **A 404 from the API means the deployed script has no `doPost`, or the /exec URL is
-  stale.** Apps Script answers a POST it cannot route with an HTML "Page not found" page,
-  not a JSON error. Tell the two apart by whether a plain GET of the /exec URL still
-  returns the app: if it does, the deployment is alive and `doPost` is what is missing —
-  usually because only part of `Code.gs` was pasted. `doPost` sits near the very end of the
-  file (the last function is `setup()`), so a truncated paste takes it out while leaving
-  `doGet` intact, which is exactly the shape of that symptom. If the GET also fails, the
-  URL itself is retired: **Deploy → New deployment mints a brand-new /exec URL**, so always
-  use **Manage deployments → Edit → Version: New version** to keep the published URL
-  working.
 
 - **Every notification is sent under `MAIL_SENDER` = "i-Nventori Pejabat IMEN", and
   `_sendMail_()` is the only place that touches `MailApp`.** MailApp defaults the sender's
@@ -486,7 +548,8 @@ Each of these looks like an oversight and is not.
   allowing them would let a withdrawal be quietly backdated or attributed to a supplier.
   Backdating a *delivery* is normal; a **future** date is rejected because the stock is not
   physically there and counting it would make the balance a lie. `source` is free text with
-  a `<datalist>` of values already used, built from `D.transactions` — no Suppliers table
+  a `<datalist>` of values already used, built from `D.transactions` once the ledger
+  has merged in (see §4) — no Suppliers table
   to maintain.
 - **Quantity is not editable on the item edit form.** Stock only moves through ledgered
   actions, so the item row can never disagree with the ledger.
@@ -579,7 +642,7 @@ Each of these looks like an oversight and is not.
 
 ---
 
-## 8. How to verify a change before considering it done
+## 9. How to verify a change before considering it done
 
 There is no local Apps Script emulator, so verification uses three techniques.
 
@@ -589,7 +652,7 @@ There is no local Apps Script emulator, so verification uses three techniques.
 node tests/test_backend.js
 ```
 
-**277 assertions.** Loads `Code.gs` into a `vm` context with hand-written mocks for
+**376 assertions.** Loads `Code.gs` into a `vm` context with hand-written mocks for
 `SpreadsheetApp`, `LockService`, `PropertiesService`, `CacheService`, `MailApp`,
 `UrlFetchApp` and `ScriptApp`, backed by an in-memory spreadsheet, then drives the **real**
 service functions. It covers asset-tag generation, stock round-trips, `SCOPES` boundaries
@@ -611,7 +674,7 @@ Two harness quirks worth knowing:
 node tests/check_html.js
 ```
 
-**21 checks.** Parses every inline `<script>`, verifies tag balance (the "page won't load"
+**23 checks.** Parses every inline `<script>`, verifies tag balance (the "page won't load"
 bug class that has bitten i-print), that every `on*=` handler resolves to a defined
 function, that every icon reference exists in the sprite **and declares a viewBox**, and
 that no CDN script loads at boot.
@@ -660,7 +723,7 @@ Always syntax-check both files before considering an edit done — `Code.gs` wit
 
 ---
 
-## 9. What has not been proven
+## 10. What has not been proven
 
 Honest gaps, so nobody assumes otherwise:
 
@@ -674,3 +737,38 @@ Honest gaps, so nobody assumes otherwise:
   being present. Whether a given handset opens the camera is untested.
 - **Drive uploads** run against a mocked `UrlFetchApp`. The resumable-session logic is
   exercised; a real file has never been PUT through it from this test suite.
+
+---
+
+## 11. Session log — what changed and why, most recent first
+
+Only entries a future session would be misled without. Not a changelog; the git history is
+the changelog.
+
+### 2026-08-19 — the day the admin screen would not load
+
+Four separate faults were tangled together and looked like one. Untangling them took a
+whole session, so the order matters:
+
+1. **Tambah Stok and Keluar Stok were dead buttons.** `mi()` drops its handler into an
+   `onclick="…"` attribute, and these two were the only menu entries passing a string
+   argument — written with double quotes, which closed the attribute early. The browser
+   kept `openStock(1,` and clicking did nothing, silently. Fixed with escaped single
+   quotes; `check_html.js` now evaluates every `mi()` call site and reads the result the
+   way a browser would.
+2. **`svcCheckOut` had no type guard**, so an Alat Tulis could be booked out as a loan that
+   nothing could ever close. Now refused server-side, and the menu no longer offers it.
+3. **The Pages build could not reach the backend at all** — POST and every ContentService
+   response return "Page not found" on this deployment. Still true. See §4.
+4. **`getInitialData` returned `null`** because the payload had grown to ~141KB. Split:
+   the ledger now travels separately. See §4 and §8.
+
+Also that day, in passing: `return_token` was being sent to every client that asked for the
+payload despite nothing reading it; the admin's `<head>` prefetch was a dead end when it
+failed; a failed refresh was silent whenever the cache had painted; and `render()` left the
+boot placeholder up for ever when data never arrived — so "never arrived" and "still
+loading" looked identical. All fixed, all in §8.
+
+The lesson worth keeping: **the app could not say what was wrong.** Every failure mode
+above presented as a blank screen. The banner, the named errors, and the in-app diagnostic
+exist because of that, and are worth more than any single fix on this list.
