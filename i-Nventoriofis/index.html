@@ -1575,11 +1575,8 @@ var SECTION = {
 var SUBTAB = { inventori: 'senarai', aset: 'senarai' };
 // The log sub-tab defaults to its own section, but can widen to the whole
 // ledger — the complete audit trail must stay browsable from somewhere.
-var LEDGER_SCOPE = 'section';
-
-function goSub(sec, tab, scope) {
+function goSub(sec, tab) {
   SUBTAB[sec] = tab;
-  if (scope) LEDGER_SCOPE = scope;
   go(sec);
 }
 
@@ -1906,7 +1903,7 @@ function viewDashboard() {
   h += '<div class="card"><div class="card-head"><div style="flex:1">' +
     '<h3>Pengeluaran Mengikut Staf</h3>' +
     '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">30 hari terakhir</p></div>' +
-    '<button class="btn btn-sm btn-ghost" onclick="goSub(\'aset\',\'log\',\'all\')">Log penuh</button></div><div class="card-body">';
+    '<button class="btn btn-sm btn-ghost" onclick="goSub(\'aset\',\'log\')">Log Aset Alih</button></div><div class="card-body">';
   if (!issued30.staff.length) {
     h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">' +
          'Belum ada pengeluaran stok direkodkan kepada staf.<br>' +
@@ -1968,7 +1965,7 @@ function viewDashboard() {
 
   // ══════════════ AKTIVITI ══════════════
   h += sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
-    '<button class="btn btn-sm" onclick="goSub(\'aset\',\'log\',\'all\')">Log penuh ' + icon('i-out', 13) + '</button>');
+    '<button class="btn btn-sm" onclick="goSub(\'aset\',\'log\')">Log Aset Alih ' + icon('i-out', 13) + '</button>');
 
   var recent = (D.transactions || []).slice().sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 8);
   h += '<div class="card">';
@@ -2362,16 +2359,18 @@ function viewStock(embed) {
 // ══════════════════════════════════════════════════════════════════════
 var LEDGER_FILTER = { action: '', q: '' };
 
-// `scope` narrows the ledger to one section's item type. LEDGER_SCOPE
-// can widen it back to everything, so the full audit trail is never
-// unreachable just because it now lives under a section.
-function viewLedger(embed, scope) {
-  var narrow = scope && LEDGER_SCOPE === 'section';
+// The log is ALWAYS scoped to one section's item type. Alat Tulis and Aset
+// Alih are two separate inventories that share a webapp, and their audit
+// trails must never mix — so there is deliberately no "show everything"
+// mode. `type` is the section's item_type; a transaction belongs to this log
+// only if its item is of that type. (The combined overview is the Ringkasan
+// dashboard, not the log.)
+function viewLedger(embed, type) {
   var txns = (D.transactions || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
   var filtered = txns.filter(function (t) {
-    if (narrow) {
+    if (type) {
       var itx = itemById(t.item_id);
-      if (!itx || itx.item_type !== scope) return false;
+      if (!itx || itx.item_type !== type) return false;
     }
     if (LEDGER_FILTER.action && t.action_type !== LEDGER_FILTER.action) return false;
     if (!LEDGER_FILTER.q) return true;
@@ -2384,15 +2383,13 @@ function viewLedger(embed, scope) {
     '<div class="page-head"><div><h2>Log Audit</h2>' +
     '<p>Lejar tidak boleh diubah — ' + txns.length + ' transaksi direkodkan</p></div>' +
     '<div class="spacer"></div>' +
-    '<button class="btn" onclick="exportLedgerCSV()">' + icon('i-down', 15) + ' Eksport CSV</button></div>';
+    '<button class="btn" onclick="exportLedgerCSV(\'' + (type || '') + '\')">' + icon('i-down', 15) + ' Eksport CSV</button></div>';
 
-  if (embed && scope) {
+  if (embed) {
     h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px">' +
-      '<div class="tabs">' +
-        '<button class="' + (LEDGER_SCOPE === 'section' ? 'active' : '') + '" onclick="LEDGER_SCOPE=\'section\';render()">Seksyen ini</button>' +
-        '<button class="' + (LEDGER_SCOPE === 'all' ? 'active' : '') + '" onclick="LEDGER_SCOPE=\'all\';render()">Semua rekod</button>' +
-      '</div><div style="flex:1"></div>' +
-      '<button class="btn btn-sm" onclick="exportLedgerCSV()">' + icon('i-down', 13) + ' Eksport CSV</button></div>';
+      '<div style="flex:1;font-size:12.5px;color:var(--muted)">Log <b>' + esc(TYPE_LABEL[type] || '') +
+        '</b> sahaja — lejar berasingan bagi setiap inventori.</div>' +
+      '<button class="btn btn-sm" onclick="exportLedgerCSV(\'' + (type || '') + '\')">' + icon('i-down', 13) + ' Eksport CSV</button></div>';
   }
 
   h += '<div class="info-box" style="display:flex;gap:9px;align-items:flex-start">' + icon('i-shield', 16) +
@@ -2582,7 +2579,7 @@ function viewSettings() {
     // in the moment before the ledger itself arrives.
     '<div class="t-sub">' + (D.tx_total != null ? D.tx_total : (D.transactions || []).length) +
       ' transaksi. Tiada laluan kod menyunting atau memadam rekod lejar.</div></div>' +
-    '<div class="spacer"></div><button class="btn btn-sm" onclick="goSub(\'aset\',\'log\',\'all\')">Lihat Log</button></div>' +
+    '<div class="spacer"></div><button class="btn btn-sm" onclick="goSub(\'aset\',\'log\')">Lihat Log</button></div>' +
     '</div></div>';
   return h;
 }
@@ -4285,11 +4282,18 @@ function buildItemsCSV(shown, full) {
   downloadCSV('i-nventori_' + inputDate(new Date()) + '.csv', rows);
 }
 
-function exportLedgerCSV() {
+// The ledger export is scoped to one inventory's type — never a combined
+// dump. `type` comes from the section the log is embedded in; if it is
+// somehow missing, fall back to the current section so the export can never
+// silently mix the two.
+function exportLedgerCSV(type) {
+  type = type || (SECTION[VIEW] && SECTION[VIEW].type) || '';
+  var slug = type === 'consumable' ? 'alat-tulis' : type === 'fixed_asset' ? 'aset-alih' : 'lejar';
   var rows = [['ID', 'Tarikh', 'Tindakan', 'Tag Aset', 'Item', 'Penjaga', 'Kuantiti',
                'Sumber', 'Jangka Pulang', 'Tarikh Pulang', 'Catatan']];
   (D.transactions || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); }).forEach(function (t) {
     var it = itemById(t.item_id);
+    if (type) { if (!it || it.item_type !== type) return; }   // this inventory only
     rows.push([
       t.id, fmtDateTime(t.transaction_date), ACTION_LABEL[t.action_type] || t.action_type,
       it ? it.asset_tag : '', it ? it.name : ('Item #' + t.item_id),
@@ -4298,7 +4302,8 @@ function exportLedgerCSV() {
       fmtDate(t.expected_return_date), fmtDate(t.actual_return_date), t.reason_notes
     ]);
   });
-  downloadCSV('i-nventori_lejar_' + inputDate(new Date()) + '.csv', rows);
+  if (rows.length === 1) { toast('Tiada transaksi untuk dieksport.', 'err'); return; }
+  downloadCSV('i-nventori_lejar_' + slug + '_' + inputDate(new Date()) + '.csv', rows);
 }
 </script>
 </body>

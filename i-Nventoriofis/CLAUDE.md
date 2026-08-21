@@ -441,6 +441,19 @@ Each of these looks like an oversight and is not.
 
 ### The ledger
 
+- **The log is split by inventory and never mixes.** Alat Tulis (consumable) and Aset Alih
+  (fixed_asset) are two separate inventories sharing one webapp, and their audit logs must
+  stay apart. `viewLedger(embed, type)` **always** narrows to the section's `item_type` (via
+  the `t.item_id → itemById().item_type` join) — there is deliberately no "show everything"
+  mode, and `exportLedgerCSV(type)` filters the same way and names the file per type
+  (`…_alat-tulis_…` / `…_aset-alih_…`). Do not reintroduce a combined log or a sticky
+  cross-section scope: an earlier `LEDGER_SCOPE='all'` global, set by "Log penuh" buttons,
+  leaked both types into one list and persisted across sections — that was the bug. The
+  combined overview is the **Ringkasan** dashboard, not the log. (A transaction whose item is
+  not in `D.items` — only possible via a manual soft-delete, since the app hard-purges —
+  falls out of both logs; denormalising `item_type` onto the row would close that, but needs
+  a deploy and has not been done.)
+
 - **A ledger row is never EDITED. It is appended, or — in exactly one case — purged.**
   `_update_()` **throws** if handed the `Transactions` tab, so nothing can rewrite history
   in place. A check-in appends a *new* row; it never touches the original `check_out`.
