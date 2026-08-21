@@ -205,9 +205,25 @@ Same session, same channel, seconds apart: the small responses arrived, the larg
 not. The call *succeeded* and took nine seconds — it neither failed nor timed out — but the
 value never came back. The payload was ~141KB for 121 items and 125 ledger rows.
 
-Fixed by splitting it (see §8): the ledger now travels in its own `getLedger()` call, which
-puts ~90KB on the critical path instead of 141KB. **If a payload ever silently returns
-`null` again, suspect its size first.**
+Splitting the ledger out (`getLedger()`) was the first cut — 141KB → ~90KB — but a later
+diagnostic showed `getInitialData` **still** returned `null` at ~90KB, so that alone was not
+enough. The full fix (see §8, *"The initial payload is lean"*) does three things and gets
+the critical path to **~30KB, ~1.1× the proven-good `getPublicCatalog`**:
+
+- **Lean items** — `getInitialData` sends only the ~11 fields the list renders
+  (`_itemForList_`); full detail (notes, serial, photos, the other dates) is fetched on
+  demand by `getItem()` when a drawer opens.
+- **No `Date` objects** — the whole payload is `_jsonSafe_`'d (JSON round-trip) so every date
+  is an ISO string. `getPublicCatalog` delivered partly *because* it carried no Dates; the
+  admin payload carried one per item. This is likely as much the cause as raw size.
+- **Alerts as counts, not lists** — `inspection`/`audit` ship as `inspection_count`/
+  `audit_count`; `low_stock`/`overdue` are derived on the client (`deriveAlerts`) from the
+  lean items. The per-item `audit` array — one entry per never-audited item — was ~22KB, the
+  single largest chunk, for data nothing lists.
+
+**If a payload ever silently returns `null` again, suspect its size AND its Date objects.**
+Verify with the in-app diagnostic after deploying: `getInitialData` should read ~30KB, not
+`NULL`.
 
 ---
 
@@ -448,6 +464,38 @@ Each of these looks like an oversight and is not.
   malformed input is answered rather than crashing, and that the response declares JSON
   (the shim calls `r.json()` on it). It bails immediately with a named error if `doPost` is
   absent, rather than dying with a stack trace.
+
+- **The initial payload is lean; item detail and the ledger are fetched on demand.** This
+  is what makes `getInitialData` deliver over `google.script.run` at all (see §4). Three
+  rules, none of which should be "optimised" back:
+  - `getInitialData` sends items via `_itemForList_` — ~11 grid fields only. The full row
+    (notes, serial, photos, lifecycle dates) comes from `getItem(id)` when the edit/history
+    drawer opens. **The edit form pre-fills from that fetch, not the list** — pre-filling
+    from the lean row and saving would blank the missing fields. `openItemDrawer`/
+    `openHistory` therefore fetch first; `getItemsForExport` does the same for the CSV.
+  - The whole payload is `_jsonSafe_`'d — **no `Date` objects cross the bridge**, only ISO
+    strings. `toDate()`/`inputDate()` already parse strings (the cache path always did), so
+    this changed nothing on the client.
+  - Alerts travel as **counts** (`inspection_count`, `audit_count`); `low_stock` and
+    `overdue` are rebuilt client-side by `deriveAlerts()` from the lean items. Keep
+    `deriveAlerts` and the server counts in agreement with `SCOPES` — a test asserts the
+    derived counts match the `checkDates` digest.
+  - Target size: ~30KB, ~1.1× `getPublicCatalog`. If you add a field to `_itemForList_`,
+    watch that ratio.
+
+- **Reads do not re-heal the schema or re-open the spreadsheet per tab.** `getInitialData`/
+  `getPublicCatalog` call `ensureSheetsOnce_()` (a 5-min `CacheService` gate) instead of
+  `ensureSheets_()` on every request; writes still heal fully. `_ss_()` memoises `openById`
+  for the execution. With the payload now under 100KB, the `CacheService` payload cache
+  finally succeeds too, so a repeat load inside 45s skips the sheet reads entirely. Together
+  these cut a ~5s load (the diagnostic's figure) down sharply.
+
+- **Mobile: sized in `dvh`, touch targets ≥44px, safe-area insets.** The mobile touch
+  offset was dominated by the iframe workaround (§4) plus `100vh` overrunning the visible
+  viewport; the embed and the ≤820px rules now use `100dvh`. A `@media (pointer:coarse)`
+  block gives the icon rail (the only nav on a phone) and the icon buttons 44px targets, and
+  fixed elements pad for `env(safe-area-inset-*)`. The **real** fix for the offset is the
+  direct-serve deployment (§4) — these make the framed interim usable.
 
 - **The ledger is fetched separately from the initial payload.** As one response the admin
   payload reached 141KB against a real inventory, took nine seconds, and came back `null` —
@@ -769,6 +817,24 @@ Honest gaps, so nobody assumes otherwise:
 
 Only entries a future session would be misled without. Not a changelog; the git history is
 the changelog.
+
+### 2026-08-21 — the load actually fixed, and a mobile pass
+
+A diagnostic run showed `getInitialData` **still** returned `null` even with the ledger
+split deployed (the payload was ~90KB). So the split was necessary but not sufficient. The
+real fix (§4, §8): the initial payload is now lean (`_itemForList_`, ~11 fields), Date-free
+(`_jsonSafe_`), and its alerts are counts — ~30KB total, ~1.1× the `getPublicCatalog` that
+always delivered. Full item detail moved to `getItem(id)` fetched when a drawer opens, so
+the edit form had to fetch-before-prefill or it would have blanked serial/notes on save.
+Slow loads were separately addressed: `ensureSheetsOnce_`, a memoised spreadsheet handle,
+and — now that the payload fits under 100KB — a `CacheService` cache that finally works.
+
+Same day, a mobile pass: `dvh` instead of `vh` (the address bar made `100vh` overrun and
+dragged taps off), 44px touch targets for the icon rail (the only nav on a phone), and
+safe-area insets. The deeper touch offset is the nested-iframe workaround; its real fix is
+the direct-serve deployment (§4), which is the owner's task.
+
+Awaiting the owner's `Code.gs` deploy to take effect — verify with the in-app diagnostic.
 
 ### 2026-08-19 — the day the admin screen would not load
 

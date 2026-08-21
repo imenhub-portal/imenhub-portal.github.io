@@ -180,8 +180,44 @@ const REQUEST_STATUS = ['pending', 'approved', 'rejected', 'cancelled'];
 //  Code.gs, and the next request repairs the sheet in place. Existing
 //  rows simply read blank for the new column.
 // ============================================================
+// One spreadsheet handle per execution. Apps Script starts a fresh global
+// scope for every request, so this memoizes openById across the many
+// _readTable_ calls in a single load instead of re-opening for each — a
+// build that read six tabs was paying for six opens.
+var _SS_ = null;
+function _ss_() {
+  if (!_SS_) _SS_ = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return _SS_;
+}
+
+// Round-trips a value through JSON so what reaches google.script.run holds
+// no Date objects, only ISO strings. The native RPC bridge silently handed
+// the success handler `null` when the admin payload carried a large object
+// with many Date instances; stripping the Dates removes that failure mode
+// and matches the shape the CacheService path already returns (it re-parses
+// what it stored).
+function _jsonSafe_(x) {
+  return JSON.parse(JSON.stringify(x));
+}
+
+// Reads do not need to re-heal the schema on every request — only a deploy
+// changes it. Gate ensureSheets_ behind a short-lived cache flag so the hot
+// read path skips ~14 Sheets round-trips. Writes still call ensureSheets_
+// directly (see handleAction), so a newly deployed column is healed on the
+// next write regardless of this flag.
+function ensureSheetsOnce_() {
+  try {
+    const c = CacheService.getScriptCache();
+    if (c.get('schema_ok_v1')) return;
+    ensureSheets_();
+    c.put('schema_ok_v1', '1', 300);
+  } catch (e) {
+    ensureSheets_();
+  }
+}
+
 function ensureSheets_() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = _ss_();
   Object.keys(SCHEMA).forEach(function (name) {
     var sh = ss.getSheetByName(name);
     if (!sh) {
@@ -205,7 +241,7 @@ function ensureSheets_() {
 // ============================================================
 
 function _sheet_(name) {
-  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(name);
+  const sh = _ss_().getSheetByName(name);
   if (!sh) throw new Error('Sheet tidak dijumpai: ' + name + ' (jalankan ensureSheets_)');
   return sh;
 }
@@ -514,7 +550,7 @@ function _bustCache_() {
 // inventory but never a bulk directory dump. (The i-nstrumen
 // GetAllIMenianUsers incident is exactly this mistake.)
 function getInitialData(adminPass) {
-  ensureSheets_();
+  ensureSheetsOnce_();
   const isAdmin = _isAdmin_(adminPass);
 
   var payload = null;
@@ -535,7 +571,7 @@ function getInitialData(adminPass) {
     payload.transactions = [];
     payload.requests     = [];
     payload.config       = {};   // the officer's address is contact detail, not public
-    payload.alerts       = { overdue: [], inspection: [], audit: [], low_stock: [] };
+    payload.alerts       = { inspection_count: 0, audit_count: 0 };
   }
   payload.is_admin  = isAdmin;
   payload.server_ts = new Date().toISOString();
@@ -567,8 +603,8 @@ function _buildPayload_() {
     } : null;
   });
 
-  return {
-    items:        items.map(_itemForClient_),
+  const payload = {
+    items:        items.map(_itemForList_),
     categories:   _stripRows_(cats),
     locations:    _stripRows_(locs),
     custodians:   _stripRows_(custs),
@@ -582,21 +618,16 @@ function _buildPayload_() {
     tx_total:     txns.length,
     requests: _stripRows_(reqs.slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); })),
     config: _config_(),
+    // Alerts leave as COUNTS, not lists. The client only ever shows these as
+    // badge numbers; sending one alert object per never-audited item was ~22KB
+    // of the payload — the single largest part — for data nothing lists.
+    // inspection and audit are counted here (they need asset-only dates the
+    // lean list omits); low_stock and overdue are derived on the client from
+    // the lean items, which already carry quantity/min_stock and
+    // open_loan.is_overdue. See deriveAlerts() client-side.
     alerts: {
-      inspection: items.filter(function (i) { return SCOPES.inspectionDue(i, today); }).map(_alertRef_),
-      audit:      items.filter(function (i) { return SCOPES.auditDue(i, today); }).map(_alertRef_),
-      low_stock:  items.filter(function (i) { return SCOPES.lowStock(i); }).map(_alertRef_),
-      overdue:    loans.filter(function (l) { return SCOPES.overdue(l, today); }).map(function (l) {
-        var it = _findById_(items, l.item_id);
-        return {
-          id:        l.item_id,
-          asset_tag: it ? it.asset_tag : '?',
-          name:      it ? it.name : '(item dipadam)',
-          custodian_id: l.custodian_id,
-          expected_return_date: l.expected_return_date,
-          days_overdue: Math.abs(_daysBetween_(today, l.expected_return_date) || 0)
-        };
-      })
+      inspection_count: items.filter(function (i) { return SCOPES.inspectionDue(i, today); }).length,
+      audit_count:      items.filter(function (i) { return SCOPES.auditDue(i, today); }).length
     },
     meta: {
       item_types:      ITEM_TYPES,
@@ -605,6 +636,12 @@ function _buildPayload_() {
       removal_reasons: REMOVAL_REASONS
     }
   };
+  // Normalise to plain JSON (no Date objects) before it leaves. This is the
+  // fix for the payload that returned `null` over google.script.run: lean
+  // items (via _itemForList_) bring the size down near the proven-good
+  // getPublicCatalog, and _jsonSafe_ removes the Date objects that the bridge
+  // choked on.
+  return _jsonSafe_(payload);
 }
 
 // Strips fields the client never reads before they go over the wire.
@@ -644,7 +681,7 @@ function _stripRows_(rows) {
 // Admin-gated: the ledger names who took what.
 function getLedger(adminPass) {
   if (!_isAdmin_(adminPass)) return { ok: false, error: 'Akses ditolak.' };
-  return { ok: true, transactions: _stripRows_(_readTable_('Transactions')) };
+  return { ok: true, transactions: _jsonSafe_(_stripRows_(_readTable_('Transactions'))) };
 }
 
 function _itemForClient_(it) {
@@ -656,14 +693,51 @@ function _itemForClient_(it) {
   return out;
 }
 
-function _alertRef_(i) {
+// The LEAN shape sent for the list/grid — only the fields the tables render.
+// Everything else (serial number, notes, photos, the other dates) is fetched
+// on demand by getItem() when a drawer opens. This is what keeps the initial
+// payload near getPublicCatalog's deliverable size rather than the ~90KB that
+// google.script.run dropped as null. `date_acquired` is the one date the list
+// shows; `open_loan` already holds the holder + due date the grid needs.
+function _itemForList_(it) {
   return {
-    id: i.id, asset_tag: i.asset_tag, name: i.name, status: i.status,
-    date_next_inspection: i.date_next_inspection,
-    date_last_audited:    i.date_last_audited,
-    quantity_available:   i.quantity_available,
-    min_stock_alert:      i.min_stock_alert
+    id:                 it.id,
+    asset_tag:          it.asset_tag || '',
+    name:               it.name,
+    item_type:          it.item_type,
+    status:             it.status,
+    location_id:        it.location_id,
+    quantity_available: it.quantity_available,
+    min_stock_alert:    it.min_stock_alert,
+    date_acquired:      it.date_acquired,
+    // Kept in the lean list because the table shows it inline, search matches
+    // on it, and it is short (empty for every consumable). The heavier
+    // asset-only fields (notes, lifecycle dates) are not here — the CSV export
+    // pulls those on demand via getItemsForExport().
+    serial_number:      it.serial_number || '',
+    open_loan:          it.open_loan || null
   };
+}
+
+// Full detail for one item, fetched when an edit or history drawer opens.
+// Required precisely because the list is lean: the edit form pre-fills from
+// this and would otherwise blank-out serial/notes/photos and overwrite them
+// on save. Admin-gated and carries no Date objects (see _jsonSafe_).
+function getItem(itemId, adminPass) {
+  _requireAdmin_(adminPass);
+  const it = _findById_(_readTable_('Items'), itemId);
+  if (!it) throw new Error('Item tidak dijumpai.');
+  return _jsonSafe_(_itemForClient_(it));
+}
+
+// Every item with every field the CSV needs — fetched only when the admin
+// clicks Eksport CSV, never on load, so it stays off the critical path. The
+// list itself is lean and does not carry notes or the lifecycle dates; this
+// is where the export gets them. Date-free via _jsonSafe_, like every other
+// payload, so it delivers over google.script.run.
+function getItemsForExport(adminPass) {
+  _requireAdmin_(adminPass);
+  return _jsonSafe_({ ok: true, items: _readTable_('Items').map(_itemForClient_) });
 }
 
 function _findById_(rows, id) {
@@ -671,14 +745,21 @@ function _findById_(rows, id) {
   return null;
 }
 
-// Full history for one item — the audit-trail drawer.
+// Full history for one item — the audit-trail drawer. Returns the full item
+// alongside its ledger rows: the drawer's summary reads serial/dates/photos,
+// which the lean list no longer carries, so they must travel with the history
+// rather than be read off the in-memory (lean) list row.
 function getItemHistory(itemId, adminPass) {
   _requireAdmin_(adminPass);
   const txns = _readTable_('Transactions').filter(function (t) {
     return Number(t.item_id) === Number(itemId);
   });
   txns.sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
-  return txns;
+  const it = _findById_(_readTable_('Items'), itemId);
+  return _jsonSafe_({
+    item:         it ? _itemForClient_(it) : null,
+    transactions: _stripRows_(txns)
+  });
 }
 
 // ============================================================
@@ -692,7 +773,7 @@ function getItemHistory(itemId, adminPass) {
 //  and this endpoint is reachable by anyone with the URL.
 // ============================================================
 function getPublicCatalog() {
-  ensureSheets_();
+  ensureSheetsOnce_();
   const today = _today_();
   const items = _readTable_('Items');
   const locs  = _readTable_('Locations');
@@ -2189,6 +2270,8 @@ function doPost(e) {
       case 'handleAction':         result = handleAction(args[0], args[1]); break;
       case 'adminLogin':           result = adminLogin(args[0]); break;
       case 'getItemHistory':       result = getItemHistory(args[0], args[1]); break;
+      case 'getItem':              result = getItem(args[0], args[1]); break;
+      case 'getItemsForExport':    result = getItemsForExport(args[0]); break;
       case 'getLedger':            result = getLedger(args[0]); break;
       case 'startResumableUpload': result = startResumableUpload(args[0], args[1], args[2], args[3]); break;
       default: throw new Error('Unknown API function: ' + req.fn);

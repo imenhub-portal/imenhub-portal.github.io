@@ -591,11 +591,14 @@ section('10. Locking, cache and the date engine');
   const failed = S._txn_(() => { throw new Error('kesalahan ujian'); });
   eq('a thrown error is reported, not swallowed', [failed.success, failed.error], [false, 'kesalahan ujian']);
 
-  // A write must invalidate the cached payload.
+  // A write must invalidate the cached payload. Assert on the payload key
+  // specifically, not the total count: getInitialData also sets a separate
+  // schema-heal gate key (ensureSheetsOnce_), which a write deliberately does
+  // not bust — only the payload does.
   S.getInitialData('rahsia');
-  ok('the payload gets cached', Object.keys(S.__test.cache).length === 1);
+  ok('the payload gets cached', S.__test.cache['inv_initial_v1'] !== undefined);
   S._txn_(() => S.svcSeedReference());
-  eq('a write busts the cache', Object.keys(S.__test.cache).length, 0);
+  eq('a write busts the cached payload', S.__test.cache['inv_initial_v1'], undefined);
 
   // Date engine over a deliberately messy portfolio.
   const S2 = fresh();
@@ -626,11 +629,27 @@ section('10. Locking, cache and the date engine');
   ok('audit alerts include the stale one and the never-audited ones', sum.audit >= 1, 'got ' + sum.audit);
   eq('skipMail sends nothing', S2.__test.sentMail.length, 0);
 
-  // The digest and the dashboard must agree — same SCOPES, same numbers.
+  // inspection and audit travel as COUNTS (never lists) and must match the digest.
   const payload = S2.getInitialData('rahsia');
-  eq('the dashboard overdue badge matches the digest', payload.alerts.overdue.length, sum.overdue);
-  eq('the dashboard low-stock badge matches the digest', payload.alerts.low_stock.length, sum.low_stock);
-  eq('the dashboard audit badge matches the digest', payload.alerts.audit.length, sum.audit);
+  eq('the audit badge matches the digest', payload.alerts.audit_count, sum.audit);
+  eq('the inspection badge matches the digest', payload.alerts.inspection_count, sum.inspection);
+  ok('no per-item audit array is shipped', payload.alerts.audit === undefined);
+
+  // low_stock and overdue are now DERIVED on the client from the lean items,
+  // not shipped by the server — so the payload must not carry them, and the
+  // lean items must hold everything needed to reproduce the digest's counts
+  // (this mirrors deriveAlerts() in index.html).
+  ok('low_stock is not shipped in the payload', payload.alerts.low_stock === undefined);
+  ok('overdue is not shipped in the payload', payload.alerts.overdue === undefined);
+
+  const derivedLow = payload.items.filter((i) =>
+    i.item_type === 'consumable' &&
+    i.status !== 'decommissioned' && i.status !== 'disposed' &&
+    Number(i.quantity_available || 0) <= Number(i.min_stock_alert || 0)).length;
+  eq('low stock is derivable from the lean list', derivedLow, sum.low_stock);
+
+  const derivedOverdue = payload.items.filter((i) => i.open_loan && i.open_loan.is_overdue).length;
+  eq('overdue is derivable from the lean list', derivedOverdue, sum.overdue);
 
   ok('an overdue loan is flagged on the item itself', payload.items.find((i) => i.id === loanId).open_loan.is_overdue === true);
 }
@@ -1632,6 +1651,75 @@ section('25. The ledger travels separately from the initial payload');
      S._readTable_('Transactions').length);
 }
 
+
+section('26. The initial payload is lean and Date-free; full detail is on demand');
+{
+  const S = fresh();
+  const pen = S._txn_(() => S.svcAddItem({
+    name: 'Pen Biru', location_id: 2, item_type: 'consumable',
+    quantity_total: 10, min_stock_alert: 2, date_acquired: '2026-01-10'
+  })).result.id;
+  S._txn_(() => S.svcStockChange(
+    { id: pen, quantity: 3, custodian_id: 1, reason_notes: 'Bekalan' }, 'stock_remove'));
+
+  const payload = S.getInitialData('rahsia');
+  const lean = payload.items.filter((i) => Number(i.id) === Number(pen))[0];
+  ok('the item is in the payload', !!lean);
+
+  // Lean list carries the grid fields...
+  ['id', 'asset_tag', 'name', 'item_type', 'status', 'location_id',
+   'quantity_available', 'min_stock_alert', 'date_acquired', 'serial_number'].forEach(function (f) {
+    ok('lean list keeps: ' + f, f in lean, f + ' missing from the list row');
+  });
+  // ...and NOT the heavy detail fields (those come from getItem).
+  ['notes', 'photo_url', 'receipt_url', 'date_next_inspection', 'date_last_maintained',
+   'category_id', 'quantity_total'].forEach(function (f) {
+    ok('lean list drops: ' + f, !(f in lean), f + ' should not be on the list row');
+  });
+
+  // No Date objects anywhere in the payload — this is the other half of why
+  // it now delivers over google.script.run. Dates are ISO strings.
+  const walk = (v) => {
+    if (isDate(v)) return true;
+    if (v && typeof v === 'object') return Object.keys(v).some((k) => walk(v[k]));
+    return false;
+  };
+  ok('the payload holds no Date objects', !walk(payload));
+  ok('date_acquired is a string, not a Date',
+    lean.date_acquired === null || typeof lean.date_acquired === 'string');
+
+  // getItem — the full row, admin-gated, for the edit/history drawers.
+  throws('getItem refuses a wrong password', () => S.getItem(pen, 'salah'), /ditolak/i);
+  const full = S.getItem(pen, 'rahsia');
+  ['notes', 'photo_url', 'receipt_url', 'date_next_inspection'].forEach(function (f) {
+    ok('getItem carries: ' + f, f in full, f + ' missing from the full item');
+  });
+  eq('getItem is the right item', Number(full.id), Number(pen));
+  ok('getItem holds no Date objects', !walk(full));
+
+  // getItemHistory now returns { item, transactions } — the summary needs the
+  // full item because the list row is lean.
+  const hist = S.getItemHistory(pen, 'rahsia');
+  ok('history carries the full item', hist.item && 'notes' in hist.item);
+  ok('history carries the ledger rows', Array.isArray(hist.transactions));
+  eq('and the movement is there', hist.transactions.filter((t) => t.action_type === 'stock_remove').length, 1);
+  ok('history holds no Date objects', !walk(hist));
+
+  // getItemsForExport — full rows for the CSV, admin-gated, fetched only on
+  // export so it stays off the load path.
+  throws('export refuses a wrong password', () => S.getItemsForExport('salah'), /ditolak/i);
+  const exp = S.getItemsForExport('rahsia');
+  eq('export succeeds for an admin', exp.ok, true);
+  eq('and returns every item', exp.items.length, S._readTable_('Items').length);
+  ok('with the heavy fields the list lacks', 'notes' in exp.items[0] && 'date_next_inspection' in exp.items[0]);
+  ok('export holds no Date objects', !walk(exp));
+
+  // getItem and export are routed through the real entry point.
+  const viaApi = JSON.parse(S.doPost({ postData: { contents: JSON.stringify(
+    { fn: 'getItem', args: [pen, 'rahsia'] }) } }).getContent());
+  eq('getItem is routed in doPost', viaApi.ok, true);
+  eq('and returns the item', Number(viaApi.result.id), Number(pen));
+}
 
 if (failures.length) {
   console.log(passed + ' passed, ' + failures.length + ' FAILED\n');
