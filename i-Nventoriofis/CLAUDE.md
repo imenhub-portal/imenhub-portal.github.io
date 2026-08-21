@@ -448,11 +448,19 @@ Each of these looks like an oversight and is not.
   mode, and `exportLedgerCSV(type)` filters the same way and names the file per type
   (`…_alat-tulis_…` / `…_aset-alih_…`). Do not reintroduce a combined log or a sticky
   cross-section scope: an earlier `LEDGER_SCOPE='all'` global, set by "Log penuh" buttons,
-  leaked both types into one list and persisted across sections — that was the bug. The
-  combined overview is the **Ringkasan** dashboard, not the log. (A transaction whose item is
-  not in `D.items` — only possible via a manual soft-delete, since the app hard-purges —
-  falls out of both logs; denormalising `item_type` onto the row would close that, but needs
-  a deploy and has not been done.)
+  leaked both types into one list and persisted across sections — that was the bug. (A
+  transaction whose item is not in `D.items` — only possible via a manual soft-delete, since
+  the app hard-purges — falls out of both logs; denormalising `item_type` onto the row would
+  close that, but needs a deploy and has not been done.)
+
+- **The Ringkasan (dashboard) is tabbed by system too, not combined.** `viewDashboard()` is
+  a shell that renders a `DASH_TAB` switcher (`'alat'` / `'aset'`) over `dashAlat()` and
+  `dashAset()`; there is no combined rollup. The owner's rule is that the two inventories are
+  separate everywhere they can be, so the dashboard follows the log. `recentActivityCard(type)`
+  filters the ledger by item type and links to that section's log; `flowChart(type)` /
+  `monthlyFlow(months, type)` scope the movement chart to consumables. `issueStats` is already
+  consumable-only (it counts `stock_remove`). If you add a dashboard card, put it in the right
+  tab — do not reintroduce a merged view.
 
 - **Clicking an item row opens a non-modal quick-peek** (`openQuickPeek` / `rowPeek`): a
   compact movement history (quantity, who, date) beside the list, rendered **instantly from

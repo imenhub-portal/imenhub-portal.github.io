@@ -1655,7 +1655,7 @@ function greeting() {
 // Units flowing in and out per month, straight from the ledger. For a
 // tracking app the meaningful question is "how much moved", not what it
 // was worth — so this counts units, never money.
-function monthlyFlow(months) {
+function monthlyFlow(months, type) {
   var n = months || 8;
   var buckets = [];
   var now = new Date();
@@ -1665,6 +1665,7 @@ function monthlyFlow(months) {
   }
   var first = buckets[0];
   (D.transactions || []).forEach(function (t) {
+    if (type) { var itx = itemById(t.item_id); if (!itx || itx.item_type !== type) return; }
     var d = toDate(t.transaction_date);
     if (!d) return;
     if (d.getFullYear() < first.y || (d.getFullYear() === first.y && d.getMonth() < first.m)) return;
@@ -1681,8 +1682,8 @@ function monthlyFlow(months) {
 
 var MONTH_BM = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
 
-function flowChart() {
-  var data = monthlyFlow(8);
+function flowChart(type) {
+  var data = monthlyFlow(8, type);
   var max = 0;
   data.forEach(function (b) { max = Math.max(max, b.inV, b.outV); });
   if (max <= 0) {
@@ -1761,32 +1762,37 @@ function issueStats(sinceDays) {
   };
 }
 
-function viewDashboard() {
-  var a = D.alerts || {};
-  var items = D.items || [];
-  var active = items.filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
-  var assets = active.filter(function (i) { return i.item_type === 'fixed_asset'; });
-  var cons   = active.filter(function (i) { return i.item_type === 'consumable'; });
-  var onLoan = items.filter(function (i) { return i.open_loan; });
-  var overdue = (a.overdue || []).length;
-  var low = (a.low_stock || []).length;
-  var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
-  var issued30 = issueStats(30);
+var DASH_TAB = 'alat';   // Ringkasan is two separate systems: 'alat' | 'aset'
 
+function viewDashboard() {
   var h = '<div class="page-head"><div>' +
     '<h2>' + greeting() + ', admin</h2>' +
     '<p>Pantau kedudukan aset dan baki stok inventori IMEN.</p></div>' +
     '<div class="spacer"></div>' +
     '<button class="btn" onclick="runDateCheck(this)">' + icon('i-clock', 15) + ' Semak Tarikh</button>' +
-    '<button class="btn" onclick="exportCSV()">' + icon('i-down', 15) + ' Eksport</button>' +
     '</div>';
 
-  // ══════════════ ASET ══════════════
-  h += sectionHead('Aset Alih',
-    'Laptop, projektor, mikrofon — dijejak seunit mengikut lokasi.',
-    '<button class="btn btn-sm" onclick="FILTER.type=\'fixed_asset\';go(\'aset\')">Lihat semua ' + icon('i-out', 13) + '</button>');
+  // Alat Tulis and Aset Alih are two separate inventories sharing one webapp,
+  // so the summary is split into clickable tabs and never mixed. Each tab is
+  // its own system; there is deliberately no combined rollup here.
+  h += '<div class="tabs" style="display:inline-flex;margin-bottom:18px">' +
+    '<button class="' + (DASH_TAB === 'alat' ? 'active' : '') + '" onclick="DASH_TAB=\'alat\';render()">Alat Tulis</button>' +
+    '<button class="' + (DASH_TAB === 'aset' ? 'active' : '') + '" onclick="DASH_TAB=\'aset\';render()">Aset Alih</button>' +
+    '</div>';
 
-  // Where the assets physically are — the core question this app answers.
+  h += (DASH_TAB === 'aset') ? dashAset() : dashAlat();
+  return h;
+}
+
+// \u2500\u2500 Ringkasan \u00b7 Aset Alih \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function dashAset() {
+  var a = D.alerts || {};
+  var items = D.items || [];
+  var active = items.filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
+  var assets = active.filter(function (i) { return i.item_type === 'fixed_asset'; });
+  var onLoan = items.filter(function (i) { return i.open_loan; });
+  var overdue = (a.overdue || []).length;
+
   var byLoc = {};
   assets.forEach(function (i) {
     var k = i.open_loan ? '__loan' : locName(i.location_id);
@@ -1796,25 +1802,25 @@ function viewDashboard() {
   var locKeys = Object.keys(byLoc).filter(function (k) { return k !== '__loan'; })
                   .sort(function (x, y) { return byLoc[y].length - byLoc[x].length; });
 
-  h += '<div class="dash-top">';
+  var h = '<div class="dash-top">';
 
   h += '<div class="hero">' +
     '<div class="lbl">Jumlah Aset Alih</div>' +
     '<div class="big mono">' + assets.length + '</div>' +
     '<div class="trend ' + (overdue ? 'down' : 'up') + '">' +
       (onLoan.length ? onLoan.length + ' sedang dipinjam' : 'Semua berada di lokasi') +
-      ' <span>' + (overdue ? '· ' + overdue + ' lewat dipulangkan' : '') + '</span></div>' +
+      ' <span>' + (overdue ? '\u00b7 ' + overdue + ' lewat dipulangkan' : '') + '</span></div>' +
     '<div class="hero-actions">' +
       '<button class="btn btn-primary" onclick="openItemDrawer(null,\'fixed_asset\')">' + icon('i-plus', 15) + ' Tambah Aset Alih</button>' +
       '<button class="btn" onclick="openCheckOut()">' + icon('i-out', 15) + ' Daftar Keluar</button>' +
     '</div>' +
-    '<div class="substrip"><div class="cap">Kedudukan aset <b>· ' + locKeys.length + ' lokasi</b></div>' +
+    '<div class="substrip"><div class="cap">Kedudukan aset <b>\u00b7 ' + locKeys.length + ' lokasi</b></div>' +
     '<div class="chips">' +
       (locKeys.length ? locKeys.slice(0, 3).map(function (k, n) {
         return '<div class="chip"><div class="t">' +
           '<span style="width:7px;height:7px;border-radius:2px;background:' +
             (n === 0 ? 'var(--accent)' : n === 1 ? 'var(--ink)' : 'var(--muted-2)') + ';display:block"></span>' +
-          esc(k.length > 12 ? k.slice(0, 11) + '…' : k) + '</div>' +
+          esc(k.length > 12 ? k.slice(0, 11) + '\u2026' : k) + '</div>' +
           '<div class="v mono">' + byLoc[k].length + '</div>' +
           '<div class="s">aset di sini</div></div>';
       }).join('') : '<div class="chip"><div class="s">Belum ada aset</div></div>') +
@@ -1826,15 +1832,14 @@ function viewDashboard() {
          '<div class="trend"><span>sedia untuk dipinjam</span></div>') +
     tile('i-out', 'Sedang Dipinjam', onLoan.length,
          overdue ? overdue + ' lewat' : 'Mengikut jadual', 'aset', false,
-         overdue ? '<div class="trend down">↑ ' + overdue + ' <span>lewat dipulangkan</span></div>'
-                 : '<div class="trend up">✓ <span>tiada lewat</span></div>') +
+         overdue ? '<div class="trend down">\u2191 ' + overdue + ' <span>lewat dipulangkan</span></div>'
+                 : '<div class="trend up">\u2713 <span>tiada lewat</span></div>') +
     tile('i-pin', 'Lokasi', locKeys.length, 'Tempat penyimpanan', 'settings', false,
          '<div class="trend flat"><span>' + (D.locations || []).length + ' lokasi berdaftar</span></div>') +
     tile('i-clock', 'Pemeriksaan', (a.inspection_count || 0), 'Tertunggak', 'aset', false,
          '<div class="trend flat"><span>' + (a.audit_count || 0) + ' audit tertunggak</span></div>') +
     '</div>';
 
-  // Assets currently out, with who holds them.
   h += '<div class="card"><div class="card-head"><div style="flex:1">' +
     '<h3>Aset Di Luar Lokasi</h3>' +
     '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Siapa memegangnya sekarang</p></div>' +
@@ -1848,7 +1853,7 @@ function viewDashboard() {
       var d = daysBetween(today(), l.expected_return_date);
       return '<div class="alert-row" style="cursor:pointer" onclick="openCheckIn(' + i.id + ')">' +
         '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(i.name) + '</div>' +
-        '<div class="t-sub mono">' + esc(i.asset_tag) + ' · ' + esc(custName(l.custodian_id)) + '</div></div>' +
+        '<div class="t-sub mono">' + esc(i.asset_tag) + ' \u00b7 ' + esc(custName(l.custodian_id)) + '</div></div>' +
         '<div class="spacer"></div>' +
         (l.is_overdue
           ? '<span class="pill pill-err"><i></i>' + Math.abs(d) + ' hari lewat</span>'
@@ -1859,12 +1864,19 @@ function viewDashboard() {
 
   h += '</div>';   // /dash-top
 
-  // ══════════════ INVENTORI ══════════════
-  h += sectionHead('Alat Tulis',
-    'Kertas, pen, dakwat — dijejak mengikut baki stok.',
-    '<button class="btn btn-sm" onclick="go(\'inventori\')">Urus stok ' + icon('i-out', 13) + '</button>');
+  h += recentActivityCard('fixed_asset');
+  return h;
+}
 
-  h += '<div class="dash-top">';
+// \u2500\u2500 Ringkasan \u00b7 Alat Tulis \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function dashAlat() {
+  var a = D.alerts || {};
+  var items = D.items || [];
+  var active = items.filter(function (i) { return i.status !== 'decommissioned' && i.status !== 'disposed'; });
+  var cons = active.filter(function (i) { return i.item_type === 'consumable'; });
+  var low = (a.low_stock || []).length;
+  var stockUnits = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
+  var issued30 = issueStats(30);
 
   var lowest = cons.slice().sort(function (x, y) {
     var rx = Number(x.min_stock_alert || 1) ? Number(x.quantity_available || 0) / Number(x.min_stock_alert || 1) : 99;
@@ -1872,24 +1884,26 @@ function viewDashboard() {
     return rx - ry;
   }).slice(0, 3);
 
+  var h = '<div class="dash-top">';
+
   h += '<div class="hero">' +
     '<div class="lbl">Unit Dalam Simpanan</div>' +
     '<div class="big mono">' + stockUnits + '</div>' +
     '<div class="trend ' + (low ? 'down' : 'up') + '">' +
-      (low ? '↓ ' + low + ' jenis stok rendah' : '✓ semua paras selamat') +
-      ' <span>· ' + cons.length + ' jenis item</span></div>' +
+      (low ? '\u2193 ' + low + ' jenis stok rendah' : '\u2713 semua paras selamat') +
+      ' <span>\u00b7 ' + cons.length + ' jenis item</span></div>' +
     '<div class="hero-actions">' +
       '<button class="btn btn-primary" onclick="openItemDrawer(null,\'consumable\')">' + icon('i-plus', 15) + ' Alat Tulis Baharu</button>' +
       '<button class="btn" onclick="go(\'inventori\')">' + icon('i-layers', 15) + ' Keluar Stok</button>' +
     '</div>' +
-    '<div class="substrip"><div class="cap">Paling hampir habis <b>· ' + cons.length + ' jenis item</b></div>' +
+    '<div class="substrip"><div class="cap">Paling hampir habis <b>\u00b7 ' + cons.length + ' jenis item</b></div>' +
     '<div class="chips">' +
       (lowest.length ? lowest.map(function (i, n) {
         var isLow = Number(i.quantity_available || 0) <= Number(i.min_stock_alert || 0);
         return '<div class="chip"><div class="t">' +
           '<span style="width:7px;height:7px;border-radius:2px;background:' +
             (isLow ? 'var(--accent)' : 'var(--ok)') + ';display:block"></span>' +
-          esc(i.name.length > 12 ? i.name.slice(0, 11) + '…' : i.name) + '</div>' +
+          esc(i.name.length > 12 ? i.name.slice(0, 11) + '\u2026' : i.name) + '</div>' +
           '<div class="v mono">' + i.quantity_available + '</div>' +
           '<div class="s">min ' + (i.min_stock_alert || 0) + '</div></div>';
       }).join('') : '<div class="chip"><div class="s">Belum ada item</div></div>') +
@@ -1899,8 +1913,8 @@ function viewDashboard() {
     tile('i-layers', 'Jenis Alat Tulis', cons.length, 'Dalam inventori', 'inventori', true,
          '<div class="trend"><span>' + stockUnits + ' unit di tangan</span></div>') +
     tile('i-warn', 'Stok Rendah', low, 'Perlu diisi semula', 'inventori', false,
-         low ? '<div class="trend down">↓ <span>di bawah paras minimum</span></div>'
-             : '<div class="trend up">✓ <span>paras selamat</span></div>') +
+         low ? '<div class="trend down">\u2193 <span>di bawah paras minimum</span></div>'
+             : '<div class="trend up">\u2713 <span>paras selamat</span></div>') +
     tile('i-out', 'Dikeluarkan (30 hari)', issued30.totalUnits, 'unit', 'inventori', false,
          '<div class="trend flat"><span>kepada ' + issued30.staff.length + ' staf</span></div>') +
     tile('i-users', 'Penerima', issued30.staff.length, 'staf dalam 30 hari', 'inventori', false,
@@ -1911,18 +1925,18 @@ function viewDashboard() {
   h += '<div class="card"><div class="card-head"><div style="flex:1">' +
     '<h3>Pengeluaran Mengikut Staf</h3>' +
     '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">30 hari terakhir</p></div>' +
-    '<button class="btn btn-sm btn-ghost" onclick="goSub(\'aset\',\'log\')">Log Aset Alih</button></div><div class="card-body">';
+    '<button class="btn btn-sm btn-ghost" onclick="goSub(\'inventori\',\'log\')">Log Alat Tulis</button></div><div class="card-body">';
   if (!issued30.staff.length) {
     h += '<p style="color:var(--muted-2);font-size:12.5px;text-align:center;padding:16px 0;margin:0">' +
          'Belum ada pengeluaran stok direkodkan kepada staf.<br>' +
-         '<span style="font-size:11.5px">Pilih “Diberikan kepada” semasa keluar stok supaya penggunaan boleh dijejaki.</span></p>';
+         '<span style="font-size:11.5px">Pilih \u201cDiberikan kepada\u201d semasa keluar stok supaya penggunaan boleh dijejaki.</span></p>';
   } else {
     var maxU = issued30.staff[0].units || 1;
     h += issued30.staff.slice(0, 6).map(function (r) {
       var top = Object.keys(r.items).sort(function (x, y) { return r.items[y] - r.items[x]; }).slice(0, 2);
       return '<div class="alert-row">' +
         '<div style="min-width:0"><div class="t-name" style="font-size:13px">' + esc(custName(r.id)) + '</div>' +
-        '<div class="t-sub">' + esc(top.map(function (n) { return n + ' ×' + r.items[n]; }).join(' · ') || '—') + '</div></div>' +
+        '<div class="t-sub">' + esc(top.map(function (n) { return n + ' \u00d7' + r.items[n]; }).join(' \u00b7 ') || '\u2014') + '</div></div>' +
         '<div class="spacer"></div>' +
         '<div class="mini-bar"><span style="width:' + ((r.units / maxU) * 100).toFixed(0) + '%;background:var(--accent)"></span></div>' +
         '<span class="mono" style="font-weight:700;min-width:64px;text-align:right">' + r.units + ' unit</span>' +
@@ -1933,16 +1947,13 @@ function viewDashboard() {
 
   h += '</div>';   // /dash-top
 
-  // Monthly movement, in units. Answers "berapa banyak keluar sebulan",
-  // which is what drives reorder timing.
   h += '<div class="card" style="margin-top:14px">' +
     '<div class="card-head"><div style="flex:1"><h3>Pergerakan Stok Bulanan</h3>' +
       '<p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Unit masuk berbanding keluar, 8 bulan terakhir</p></div>' +
       '<div class="chart-legend"><span><i style="background:var(--ink)"></i>Masuk</span>' +
       '<span><i style="background:var(--accent)"></i>Keluar</span></div></div>' +
-    '<div class="card-body">' + flowChart() + '</div></div>';
+    '<div class="card-body">' + flowChart('consumable') + '</div></div>';
 
-  // Alerts
   h += '<div class="grid g-2" style="margin-top:14px">';
   h += alertCard('Stok Rendah', 'i-layers', 'var(--warn)', (a.low_stock || []).map(function (o) {
     var pct = o.min_stock_alert ? Math.min(100, (o.quantity_available / o.min_stock_alert) * 100) : 0;
@@ -1971,11 +1982,21 @@ function viewDashboard() {
   }
   h += '</div></div></div>';
 
-  // ══════════════ AKTIVITI ══════════════
-  h += sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
-    '<button class="btn btn-sm" onclick="goSub(\'aset\',\'log\')">Log Aset Alih ' + icon('i-out', 13) + '</button>');
+  h += recentActivityCard('consumable');
+  return h;
+}
 
-  var recent = (D.transactions || []).slice().sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 8);
+// Recent ledger activity for ONE system \u2014 the logs are separate, so this is
+// too: filtered to the given item type and linking to that section's log.
+function recentActivityCard(type) {
+  var sec = (type === 'fixed_asset') ? 'aset' : 'inventori';
+  var recent = (D.transactions || []).filter(function (t) {
+    var it = itemById(t.item_id); return it && it.item_type === type;
+  }).sort(function (x, y) { return (y.id || 0) - (x.id || 0); }).slice(0, 8);
+
+  var h = sectionHead('Aktiviti Terkini', 'Setiap pergerakan direkod kekal dalam lejar audit.',
+    '<button class="btn btn-sm" onclick="goSub(\'' + sec + '\',\'log\')">Log ' + esc(TYPE_LABEL[type] || '') + ' ' + icon('i-out', 13) + '</button>');
+
   h += '<div class="card">';
   if (!recent.length) {
     h += '<div class="empty">' + icon('i-history', 28) + '<p>Belum ada transaksi direkodkan.</p></div>';
@@ -1995,10 +2016,10 @@ function viewDashboard() {
           '<span class="rowicon" style="background:' + st.bg + ';color:' + st.fg + '">' + icon(st.icon, 13) + '</span>' +
           '<div style="min-width:0"><div class="t-name" style="font-size:13px">' +
             esc(it ? it.name : 'Item #' + t.item_id) + '</div>' +
-            '<div class="t-sub mono">' + esc(it && it.asset_tag ? it.asset_tag : (it ? TYPE_LABEL[it.item_type] : '—')) + '</div></div></div></td>' +
+            '<div class="t-sub mono">' + esc(it && it.asset_tag ? it.asset_tag : (it ? TYPE_LABEL[it.item_type] : '\u2014')) + '</div></div></div></td>' +
         '<td style="font-size:12.5px">' + (t.custodian_id
             ? esc(custName(t.custodian_id))
-            : '<span style="color:var(--muted-3)">—</span>') + '</td>' +
+            : '<span style="color:var(--muted-3)">\u2014</span>') + '</td>' +
         '<td class="t-num mono" style="font-weight:600;color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
           (q > 0 ? '+' : '') + q + '</td>' +
         '<td><span class="dotstat"><i style="background:' + st.fg + '"></i>' + esc(ACTION_LABEL[t.action_type] || t.action_type) + '</span></td>' +
@@ -2009,7 +2030,6 @@ function viewDashboard() {
     h += '</tbody></table></div>';
   }
   h += '</div>';
-
   return h;
 }
 
