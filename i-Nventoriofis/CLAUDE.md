@@ -454,6 +454,14 @@ Each of these looks like an oversight and is not.
   falls out of both logs; denormalising `item_type` onto the row would close that, but needs
   a deploy and has not been done.)
 
+- **Clicking an item row opens a non-modal quick-peek** (`openQuickPeek` / `rowPeek`): a
+  compact movement history (quantity, who, date) beside the list, rendered **instantly from
+  `D.transactions`** already in memory — no server round-trip — with a fallback to
+  `getItemHistory` if the ledger has not merged yet. It reuses the `#drawer` element but
+  leaves the scrim hidden, so you can click straight to the next row; `Sejarah Penuh` opens
+  the full modal history. `rowPeek` ignores clicks inside `.rowmenu` so the ⋮ menu still
+  works. Don't make it fetch per-click — the whole point is that the ledger is already local.
+
 - **A ledger row is never EDITED. It is appended, or — in exactly one case — purged.**
   `_update_()` **throws** if handed the `Transactions` tab, so nothing can rewrite history
   in place. A check-in appends a *new* row; it never touches the original `check_out`.

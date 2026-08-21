@@ -750,6 +750,14 @@ table.tbl tbody tr.overdue-row td{background:var(--err-bg)}
 }
 .ackrow .ck{flex:0 0 16px; margin-top:1px}
 
+/* Quick-peek panel (click a row) */
+table.tbl tbody tr.peekable{cursor:pointer}
+.peek-list{display:flex; flex-direction:column}
+.peek-row{display:flex; align-items:center; gap:12px; padding:9px 3px; border-bottom:1px solid var(--border)}
+.peek-row:last-child{border-bottom:0}
+.peek-q{min-width:42px; text-align:right; font-weight:700; font-size:14px}
+.peek-date{font-size:12px; color:var(--muted-2); white-space:nowrap}
+
 /* ═══ RESPONSIVE ═════════════════════════════════════════════════════ */
 @media (max-width:1180px){
   .dash-top{grid-template-columns:1fr 1fr}
@@ -2172,7 +2180,7 @@ function itemsTable(rows) {
     var loan = i.open_loan;
     var lowFlag = (i.item_type === 'consumable' && Number(i.quantity_available) <= Number(i.min_stock_alert || 0));
 
-    return '<tr class="' + (loan && loan.is_overdue ? 'overdue-row' : '') + '">' +
+    return '<tr class="peekable ' + (loan && loan.is_overdue ? 'overdue-row' : '') + '" onclick="rowPeek(event,' + i.id + ')">' +
       (ITEMS_HIDE_TAG ? '' :
         '<td>' + (i.asset_tag
           ? '<span class="mono" style="font-weight:600;font-size:12.5px">' + esc(i.asset_tag) + '</span>'
@@ -2649,6 +2657,7 @@ function openDrawer(title, sub, bodyHtml, footHtml) {
   if (first) setTimeout(function () { first.focus(); }, 240);
 }
 function closeDrawer() {
+  PEEK_ID = null;
   $('drawer').classList.remove('open');
   $('scrim').classList.remove('open');
   stopScanner();
@@ -3286,6 +3295,96 @@ function delRef(kind, id) {
   api('Delete' + kind, { id: id }, function () {
     refresh(function () { toast('Rekod dipadam.', 'ok'); });
   });
+}
+
+// ── Quick peek (click a row) ──────────────────────────────────────────
+// A sneak peek: click any item row and a compact movement history slides in
+// beside the list — quantity, who, date — rendered instantly from the ledger
+// already in memory (D.transactions), so there is no server round-trip. It is
+// non-modal (no scrim) so you can click straight on to the next row. The full
+// audit trail is one button away (Sejarah Penuh → openHistory).
+var PEEK_ID = null;
+
+// Row click, but not when the click lands on the ⋮ menu or its popup (those
+// live in .rowmenu and handle themselves).
+function rowPeek(ev, id) {
+  if (ev && ev.target && ev.target.closest && ev.target.closest('.rowmenu')) return;
+  openQuickPeek(id);
+}
+
+function openQuickPeek(id) {
+  var it = itemById(id);
+  if (!it) return;
+  PEEK_ID = id;
+
+  $('drTitle').textContent = it.name;
+  $('drSub').textContent = (TYPE_LABEL[it.item_type] || '') +
+    (it.item_type === 'consumable' ? ' · baki ' + it.quantity_available : '');
+  $('drBody').innerHTML = '<div id="peekBody"><div class="empty" style="padding:30px">' +
+    '<span class="spin" style="border-color:rgba(0,0,0,.15);border-top-color:var(--accent)"></span></div></div>';
+  $('drFoot').innerHTML =
+    '<button class="btn" onclick="closeDrawer()">Tutup</button>' +
+    '<button class="btn btn-primary" onclick="openHistory(' + id + ')">' + icon('i-history', 15) + ' Sejarah Penuh</button>';
+  // Non-modal: keep the scrim hidden so the list stays visible and clickable.
+  $('scrim').classList.add('hide');
+  $('scrim').classList.remove('open');
+  $('drawer').classList.add('open');
+
+  if (D.transactions) {
+    fillPeek(it, D.transactions);
+  } else {
+    // The ledger has not merged in yet — fetch just this item's rows.
+    google.script.run
+      .withSuccessHandler(function (res) { if (PEEK_ID === id) fillPeek(it, (res && res.transactions) || []); })
+      .withFailureHandler(function () { if (PEEK_ID === id) fillPeek(it, []); })
+      .getItemHistory(id, PASS);
+  }
+}
+
+function fillPeek(it, allTxns) {
+  var host = $('peekBody');
+  if (!host) return;
+  var rows = (allTxns || []).filter(function (t) { return Number(t.item_id) === Number(it.id); })
+    .sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
+
+  var h = '';
+  if (it.item_type === 'consumable') {
+    var issued = rows.filter(function (t) { return t.action_type === 'stock_remove'; })
+      .reduce(function (s, t) { return s + Math.abs(Number(t.quantity || 0)); }, 0);
+    h += '<div class="info-box" style="display:flex;gap:22px">' +
+      '<div><div class="t-sub">Baki semasa</div><div class="mono" style="font-size:20px;font-weight:700">' + it.quantity_available + '</div></div>' +
+      '<div><div class="t-sub">Jumlah dikeluarkan</div><div class="mono" style="font-size:20px;font-weight:700">' + issued + '</div></div>' +
+      '</div>';
+  }
+
+  if (!rows.length) {
+    host.innerHTML = h + '<div class="empty" style="padding:26px 10px">' + icon('i-history', 26) +
+      '<p style="margin:6px 0 0">Belum ada pergerakan direkod.</p></div>';
+    return;
+  }
+
+  h += '<div class="t-sub" style="margin:6px 2px 8px;font-weight:600">Pergerakan terkini</div>';
+  h += '<div class="peek-list">' + rows.slice(0, 12).map(function (t) {
+    var q = Number(t.quantity || 0);
+    var who = (t.action_type === 'stock_add')
+      ? (t.source || '—')
+      : (t.custodian_id ? custName(t.custodian_id) : '—');
+    return '<div class="peek-row">' +
+      '<div class="peek-q mono" style="color:' + (q > 0 ? 'var(--ok)' : q < 0 ? 'var(--err)' : 'var(--muted)') + '">' +
+        (q > 0 ? '+' : '') + q + '</div>' +
+      '<div style="min-width:0;flex:1">' +
+        '<div class="t-name" style="font-size:13px">' + esc(who) + '</div>' +
+        '<div class="t-sub">' + esc(ACTION_LABEL[t.action_type] || t.action_type) +
+          (t.reason_notes ? ' · ' + esc(t.reason_notes) : '') + '</div>' +
+      '</div>' +
+      '<div class="peek-date mono">' + fmtDate(t.transaction_date) + '</div>' +
+      '</div>';
+  }).join('') + '</div>';
+  if (rows.length > 12) {
+    h += '<p style="text-align:center;margin:10px 0 0;font-size:12px;color:var(--muted-2)">' +
+      '…dan ' + (rows.length - 12) + ' lagi — buka Sejarah Penuh.</p>';
+  }
+  host.innerHTML = h;
 }
 
 // ── Item history (audit trail for one item) ───────────────────────────
