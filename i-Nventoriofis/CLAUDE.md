@@ -11,9 +11,10 @@ the same commit — and when you retire a feature, **delete the paragraph descri
 rather than adding a newer one beside it. This document was once patched incrementally
 until it claimed both that `is_portable` had been added and that it had been removed.
 
-> **Start with [§4](#4-known-faults-on-the-live-deployment--read-this-before-debugging).**
-> One deployment-side fault is live, and two things in the code look like mistakes but are
-> workarounds for it. A full session was lost re-deriving that from scratch.
+> **Start with [§4](#4-deployment-health--read-this-before-debugging).**
+> The deployment health commands are there. A full session was once lost re-deriving a
+> live POST fault from scratch; that fault is now resolved, but the diagnostic commands are
+> kept so nobody has to re-derive them again.
 
 ---
 
@@ -96,9 +97,9 @@ Already wired in — do not re-enter these:
 ### Naming and the URL rename
 
 The system is **i-Nventori Ofis**. It lived at `/i-Nventori/` until the owner renamed it;
-the folder is now `i-Nventoriofis/`. `i-Nventori/index.html` is kept as a **redirect stub**
-so links shared before the rename still land somewhere sensible instead of a bare 404. It
-can be deleted once nobody uses the old address.
+the folder is now `i-Nventoriofis/`. The old `i-Nventori/index.html` redirect stub has been
+removed from the repo: the owner confirmed the old address is no longer used. Any remaining
+bookmarks to `/i-Nventori/` will 404.
 
 ### <a name="secrets"></a>Secrets
 
@@ -110,13 +111,18 @@ Current value is `hazde`, set by the owner in **Project Settings → Script Prop
 
 ---
 
-## 4. Known faults on the live deployment — read this before debugging
+## 4. Deployment health — read this before debugging
 
-**One deployment-side fault is live right now, and two workarounds in the code exist only
-because of it.** A whole session was lost re-deriving this. Do not repeat that: run the two
-commands below first, and believe the result over any theory.
+**The POST-broken fault that once forced an iframe workaround is resolved.** As of the last
+debug routine, the live deployment answers JSON on POST and serves the full app on GET.
+The `window.__EMBED` iframe block in `index.html` is therefore a historical workaround, not
+a current fix. It has been left in place only because removing it changes how GitHub Pages
+serves the app, and the owner prefers not to touch a working deployment. If someone wants
+direct Pages serving back, delete the embed block and test from a real Pages build.
 
-### The fault: this deployment answers no POST, and no ContentService response
+Use the two commands below first, and believe the result over any theory.
+
+### Health check: does the deployment answer POST and GET?
 
 ```bash
 EXEC='https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9hfPG-QVLs0T6m0OePE5_WxVr7XSRawaGE/exec'
@@ -126,48 +132,27 @@ EXEC='https://script.google.com/macros/s/AKfycbyY2fSJbt6FMYtH8fIun8D_O4JWbhBZlN9
 R=$(curl -s -L -m 60 -H 'Content-Type: text/plain;charset=utf-8'  -d '{"fn":"handleAction","args":["Ping",{}]}' "$EXEC")
 case "$R" in '{'*) echo "POST OK: $R";; *) echo 'POST BROKEN (HTML, not JSON)';; esac
 
-# Does the page itself still serve? Expect 200 and ~260KB.
+# Does the page itself still serve? Expect 200 and ~260-280KB.
 curl -s -o /dev/null -w 'GET %{http_code} %{size_download}\n' -L "$EXEC"
 ```
 
-Today those print `POST BROKEN (HTML, not JSON)` and `GET 200 267006`. That is the whole
-shape of it:
+Current live state:
 
 | Path | Response type | Result |
 |---|---|---|
-| `GET /exec` | HtmlService | ✅ serves the full app |
-| `GET /exec?format=json` | ContentService | ❌ Page not found |
-| `POST /exec` (any content type) | ContentService | ❌ Page not found |
+| `GET /exec` | HtmlService | ✅ serves the full app (~277KB) |
+| `GET /exec?format=json` | ContentService | ✅ returns JSON |
+| `POST /exec` (text/plain) | ContentService | ✅ returns JSON |
 
-Both broken paths are ContentService; the working one is HtmlService, and all three live in
-the same deployed file. **The code is not at fault** — `doPost` is present, parses, and is
-covered by tests (§9), and the same `doPost` served live traffic earlier the same day. Do
-not go looking for a truncated paste or a missing function; that theory was chased and
-disproved.
+If the POST-broken state ever returns, the fix is to republish the existing deployment
+(**Manage deployments → ✏️ Edit → Version: New version**), not to create a new deployment.
+A new deployment mints a different `/exec` URL, and `API_URL` in `index.html` must then be
+updated to match.
 
-**This does not need a new deployment, and the `/exec` URL does not change.** POST worked
-on this exact URL earlier the same day — a full round trip of `AddItem`, `StockAdd`,
-`StockRemove` and `DeleteItem` went through it — so the deployment and the URL are sound.
-What is wrong is the *published version*. Republishing the existing deployment
-(**Manage deployments → ✏️ Edit → Version: New version**) is the fix, and it keeps the URL
-that `API_URL` already points at.
+### Historical workaround — the Pages build embeds `/exec` in a full-page iframe
 
-An earlier version of this file recommended creating a **new** deployment. That was wrong
-and cost the owner real time: it was a guess made after a few failed attempts, not a
-conclusion from evidence. Do not repeat it. If a session ever does deliberately replace the
-deployment, `API_URL` in `index.html` must be updated to match the new URL in the same
-commit.
-
-Once POST answers again: delete the embed block described below and re-check with the two
-commands above.
-
-### Workaround 1 — the Pages build embeds `/exec` in a full-page iframe
-
-The Pages build reaches the backend only over `doPost`, so with POST dead it cannot load at
-all. Served from `/exec` the same file works, because Apps Script provides
-`google.script.run` natively and that RPC channel never touches `doPost`.
-
-So `index.html` sets `window.__EMBED` when `location.hostname` contains `github.io`, and at
+When POST was dead, the Pages build could not reach the backend at all. So `index.html`
+sets `window.__EMBED` when `location.hostname` contains `github.io`, and at
 `DOMContentLoaded` swaps the body for a full-page iframe pointing at `/exec`. The head
 prefetch and `boot()` both check that flag and stand down, so nothing runs against an
 endpoint that cannot answer.
@@ -181,8 +166,8 @@ endpoint that cannot answer.
   from `googleusercontent.com`, so the flag is false there and it cannot nest.
 - An earlier version used `document.open()`/`write()`/`close()`; mid-parse document
   replacement left the original head in place. A flag is deterministic, that was not.
-- **Delete this block once POST works.** It costs the instant-load behaviour that Pages
-  hosting exists for — every open now goes through Apps Script.
+- **Delete this block when you want direct Pages serving back.** It costs the instant-load
+  behaviour that Pages hosting exists for — every open now goes through Apps Script.
 
 ### Workaround 2 — none. The empty admin screen was a real bug, and is fixed
 
