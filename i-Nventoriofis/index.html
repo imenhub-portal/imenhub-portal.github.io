@@ -2144,7 +2144,9 @@ function viewItems(embed, forceType) {
       '</div>') +
     '<input id="fq" placeholder="Cari nama, tag, siri…" value="' + esc(FILTER.q) + '" oninput="FILTER.q=this.value;renderTableOnly()">' +
     selectFilter('fstatus', 'status', 'Semua Status', (D.meta.item_status || []).map(function (s) {
-      return { v: s, t: (STATUS_META[s] || {}).label || s };
+      var lbl = (STATUS_META[s] || {}).label || s;
+      if (s === 'maintenance' && forceType === 'consumable') lbl = 'Perhatian';
+      return { v: s, t: lbl };
     })) +
     selectFilter('floc', 'location', 'Semua Lokasi', (D.locations || []).map(function (l) { return { v: l.id, t: locName(l.id) }; })) +
     (hasFilter() ? '<button class="btn btn-sm btn-ghost" onclick="clearFilters()">' + icon('i-x', 13) + ' Reset</button>' : '') +
