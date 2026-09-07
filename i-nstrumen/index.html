@@ -1147,7 +1147,7 @@
                         ${isMaintenance ? `
                             <div class="bg-red-50/50 p-3 sm:p-4 rounded-2xl border border-red-100 mb-4 sm:mb-5">
                                 <div class="flex items-center gap-2 text-red-800 text-xs font-bold mb-1"><i class="ph-fill ph-warning"></i> Equipment Down</div>
-                                <p class="text-red-600 text-xs">${eq.maintenanceReason || 'Under repair'}</p>
+                                <p class="text-red-600 text-xs">${maintInfo.reason || 'Under repair'}</p>
                             </div>
                         ` : isPartialMaintenance ? `
                             <div class="bg-orange-50/70 p-3 sm:p-4 rounded-2xl border border-orange-100 mb-4 sm:mb-5">
@@ -2282,7 +2282,7 @@
                                                 const mi = parseMaintenanceInfo(eq);
                                                 if (eq.status === 'Maintenance') {
                                                     return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 border border-red-200">Maintenance</span>
-                                                    ${eq.maintenanceReason ? `<p class="text-[10px] text-red-500 mt-1 max-w-[160px]">${eq.maintenanceReason}</p>` : ''}`;
+                                                    ${mi.reason ? `<p class="text-[10px] text-red-500 mt-1 max-w-[160px]">${mi.reason}</p>` : ''}`;
                                                 } else if (mi.isPartial) {
                                                     return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200">Partial Maintenance</span>
                                                     <div class="mt-1.5 flex flex-wrap gap-1">${mi.processes.map(p => `<span class="px-1.5 py-0.5 bg-red-50 text-red-600 text-[9px] font-bold rounded border border-red-200"><i class="ph-fill ph-wrench"></i> ${p}</span>`).join('')}</div>
