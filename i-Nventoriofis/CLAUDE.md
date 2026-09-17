@@ -671,6 +671,14 @@ Each of these looks like an oversight and is not.
   `@` and no custodian reference. The same assertion covers `getReturnContext`.
 - **`config` is blanked for anonymous callers** — the officer's address is contact detail,
   not public data.
+- **`getPublicCatalog` is `_jsonSafe_`'d like every other bridge payload, and must stay
+  so.** It shipped without it, so an `expected_return_date` (a real `Date` on any item
+  currently on loan) crossed `google.script.run` raw and the bridge dropped the whole
+  catalog to `null` — the exact failure that once blanked `getInitialData`. It stayed
+  hidden because `doPost` JSON-serialises Dates to strings, so `curl` saw all 128 items
+  while the framed app got `null` and the pemohon page painted "0 jenis · 0 ada stok"
+  with an empty item dropdown. The admin page looked fine because `getInitialData` was
+  already wrapped. A test now asserts the public catalog holds no Date objects.
 
 ### Return proof
 

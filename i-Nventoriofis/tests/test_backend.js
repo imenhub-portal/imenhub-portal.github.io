@@ -842,7 +842,21 @@ section('14. Public catalog leaks nothing personal');
   const cat2 = S.getPublicCatalog();
   const proj2 = cat2.items.filter((i) => i.name === 'Projektor')[0];
   eq('once loaned it reads unavailable', proj2.available, false);
-  ok('and gives the expected return date', isDate(proj2.expected_return_date));
+  ok('and gives the expected return date', proj2.expected_return_date != null);
+
+  // No Date objects anywhere — an `expected_return_date` for an item on loan
+  // is a Date on the sheet, and the google.script.run bridge DROPS the whole
+  // response to null when the payload carries Dates. doPost's JSON
+  // serialisation hid this (curl saw every item) while the framed app got
+  // null and painted "0 jenis · 0 ada stok", so assert the wire shape here.
+  const hasDate = (v) => {
+    if (isDate(v)) return true;
+    if (v && typeof v === 'object') return Object.keys(v).some((k) => hasDate(v[k]));
+    return false;
+  };
+  ok('the public catalog holds no Date objects', !hasDate(cat2));
+  ok('its return date is a string, not a Date',
+    typeof proj2.expected_return_date === 'string');
 
   // The privacy boundary: the holder's identity must never appear.
   const blob = JSON.stringify(cat2);

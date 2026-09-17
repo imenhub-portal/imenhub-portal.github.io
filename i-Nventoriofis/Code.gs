@@ -813,7 +813,13 @@ function getPublicCatalog() {
     if (a.item_type !== b.item_type) return a.item_type === 'fixed_asset' ? -1 : 1;
     return String(a.name).localeCompare(String(b.name));
   });
-  return { items: out, server_ts: new Date().toISOString() };
+  // Date-free, like every other payload that crosses google.script.run. An
+  // `expected_return_date` is a Date for any item currently on loan, and the
+  // bridge DROPS the whole response to null when it carries Date objects —
+  // the same failure that once blanked getInitialData. doPost's JSON
+  // serialisation hid it (curl saw 128 items) while the framed app got
+  // nothing and painted "0 jenis · 0 ada stok". (See CLAUDE.md §4.)
+  return _jsonSafe_({ items: out, server_ts: new Date().toISOString() });
 }
 
 // Public. Creates nothing but pending rows, so the worst case is an admin
