@@ -16,8 +16,20 @@ https://imenhub-portal.github.io/i-locker/
 |--------|----------------|
 | Green  | Available      |
 | Orange | Booked         |
-| Red    | Overdue        |
+| Red    | Overdue (pulses / breathes) |
 | Grey   | Unavailable    |
+
+Doors are painted in bold status colours (not just tinted grey), so the state
+reads from any angle. Overdue lockers breathe — the door glow and edge tag swell
+and fade on a ~2.9s cycle, matching the pulsing dot in the header.
+
+## Controls
+
+- **Reset View** (top bar) — smoothly returns the camera to the fitted home view
+  and closes any open door.
+- **Light / Dark** (top bar) — flips the whole theme: 3D scene, lighting and UI.
+  The choice is saved in `localStorage` and honoured on the next visit; a first
+  visit follows the OS `prefers-color-scheme`.
 
 ## Features
 

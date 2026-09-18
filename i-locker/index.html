@@ -42,13 +42,52 @@ tailwind.config = {
 </script>
 
 <style>
+  /* ══════════ THEME TOKENS ══════════
+     Dark is the default. [data-theme="light"] on <html> flips the tokens and
+     the utility overrides further down. */
+  :root {
+    --page-bg: #07090d;
+    --text: #e6edf3;
+    --text-dim: #94a3b8;
+    --panel-a: rgba(22,27,34,.82);
+    --panel-b: rgba(13,17,23,.72);
+    --panel-border: rgba(255,255,255,.08);
+    --panel-shadow: 0 24px 60px -20px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06);
+    --soft-bg: rgba(255,255,255,.04);
+    --soft-bg-2: rgba(255,255,255,.06);
+    --hairline: rgba(255,255,255,.08);
+    --vignette-a: rgba(90,130,255,.10);
+    --vignette-b: rgba(0,0,0,.75);
+    --input-bg: rgba(0,0,0,.30);
+    --input-border: rgba(255,255,255,.10);
+    --scroll-thumb: rgba(255,255,255,.14);
+  }
+  [data-theme="light"] {
+    --page-bg: #cfd7e0;
+    --text: #0d1520;
+    --text-dim: #4a5763;
+    --panel-a: rgba(255,255,255,.88);
+    --panel-b: rgba(240,244,249,.80);
+    --panel-border: rgba(13,21,32,.12);
+    --panel-shadow: 0 18px 44px -18px rgba(20,35,60,.35), inset 0 1px 0 rgba(255,255,255,.9);
+    --soft-bg: rgba(13,21,32,.05);
+    --soft-bg-2: rgba(13,21,32,.08);
+    --hairline: rgba(13,21,32,.12);
+    --vignette-a: rgba(120,160,255,.12);
+    --vignette-b: rgba(255,255,255,.22);
+    --input-bg: rgba(255,255,255,.85);
+    --input-border: rgba(13,21,32,.18);
+    --scroll-thumb: rgba(13,21,32,.22);
+  }
+
   html, body {
-    margin: 0; padding: 0; height: 100%; overflow: hidden; background: #07090d;
+    margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--page-bg);
     overscroll-behavior: none;               /* no pull-to-refresh while orbiting */
     -webkit-tap-highlight-color: transparent; /* no blue flash on tap */
     -webkit-touch-callout: none;
+    transition: background-color .4s ease;
   }
-  body { font-family: 'Sora', sans-serif; color: #e6edf3; -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Sora', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
 
   #scene { position: fixed; inset: 0; display: block; touch-action: none; }
 
@@ -61,16 +100,18 @@ tailwind.config = {
   .vignette {
     position: fixed; inset: 0; pointer-events: none; z-index: 5;
     background:
-      radial-gradient(120% 90% at 50% 8%, rgba(90,130,255,.10), transparent 55%),
-      radial-gradient(140% 120% at 50% 110%, rgba(0,0,0,.75), transparent 60%);
+      radial-gradient(120% 90% at 50% 8%, var(--vignette-a), transparent 55%),
+      radial-gradient(140% 120% at 50% 110%, var(--vignette-b), transparent 60%);
+    transition: background .4s ease;
   }
 
   .glass {
-    background: linear-gradient(160deg, rgba(22,27,34,.82), rgba(13,17,23,.72));
+    background: linear-gradient(160deg, var(--panel-a), var(--panel-b));
     backdrop-filter: blur(18px) saturate(1.4);
     -webkit-backdrop-filter: blur(18px) saturate(1.4);
-    border: 1px solid rgba(255,255,255,.08);
-    box-shadow: 0 24px 60px -20px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+    transition: background .4s ease, border-color .4s ease, box-shadow .4s ease;
   }
 
   .chip {
@@ -81,8 +122,9 @@ tailwind.config = {
 
   /* Status pulse dot */
   .dot { width: 9px; height: 9px; border-radius: 999px; display:inline-block; }
-  @keyframes pulseRing { 0%{ box-shadow:0 0 0 0 rgba(239,68,68,.55);} 70%{ box-shadow:0 0 0 9px rgba(239,68,68,0);} 100%{box-shadow:0 0 0 0 rgba(239,68,68,0);} }
-  .dot.overdue { animation: pulseRing 1.8s infinite; }
+  @keyframes pulseRing { 0%{ box-shadow:0 0 0 0 rgba(255,59,59,.65);} 70%{ box-shadow:0 0 0 9px rgba(255,59,59,0);} 100%{box-shadow:0 0 0 0 rgba(255,59,59,0);} }
+  /* ~2.9s to match the 3D overdue breathing cycle */
+  .dot.overdue { animation: pulseRing 2.9s ease-in-out infinite; }
 
   /* Drawer — side panel on desktop, bottom sheet on phones */
   #drawer { transition: transform .5s cubic-bezier(.16,1,.3,1), opacity .4s; }
@@ -134,12 +176,57 @@ tailwind.config = {
   @keyframes spin { to { transform: rotate(360deg); } }
 
   ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; }
 
   .toast-enter { animation: toastIn .45s cubic-bezier(.16,1,.3,1); }
   @keyframes toastIn { from { transform: translateY(14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
 
   .legend-dot { width: 12px; height: 12px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+
+  /* Icon buttons in the top bar */
+  .icon-btn {
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border-radius: 12px;
+    border: 1px solid var(--panel-border);
+    background: var(--soft-bg);
+    color: var(--text-dim);
+    transition: background .2s, color .2s, transform .15s, border-color .2s;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--soft-bg-2); transform: translateY(-1px); }
+  .icon-btn:active { transform: translateY(0) scale(.96); }
+  @media (max-width: 767px) { .icon-btn { width: 44px; height: 44px; } }
+
+  /* ══════════ LIGHT MODE — utility remaps ══════════
+     The markup uses Tailwind utilities tuned for dark. Rather than rewrite
+     every element, remap the handful of tokens that actually matter. */
+  [data-theme="light"] .text-slate-400,
+  [data-theme="light"] .text-slate-500,
+  [data-theme="light"] .text-slate-600 { color: var(--text-dim) !important; }
+  [data-theme="light"] .text-slate-300 { color: #33404f !important; }
+  [data-theme="light"] .text-white { color: #0d1520 !important; }
+
+  [data-theme="light"] .bg-white\/4 { background: var(--soft-bg) !important; }
+  [data-theme="light"] .bg-white\/6 { background: var(--soft-bg) !important; }
+  [data-theme="light"] .bg-white\/8 { background: var(--soft-bg-2) !important; }
+  [data-theme="light"] .bg-black\/30 { background: var(--input-bg) !important; }
+  [data-theme="light"] .border-white\/10 { border-color: var(--input-border) !important; }
+  [data-theme="light"] .border-white\/8 { border-color: var(--hairline) !important; }
+  [data-theme="light"] .hover\:bg-white\/6:hover { background: var(--soft-bg-2) !important; }
+  [data-theme="light"] .hover\:bg-white\/8:hover { background: var(--soft-bg-2) !important; }
+  [data-theme="light"] .hover\:text-white:hover { color: #0d1520 !important; }
+
+  /* Status accents need a slightly deeper tone on white to stay readable */
+  [data-theme="light"] .text-emerald-300 { color: #0f9d52 !important; }
+  [data-theme="light"] .text-orange-300 { color: #d9700c !important; }
+  [data-theme="light"] .text-red-300 { color: #d92b2b !important; }
+  [data-theme="light"] .text-red-200 { color: #b32424 !important; }
+  [data-theme="light"] .text-red-400 { color: #e03b3b !important; }
+  [data-theme="light"] .text-emerald-400 { color: #0f9d52 !important; }
+
+  [data-theme="light"] .legend-dot { box-shadow: inset 0 0 0 1px rgba(13,21,32,.18); }
+  [data-theme="light"] #tooltip .glass { color: #0d1520; }
+  [data-theme="light"] input::placeholder { color: #9aa7b4; }
 </style>
 </head>
 <body>
@@ -164,14 +251,33 @@ tailwind.config = {
     </div>
 
     <div class="flex items-center gap-1.5 sm:gap-3 font-mono text-[11px] sm:text-xs">
-      <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-400/20 text-emerald-300">
-        <span class="dot" style="background:#22c55e"></span><span id="statAvail">0</span><span class="hidden sm:inline opacity-70">avail</span>
+      <!-- View + theme controls -->
+      <div class="flex items-center gap-1.5">
+        <button id="btnReset" class="icon-btn" title="Reset view" aria-label="Reset view">
+          <svg viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><circle cx="12" cy="12" r="2.2"/>
+          </svg>
+        </button>
+        <button id="btnTheme" class="icon-btn" title="Toggle light / dark" aria-label="Toggle light or dark mode">
+          <svg id="iconMoon" viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+          </svg>
+          <svg id="iconSun" viewBox="0 0 24 24" class="w-[18px] h-[18px] hidden" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+          </svg>
+        </button>
       </div>
-      <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-orange-400/20 text-orange-300">
-        <span class="dot" style="background:#f97316"></span><span id="statBooked">0</span><span class="hidden sm:inline opacity-70">booked</span>
-      </div>
-      <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300">
-        <span class="dot overdue" style="background:#ef4444"></span><span id="statOverdue">0</span><span class="hidden sm:inline opacity-70">overdue</span>
+      <span class="w-px h-6 hidden sm:block" style="background: var(--hairline)"></span>
+      <div class="flex items-center gap-1.5 sm:gap-3">
+        <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-400/20 text-emerald-300">
+          <span class="dot" style="background:#22e06a"></span><span id="statAvail">0</span><span class="hidden sm:inline opacity-70">avail</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-orange-400/20 text-orange-300">
+          <span class="dot" style="background:#ff9526"></span><span id="statBooked">0</span><span class="hidden sm:inline opacity-70">booked</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300">
+          <span class="dot overdue" style="background:#ff3b3b"></span><span id="statOverdue">0</span><span class="hidden sm:inline opacity-70">overdue</span>
+        </div>
       </div>
     </div>
   </div>
@@ -302,11 +408,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 /* ══════════════════════════════════════════════════════════
    STATUS COLOR SYSTEM
    ══════════════════════════════════════════════════════════ */
+// hex  = door paint colour (bold, saturated)
+// glow = additive glow-plane / edge-tag colour (hotter, more luminous)
+// ui   = CSS colour used in the 2D chrome (legend, stats, chips)
 const STATUS = {
-  available:   { label: 'Available',   hex: 0x22c55e, ui: '#22c55e', text: 'text-emerald-300', desc: 'Ready to book' },
-  booked:      { label: 'Booked',      hex: 0xf97316, ui: '#f97316', text: 'text-orange-300',  desc: 'Currently reserved' },
-  overdue:     { label: 'Overdue',     hex: 0xef4444, ui: '#ef4444', text: 'text-red-300',     desc: 'Key not returned' },
-  unavailable: { label: 'Unavailable', hex: 0x6b7280, ui: '#6b7280', text: 'text-slate-400',   desc: 'Out of service' }
+  available:   { label: 'Available',   hex: 0x0a9e46, glow: 0x2bff85, ui: '#22e06a', text: 'text-emerald-300', desc: 'Ready to book' },
+  booked:      { label: 'Booked',      hex: 0xee6a00, glow: 0xffa53d, ui: '#ff9526', text: 'text-orange-300',  desc: 'Currently reserved' },
+  overdue:     { label: 'Overdue',     hex: 0xd10a0a, glow: 0xff4d4d, ui: '#ff3b3b', text: 'text-red-300',     desc: 'Key not returned' },
+  unavailable: { label: 'Unavailable', hex: 0x9aa1a8, glow: 0x6b7280, ui: '#8b9299', text: 'text-slate-400',  desc: 'Out of service' }
 };
 
 const UNITS = ['A', 'B', 'C', 'D'];
@@ -430,9 +539,10 @@ controls.maxAzimuthAngle = Math.PI * 0.42;
 controls.target.set(0, 2.1, 0);
 
 /* ── Lighting ─────────────────────────────────── */
-scene.add(new THREE.HemisphereLight(0xe8f0ff, 0x1a2028, 0.85));
+const hemi = new THREE.HemisphereLight(0xeaf1ff, 0x1a2028, 0.55);
+scene.add(hemi);
 
-const key = new THREE.DirectionalLight(0xffffff, 3.0);
+const key = new THREE.DirectionalLight(0xffffff, 1.15);
 key.position.set(8, 14, 9);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
@@ -444,9 +554,9 @@ key.shadow.normalBias = 0.02;
 scene.add(key);
 
 /* Broad frontal fills so the locker faces are actually lit (metal needs light to read) */
-const frontA = new THREE.DirectionalLight(0xffffff, 1.9);
+const frontA = new THREE.DirectionalLight(0xffffff, 0.7);
 frontA.position.set(-3, 5, 14); scene.add(frontA);
-const frontB = new THREE.DirectionalLight(0xd8e4ff, 1.0);
+const frontB = new THREE.DirectionalLight(0xdfeaff, 0.35);
 frontB.position.set(10, 4, 12); scene.add(frontB);
 
 /* Coloured rims: kept tight and low-spill so they accent edges, not flood the room */
@@ -462,38 +572,54 @@ const fill = new THREE.PointLight(0x22d3ee, 12, 24, 2);
 fill.position.set(0, 1.6, 11);
 scene.add(fill);
 
-/* ── Environment (procedural studio reflection) ── */
-(function buildEnv() {
+/* ── Environment (procedural studio reflection) ──
+   Rebuilt on theme change so metal reflects a bright studio in light mode. */
+const envRT = { current: null };
+function buildEnv(mode) {
+  if (envRT.current) { envRT.current.dispose(); envRT.current = null; }
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene();
   const geo = new THREE.SphereGeometry(60, 32, 32);
+  const light = mode === 'light';
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
-    uniforms: {},
+    uniforms: {
+      uDark:  { value: new THREE.Color(light ? 0.28 : 0.10, light ? 0.31 : 0.12, light ? 0.36 : 0.16) },
+      uBright:{ value: new THREE.Color(light ? 0.72 : 0.72, light ? 0.78 : 0.82, light ? 0.88 : 1.00) },
+      uBand:  { value: new THREE.Color(light ? 0.75 : 0.90, light ? 0.80 : 1.00, light ? 0.90 : 1.20) },
+      uGlow:  { value: new THREE.Color(light ? 0.35 : 0.35, light ? 0.45 : 0.55, light ? 0.70 : 0.90) },
+      uFront: { value: new THREE.Color(light ? 0.55 : 0.60, light ? 0.62 : 0.70, light ? 0.78 : 0.90) },
+      uBandK: { value: light ? 0.35 : 0.90 },
+      uGlowK: { value: light ? 0.25 : 0.50 },
+      uFrontK:{ value: light ? 0.40 : 0.35 }
+    },
     vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
     fragmentShader: `
       varying vec3 vP;
+      uniform vec3 uDark, uBright, uBand, uGlow, uFront;
+      uniform float uBandK, uGlowK, uFrontK;
       void main(){
         vec3 d = normalize(vP);
         float top = smoothstep(-0.3, 1.0, d.y);
-        vec3 sky = mix(vec3(0.10,0.12,0.16), vec3(0.72,0.82,1.0), top);
+        vec3 sky = mix(uDark, uBright, top);
         float band = pow(max(0.0, 1.0 - abs(d.y - 0.25)*2.6), 2.5);
-        sky += vec3(0.9,1.0,1.2) * band * 0.9;
-        float glow = pow(max(0.0, -d.z), 3.0) * 0.5;
-        sky += vec3(0.35,0.55,0.9) * glow;
-        float front = pow(max(0.0, d.z), 3.0) * 0.35;
-        sky += vec3(0.6,0.7,0.9) * front;
+        sky += uBand * band * uBandK;
+        float glow = pow(max(0.0, -d.z), 3.0);
+        sky += uGlow * glow * uGlowK;
+        float front = pow(max(0.0, d.z), 3.0);
+        sky += uFront * front * uFrontK;
         gl_FragColor = vec4(sky, 1.0);
       }`
   });
   envScene.add(new THREE.Mesh(geo, mat));
   const prevTone = renderer.toneMapping;
   renderer.toneMapping = THREE.NoToneMapping;
-  const rt = pmrem.fromScene(envScene, 0.04);
+  envRT.current = pmrem.fromScene(envScene, 0.04);
   renderer.toneMapping = prevTone;
-  scene.environment = rt.texture;
+  scene.environment = envRT.current.texture;
   pmrem.dispose();
-})();
+}
+buildEnv('dark');
 
 /* ── Materials ────────────────────────────────── */
 const carcassMat = new THREE.MeshStandardMaterial({
@@ -508,6 +634,14 @@ const handleMat = new THREE.MeshStandardMaterial({
 const floorMat = new THREE.MeshStandardMaterial({
   color: 0x0a0d11, roughness: 0.92, metalness: 0.05, envMapIntensity: 0.25
 });
+const plateMat = new THREE.MeshStandardMaterial({
+  color: 0x1c222b, roughness: 0.5, metalness: 0.7, emissive: 0x0a0e13, emissiveIntensity: 0.4
+});
+const linerMat = new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.9, metalness: 0.3 });
+
+/* Themeable scene pieces — applyTheme() walks this list. */
+const THEME_PARTS = { carcass: carcassMat, frame: frameEdgeMat, handle: handleMat,
+                      floor: floorMat, plate: plateMat, liner: linerMat };
 
 /* ── Groups ───────────────────────────────────── */
 const world = new THREE.Group();
@@ -549,10 +683,9 @@ const panelGeo = new THREE.BoxGeometry(SLOT_W - GAP * 1.4 - 0.16, SLOT_H - GAP *
 const tagGeo = new THREE.BoxGeometry(0.16, 0.16, 0.02);
 const doorFrontZ = 0.115;     // world z of a closed door's front face
 
-/* Shared neutral metal — status is conveyed by glow + tag, not by dyeing the door */
-const panelMat = new THREE.MeshStandardMaterial({
-  color: 0x9aa1a8, roughness: 0.55, metalness: 0.5, envMapIntensity: 1.2
-});
+/* Door paint: saturated status colour carried on painted metal.
+   Low metalness keeps the hue dominant; the panel insert shares the colour. */
+const DOOR_METAL = { roughness: 0.5, metalness: 0.28, envMapIntensity: 0.9 };
 
 /* One canvas-texture material per unit letter+slot number, generated on demand */
 function makePlateTexture(text, sub) {
@@ -609,10 +742,7 @@ UNITS.forEach((u, ui) => {
   bankGroup.add(base);
 
   // Unit letter plate on crown
-  const plate = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.6, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0x1c222b, roughness: 0.5, metalness: 0.7, emissive: 0x0a0e13, emissiveIntensity: 0.4 })
-  );
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.24), plateMat);
   plate.position.set(unitX, GRID * SLOT_H + (GRID - 1) * GAP + 0.17, -SLOT_D / 2 + 0.11 + 0.001);
   bankGroup.add(plate);
 
@@ -627,7 +757,7 @@ UNITS.forEach((u, ui) => {
       // Recess liner
       const liner = new THREE.Mesh(
         new THREE.BoxGeometry(SLOT_W - 0.02, SLOT_H - 0.02, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.9, metalness: 0.3 })
+        linerMat
       );
       liner.position.set(x, y, 0.005);
       bankGroup.add(liner);
@@ -638,14 +768,18 @@ UNITS.forEach((u, ui) => {
       bankGroup.add(hinge);
 
       const doorMat = new THREE.MeshStandardMaterial({
-        color: 0x9aa1a8, roughness: 0.46, metalness: 0.55, envMapIntensity: 1.4
+        color: 0x9aa1a8, ...DOOR_METAL
       });
       const door = new THREE.Mesh(doorGeo, doorMat);
       door.castShadow = true; door.receiveShadow = true;
       door.position.x = (SLOT_W - GAP * 1.4) / 2;
       hinge.add(door);
 
-      // Recessed panel → catches light, reads as a real locker door
+      // Recessed panel → catches light, reads as a real locker door.
+      // Own material per slot so it carries the same status colour.
+      const panelMat = new THREE.MeshStandardMaterial({
+        color: 0x9aa1a8, ...DOOR_METAL
+      });
       const panel = new THREE.Mesh(panelGeo, panelMat);
       panel.position.set((SLOT_W - GAP * 1.4) / 2, 0, 0.062);
       panel.castShadow = false; panel.receiveShadow = true;
@@ -678,7 +812,7 @@ UNITS.forEach((u, ui) => {
       glow.position.set(x, y, doorFrontZ);
       bankGroup.add(glow);
 
-      const rec = { L, hinge, door, doorMat, handle, glow, num, tag, baseX: x, baseY: y,
+      const rec = { L, hinge, door, doorMat, panelMat, handle, glow, num, tag, baseX: x, baseY: y,
                     open: 0, targetOpen: 0, hover: 0, targetHover: 0 };
       slotMeshes.set(L.id, rec);
 
@@ -690,6 +824,7 @@ UNITS.forEach((u, ui) => {
 
 /* Room side walls (subtle) */
 const wallMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.85, metalness: 0.2 });
+THEME_PARTS.wall = wallMat;
 const backWall = new THREE.Mesh(new THREE.PlaneGeometry(60, 24), wallMat);
 backWall.position.set(0, 10, -SLOT_D - 6.8); backWall.receiveShadow = true;
 scene.add(backWall);
@@ -719,28 +854,125 @@ function applyStatus(L, animate = true) {
   if (!rec) return;
   const cfg = STATUS[L.status];
   const target = new THREE.Color(cfg.hex);
+  const glowCol = new THREE.Color(cfg.glow);
   const off = (L.status === 'unavailable');
 
-  // Door keeps a metallic grey base but carries a clear status tint so the
-  // colour reads from any angle (green/orange/red), grey when unavailable.
-  const tint = off ? new THREE.Color(0x9aa1a8) : target.clone().lerp(new THREE.Color(0xb9c0c8), 0.42);
+  // Bold painted-metal doors: the saturated status colour IS the door colour,
+  // with a touch of grey so it still reads as painted metal, not neon plastic.
+  const tint = off ? new THREE.Color(0x9aa1a8)
+                   : target.clone().lerp(new THREE.Color(0xb9c0c8), 0.12);
   rec.statusTint = tint;
   rec.doorMat.color.copy(tint);
-  rec.doorMat.emissive.copy(target).multiplyScalar(off ? 0.02 : 0.14);
+  rec.panelMat.color.copy(tint).multiplyScalar(1.06);   // inset catches a little more
+  rec.doorMat.emissive.copy(target).multiplyScalar(off ? 0.02 : 0.10);
   rec.doorMat.emissiveIntensity = 1.0;
+  rec.panelMat.emissive.copy(rec.doorMat.emissive);
+  rec.panelMat.emissiveIntensity = 1.0;
   rec.doorMat.needsUpdate = true;
+  rec.panelMat.needsUpdate = true;
 
-  rec.glow.material.color.copy(target);
-  rec.glow.material.opacity = off ? 0.0 : 0.22;
+  rec.glow.material.color.copy(glowCol);
+  rec.glow.material.opacity = off ? 0.0 : 0.38;
 
-  rec.tag.material.color.copy(target);
-  rec.tag.material.opacity = off ? 0.25 : 0.95;
+  rec.tag.material.color.copy(glowCol);
+  rec.tag.material.opacity = off ? 0.25 : 1.0;
   rec.tag.visible = !off;
 
   rec.num.material.opacity = off ? 0.1 : 0.42;
 }
 
 lockers.forEach(L => applyStatus(L, false));
+
+/* ══════════════════════════════════════════════════════════
+   THEME — dark (default) / light
+   Flips the 3D scene (background, fog, lights, materials, env map)
+   and the 2D UI (via [data-theme] on <html>).
+   ══════════════════════════════════════════════════════════ */
+const SCENE_THEME = {
+  dark: {
+    bg: 0x05070a,
+    carcass: 0x2a3038, frame: 0x1a1f26, handle: 0xcfd6dd,
+    floor: 0x0a0d11, plate: 0x1c222b, plateEmissive: 0x0a0e13, liner: 0x05070a,
+    wall: 0x0a0d12,
+    hemiSky: 0xeaf1ff, hemiGround: 0x1a2028, hemiInt: 0.85,
+    keyInt: 1.6, frontAInt: 0.95, frontBInt: 0.5, fillInt: 12, rimAInt: 55, rimBInt: 40,
+    exposure: 1.0,
+    gridA: 0x232b36, gridB: 0x151b23, gridOpacity: 0.28,
+    poolOpacity: 0.16
+  },
+  light: {
+    bg: 0x7f8b99,
+    carcass: 0x4a525c, frame: 0x373e47, handle: 0x4a525c,
+    floor: 0x69737e, plate: 0x333942, plateEmissive: 0x1a2028, liner: 0x3f464f,
+    wall: 0x6f7986,
+    hemiSky: 0xffffff, hemiGround: 0x5c6672, hemiInt: 0.7,
+    keyInt: 0.85, frontAInt: 0.55, frontBInt: 0.3, fillInt: 4, rimAInt: 20, rimBInt: 14,
+    exposure: 1.0,
+    gridA: 0x59636e, gridB: 0x67717d, gridOpacity: 0.4,
+    poolOpacity: 0.08
+  }
+};
+
+let currentTheme = 'dark';
+
+function applyTheme(mode) {
+  currentTheme = (mode === 'light') ? 'light' : 'dark';
+  const t = SCENE_THEME[currentTheme];
+  const light = currentTheme === 'light';
+
+  // 2D chrome
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', light ? '#eef2f7' : '#07090d');
+
+  // 3D scene
+  scene.background.setHex(t.bg);
+  scene.fog.color.setHex(t.bg);
+
+  THEME_PARTS.carcass.color.setHex(t.carcass);
+  THEME_PARTS.frame.color.setHex(t.frame);
+  THEME_PARTS.handle.color.setHex(t.handle);
+  THEME_PARTS.floor.color.setHex(t.floor);
+  THEME_PARTS.wall.color.setHex(t.wall);
+  THEME_PARTS.plate.color.setHex(t.plate);
+  THEME_PARTS.plate.emissive.setHex(t.plateEmissive);
+  THEME_PARTS.liner.color.setHex(t.liner);
+
+  hemi.color.setHex(t.hemiSky);
+  hemi.groundColor.setHex(t.hemiGround);
+  hemi.intensity = t.hemiInt;
+  key.intensity = t.keyInt;
+  frontA.intensity = t.frontAInt;
+  frontB.intensity = t.frontBInt;
+  fill.intensity = t.fillInt;
+  rimA.intensity = t.rimAInt;
+  rimB.intensity = t.rimBInt;
+  renderer.toneMappingExposure = t.exposure;
+
+  grid.material.color.setHex(t.gridA);
+  grid.material.opacity = t.gridOpacity;
+  pool.material.opacity = t.poolOpacity;
+
+  buildEnv(currentTheme);
+
+  // Lockers: repaint (the render loop reads statusTint / re-applies per frame)
+  lockers.forEach(L => applyStatus(L));
+
+  // Icon + storage
+  const moon = document.getElementById('iconMoon');
+  const sun = document.getElementById('iconSun');
+  if (moon) moon.classList.toggle('hidden', light);
+  if (sun) sun.classList.toggle('hidden', !light);
+  try { localStorage.setItem('ilocker-theme', currentTheme); } catch (e) {}
+}
+
+/* Apply saved theme as early as possible (avoids a flash of the wrong theme) */
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('ilocker-theme'); } catch (e) {}
+  if (!saved && matchMedia('(prefers-color-scheme: light)').matches) saved = 'light';
+  applyTheme(saved || 'dark');
+})();
 
 /* ══════════════════════════════════════════════════════════
    UI WIRING
@@ -949,7 +1181,7 @@ function openDrawer(L) {
           <p class="text-[10px] text-slate-400 uppercase tracking-wider">Booked</p>
           <p class="font-mono text-[11px] mt-1 text-slate-300">${fmt(L.bookedAt)}</p>
         </div>
-        <div class="rounded-xl p-3 border" style="background:${overdue ? '#ef444414' : '#ffffff08'};border-color:${overdue ? '#ef444433' : 'rgba(255,255,255,.08)'}">
+        <div class="rounded-xl p-3 border" style="background:${overdue ? '#ff3b3b1a' : '#ffffff08'};border-color:${overdue ? '#ff3b3b44' : 'rgba(255,255,255,.08)'}">
           <p class="text-[10px] uppercase tracking-wider" style="color:${overdue ? '#fca5a5' : '#94a3b8'}">Due</p>
           <p class="font-mono text-[11px] mt-1" style="color:${overdue ? '#fecaca' : '#e2e8f0'}">${fmt(L.dueAt)}</p>
         </div>
@@ -1013,7 +1245,7 @@ function flash(L, from) {
   })();
 }
 
-function toast(msg, color = '#22c55e') {
+function toast(msg, color = '#22e06a') {
   const el = document.createElement('div');
   el.className = 'toast-enter glass rounded-xl px-4 py-2.5 text-xs font-600 flex items-center gap-2';
   el.innerHTML = `<span class="dot" style="background:${color}"></span>${msg}`;
@@ -1033,7 +1265,7 @@ $('#dBook').onclick = () => {
   L.bookedAt = Date.now(); L.durationHrs = chosenDur; L.dueAt = Date.now() + chosenDur * 3600e3;
   flash(L, from); refreshStats(); openDrawer(L);
   // PDPA: never echo the holder's name into the public UI.
-  toast(`${L.id} is now booked`, '#f97316');
+  toast(`${L.id} is now booked`, '#ff9526');
   slotMeshes.get(L.id).targetOpen = 0;
 };
 
@@ -1043,7 +1275,7 @@ $('#dRelease').onclick = () => {
   const from = STATUS[L.status];
   L.status = 'available'; L.student = null; L.sid = null; L.dueAt = null; L.bookedAt = null;
   flash(L, from); refreshStats(); openDrawer(L);
-  toast(`${L.id} released — now available`, '#22c55e');
+  toast(`${L.id} released — now available`, '#22e06a');
 };
 
 $('#dOverdue').onclick = () => {
@@ -1052,7 +1284,7 @@ $('#dOverdue').onclick = () => {
   const from = STATUS[L.status];
   L.status = 'available'; L.student = null; L.sid = null; L.dueAt = null; L.bookedAt = null;
   flash(L, from); refreshStats(); openDrawer(L);
-  toast(`Key returned · ${L.id} is available`, '#22c55e');
+  toast(`Key returned · ${L.id} is available`, '#22e06a');
 };
 
 /* ── Camera fly-to ────────────────────────────── */
@@ -1072,9 +1304,10 @@ function flyTo(L) {
 
 /* Auto-fit the whole bank in view for the current aspect ratio.
    Portrait phones use a straight-on, slightly raised angle so the full
-   4-bank row fills the screen instead of cutting a diagonal. */
+   4-bank row fills the screen instead of cutting a diagonal.
+   Returns the pose so resetView() can animate to the same place. */
 const DEFAULT_VIEW = new THREE.Vector3(7.5, 5.2, 11.5);   // desktop 3/4 view
-function fitCamera() {
+function homePose() {
   const aspect = innerWidth / innerHeight;
   const portrait = aspect < 1.05;
 
@@ -1094,9 +1327,24 @@ function fitCamera() {
     ? new THREE.Vector3(0, 0.14, 1).normalize()
     : DEFAULT_VIEW.clone().normalize();
 
-  camera.position.copy(dir.multiplyScalar(dist));
-  controls.target.set(0, 2.1, 0);
+  return { pos: dir.multiplyScalar(dist), target: new THREE.Vector3(0, 2.1, 0) };
+}
+
+function fitCamera() {
+  const home = homePose();
+  camera.position.copy(home.pos);
+  controls.target.copy(home.target);
   controls.update();
+}
+
+/* Reset View: smoothly return to the fitted home pose, close any open door
+   and clear interaction state. Uses the same camAnim tween as flyTo(). */
+function resetView() {
+  const home = homePose();
+  slotMeshes.forEach(r => { r.targetOpen = 0; r.targetHover = 0; });
+  camAnim.from.copy(camera.position);   camAnim.to.copy(home.pos);
+  camAnim.tFrom.copy(controls.target);  camAnim.tTo.copy(home.target);
+  camAnim.t = 0; camAnim.start = performance.now();
 }
 
 /* ── Resize / orientation change ──────────────── */
@@ -1113,6 +1361,16 @@ addEventListener('resize', () => onResize(false));
 addEventListener('orientationchange', () => setTimeout(() => onResize(true), 250));
 onResize(false);
 if (innerWidth < 768) fitCamera();
+
+/* ── Top-bar controls ─────────────────────────── */
+$('#btnReset').addEventListener('click', () => { closeDrawer(); resetView(); });
+$('#btnTheme').addEventListener('click', () => {
+  applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+});
+
+/* A user grabbing the camera cancels any in-flight fly/reset tween,
+   so the two never fight over the camera. */
+controls.addEventListener('start', () => { camAnim.t = 1; });
 
 /* ══════════════════════════════════════════════════════════
    RENDER LOOP
@@ -1154,8 +1412,11 @@ function tick() {
     // matching status is unmistakable.
     if (activeFilter && !match) {
       rec.doorMat.color.copy(rec.statusTint).lerp(new THREE.Color(0x394049), 0.82);
+      rec.panelMat.color.copy(rec.doorMat.color);
       rec.doorMat.emissive.set(0x000000);
       rec.doorMat.emissiveIntensity = 0;
+      rec.panelMat.emissive.set(0x000000);
+      rec.panelMat.emissiveIntensity = 0;
       rec.glow.material.opacity += (0 - rec.glow.material.opacity) * Math.min(1, dt * 10);
       rec.tag.material.opacity += (0.06 - rec.tag.material.opacity) * Math.min(1, dt * 10);
       rec.num.material.opacity += (0.05 - rec.num.material.opacity) * Math.min(1, dt * 10);
@@ -1163,20 +1424,33 @@ function tick() {
     }
 
     rec.doorMat.color.copy(rec.statusTint);
+    rec.panelMat.color.copy(rec.statusTint).multiplyScalar(1.06);
 
-    // Subtle emissive lift on hover/open only (doors stay metal)
+    // ── Red overdue: strong breathing pulse (door + glow in sync) ──
+    // One smooth swell-and-fade (~2.9s cycle) drives emissive, glow opacity
+    // and a slight glow scale, so the whole locker reads as one alert beacon.
+    const breath = 0.5 + 0.5 * Math.sin(t * 2.2);
+
+    // Emissive: bold paint holds a base glow; hover/open adds a lift
     const lift = rec.hover * 0.45 + rec.open * 0.3;
-    const overduePulse = isOverdue ? (0.25 + Math.sin(t * 3.2) * 0.18) : 0.08;
-    rec.doorMat.emissiveIntensity = overduePulse + lift;
+    if (isOverdue) {
+      rec.doorMat.emissiveIntensity = (0.22 + 0.45 * breath) + lift;
+    } else {
+      rec.doorMat.emissiveIntensity = 0.04 + lift;
+    }
     rec.doorMat.emissive.copy(rec.tag.material.color).multiplyScalar(isOff ? 0.02 : 1);
+    rec.panelMat.emissiveIntensity = rec.doorMat.emissiveIntensity;
+    rec.panelMat.emissive.copy(rec.doorMat.emissive);
 
-    // Glow target — status base + interaction + overdue pulse
+    // Glow plane: status base + interaction, overdue gets the full breath
     let pulse;
     if (isOff) pulse = 0;
-    else if (isOverdue) pulse = 0.18 + Math.abs(Math.sin(t * 2.6)) * 0.3;
-    else pulse = 0.16 + rec.hover * 0.28 + rec.open * 0.18;
+    else if (isOverdue) pulse = 0.45 + 0.5 * breath;
+    else pulse = 0.38 + rec.hover * 0.3 + rec.open * 0.2;
     rec.glow.material.opacity += (pulse - rec.glow.material.opacity) * Math.min(1, dt * 8);
-    // Glow tracks the door as it nudges out / swings open
+    // Glow tracks the door as it nudges out / swings open; overdue also throbs
+    const glowScale = isOverdue ? 1 + 0.06 * breath : 1;
+    rec.glow.scale.setScalar(glowScale);
     rec.glow.position.set(rec.baseX, rec.baseY, doorFrontZ + rec.hover * 0.09 + rec.open * 0.22);
 
     // Tag + number respond to interaction / filter
