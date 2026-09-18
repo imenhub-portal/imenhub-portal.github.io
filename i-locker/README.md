@@ -1,6 +1,29 @@
 # i-Locker 3D
 
-Interactive 3D locker-booking interface for students — **4 banks (A/B/C/D) × 3×3 = 36 lockers**, built with Three.js.
+Interactive 3D locker-booking interface for students — **4 locker banks (L1–L4) × 3×3 = 36 cabinets (K1–K9)**, built with Three.js.
+
+## Naming
+
+A cabinet is addressed as **`L{n}-K{n}`**:
+
+- **`L{n}`** — the locker bank, `L1`–`L4` (shown on the label floating above each bank)
+- **`K{n}`** — the cabinet slot, `K1`–`K9` (shown on the door decal)
+- Ordered top-left → across → down: `K1..K3` top row, `K4..K6` middle, `K7..K9` bottom
+
+So `L2-K5` = bank 2, middle-row centre cabinet.
+
+Internally there are two separate identities, on purpose:
+
+| Field  | Example | Used for |
+|--------|---------|----------|
+| `key`  | `25` (number) | every lookup — Maps, mesh userData, filters |
+| `id`   | `L2-K5` | display only (drawer, tooltip, toasts) |
+| `code` | `K5` | door decal |
+
+Because the **lookup key is a number**, renaming the display text can never
+silently break a lookup. A boot-time integrity check asserts all 36 cabinets
+round-trip and fails loudly if they ever don't.
+
 
 > **Stage: live demo (UI only).** All data is in-memory and resets on refresh.
 > There is **no backend wired up yet** — booking/release actions are dummy
@@ -22,6 +45,11 @@ https://imenhub-portal.github.io/i-locker/
 Doors are painted in bold status colours (not just tinted grey), so the state
 reads from any angle. Overdue lockers breathe — the door glow and edge tag swell
 and fade on a ~2.9s cycle, matching the pulsing dot in the header.
+
+**Locked and held cabinets** get a *blitz sweep*: a diagonal light sheen travels
+across the door every few seconds (each door phase-offset so they don't move in
+lockstep). Grey/sealed doors also show a gently pulsing padlock; orange/held
+doors get the warm-tinted sweep without the padlock.
 
 ## Controls
 

@@ -318,8 +318,8 @@ tailwind.config = {
     <div class="p-5 pb-4 border-b border-white/8">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-[10px] uppercase tracking-[.2em] text-slate-400 font-600" id="dUnit">Unit A</p>
-          <h2 class="text-3xl font-800 tracking-tight mt-1" id="dId">A1</h2>
+          <p class="text-[10px] uppercase tracking-[.2em] text-slate-400 font-600" id="dUnit">Locker L1</p>
+          <h2 class="text-3xl font-800 tracking-tight mt-1" id="dId">L1-K1</h2>
         </div>
         <button id="dClose" class="w-8 h-8 rounded-lg grid place-items-center text-slate-400 hover:text-white hover:bg-white/8 transition">
           <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -333,11 +333,11 @@ tailwind.config = {
         <div class="grid grid-cols-2 gap-2 mb-4">
           <div class="rounded-xl bg-white/4 border border-white/8 p-3">
             <p class="text-[10px] text-slate-400 uppercase tracking-wider">Unit</p>
-            <p class="font-mono text-sm mt-1" id="dMetaUnit">A</p>
+            <p class="font-mono text-sm mt-1" id="dMetaUnit">L1</p>
           </div>
           <div class="rounded-xl bg-white/4 border border-white/8 p-3">
             <p class="text-[10px] text-slate-400 uppercase tracking-wider">Slot</p>
-            <p class="font-mono text-sm mt-1" id="dMetaSlot">1</p>
+            <p class="font-mono text-sm mt-1" id="dMetaSlot">K1</p>
           </div>
         </div>
 
@@ -418,12 +418,28 @@ const STATUS = {
   unavailable: { label: 'Unavailable', hex: 0x9aa1a8, glow: 0x6b7280, ui: '#8b9299', text: 'text-slate-400',  desc: 'Out of service' }
 };
 
-const UNITS = ['A', 'B', 'C', 'D'];
-const GRID = 3;                    // 3 x 3 slots per unit
+/* ── NAMING ─────────────────────────────────────────────────────────────
+   L{n} = locker bank    (L1..L4)
+   K{n} = cabinet slot   (K1..K9, ordered top-left → across → down)
+
+   A cabinet is therefore addressed as  L2-K5  (bank 2, slot 5).
+
+   Two separate identities, on purpose:
+     • key  — a NUMBER, used for every lookup (Maps, mesh userData, filters).
+              Renaming the display text can never break a lookup.
+     • id   — the DISPLAY string 'L2-K5'. Never used as a key.
+     • code — the door decal 'K5'. The bank is already labelled by its sprite.
+   ─────────────────────────────────────────────────────────────────────── */
+const BANK_COUNT = 4;              // L1..L4
+const GRID = 3;                    // 3 x 3 cabinets per bank
 const SLOT_W = 1.0, SLOT_H = 1.0, SLOT_D = 1.25;
 const GAP = 0.06;
 const UNIT_W = GRID * SLOT_W + (GRID - 1) * GAP;
 const UNIT_GAP = 0.7;
+
+const lockerKey  = (bank, slot) => bank * 10 + slot;      // 11..49 — logic key
+const lockerId   = (bank, slot) => `L${bank}-K${slot}`;   // 'L2-K5' — display
+const lockerCode = (slot) => `K${slot}`;                  // 'K5'    — decal
 
 /* ══════════════════════════════════════════════════════════
    IN-MEMORY DEMO DATA  (swap for backend later)
@@ -461,18 +477,21 @@ const DURATIONS = [
 ];
 let uid = 0;
 const lockers = [];
-UNITS.forEach(u => {
+for (let bank = 1; bank <= BANK_COUNT; bank++) {
   for (let r = 0; r < GRID; r++) {
     for (let c = 0; c < GRID; c++) {
-      const n = r * GRID + c + 1;
+      const slot = r * GRID + c + 1;               // top-left → across → down
       lockers.push({
-        id: `${u}${n}`, unit: u, unitIndex: UNITS.indexOf(u), slot: n,
-        row: r, col: c, status: 'unavailable', student: null, sid: null,
+        key: lockerKey(bank, slot),
+        id: lockerId(bank, slot),
+        code: lockerCode(slot),
+        bank, slot, row: r, col: c,
+        status: 'unavailable', student: null, sid: null,
         bookedAt: null, dueAt: null, durationHrs: null, _uid: uid++
       });
     }
   }
-});
+}
 
 // Seed a believable mix so all 4 colours render immediately
 (function seed() {
@@ -683,6 +702,67 @@ const panelGeo = new THREE.BoxGeometry(SLOT_W - GAP * 1.4 - 0.16, SLOT_H - GAP *
 const tagGeo = new THREE.BoxGeometry(0.16, 0.16, 0.02);
 const doorFrontZ = 0.115;     // world z of a closed door's front face
 
+/* ── BLITZ SWEEP (locked + held doors) ──────────────────────────────────
+   A tall, narrow plane carrying a soft gradient band travels diagonally
+   across the door face every few seconds — a premium "scanning/sealed"
+   sheen. One shared texture; per-door materials tint it. */
+const SWEEP_W = SLOT_W * 0.72;
+const SWEEP_H = SLOT_H * 2.1;             // taller than the door so it never clips
+const sweepGeo = new THREE.PlaneGeometry(SWEEP_W, SWEEP_H);
+
+const sweepTexture = (function makeSweepTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 64; cv.height = 256;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  // transparent → bright core → transparent, so it reads as a light band
+  g.addColorStop(0.00, 'rgba(255,255,255,0)');
+  g.addColorStop(0.42, 'rgba(255,255,255,0.05)');
+  g.addColorStop(0.50, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.58, 'rgba(255,255,255,0.05)');
+  g.addColorStop(1.00, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 256);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+})();
+
+/* Sweep tints: cool sheen for a sealed locker, warm sheen for a held one. */
+const SWEEP_TINT = { locked: 0x9fd0ff, held: 0xffc98a };
+
+/* Padlock glyph canvas — shown faintly on sealed (unavailable) doors. */
+const padlockTexture = (function makePadlockTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, 256, 256);
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = 16; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // shackle
+  ctx.beginPath();
+  ctx.arc(128, 104, 42, Math.PI, 0);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(86, 104); ctx.lineTo(86, 132);
+  ctx.moveTo(170, 104); ctx.lineTo(170, 132);
+  ctx.stroke();
+  // body
+  ctx.beginPath();
+  ctx.roundRect(66, 130, 124, 92, 16);
+  ctx.stroke();
+  // keyhole
+  ctx.beginPath();
+  ctx.arc(128, 164, 13, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(128, 175); ctx.lineTo(128, 196);
+  ctx.stroke();
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+})();
+
 /* Door paint: saturated status colour carried on painted metal.
    Low metalness keeps the hue dominant; the panel insert shares the colour. */
 const DOOR_METAL = { roughness: 0.5, metalness: 0.28, envMapIntensity: 0.9 };
@@ -715,9 +795,10 @@ function numberMaterial(id) {
   return numberMats.get(id);
 }
 
-const totalBankW = UNITS.length * UNIT_W + (UNITS.length - 1) * UNIT_GAP;
+const totalBankW = BANK_COUNT * UNIT_W + (BANK_COUNT - 1) * UNIT_GAP;
 
-UNITS.forEach((u, ui) => {
+for (let bank = 1; bank <= BANK_COUNT; bank++) {
+  const ui = bank - 1;
   const unitX = -totalBankW / 2 + ui * (UNIT_W + UNIT_GAP) + UNIT_W / 2;
 
   // Carcass: a solid dark box behind the doors
@@ -748,8 +829,8 @@ UNITS.forEach((u, ui) => {
 
   for (let r = 0; r < GRID; r++) {
     for (let c = 0; c < GRID; c++) {
-      const n = r * GRID + c + 1;
-      const L = lockers.find(x => x.unit === u && x.slot === n);
+      const slot = r * GRID + c + 1;
+      const L = lockers.find(x => x.bank === bank && x.slot === slot);
 
       const x = unitX - UNIT_W / 2 + SLOT_W / 2 + c * (SLOT_W + GAP);
       const y = (GRID - 1 - r) * (SLOT_H + GAP) + SLOT_H / 2;   // row 0 = top
@@ -799,8 +880,30 @@ UNITS.forEach((u, ui) => {
       handle.position.set((SLOT_W - GAP * 1.4) - 0.11, 0, 0.055);
       hinge.add(handle);
 
-      // Slot number decal (canvas)
-      const num = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.15), numberMaterial(L.id));
+      // Blitz sweep band — diagonal sheen that travels across shipped doors
+      const sweep = new THREE.Mesh(sweepGeo, new THREE.MeshBasicMaterial({
+        map: sweepTexture, color: SWEEP_TINT.locked, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      }));
+      sweep.rotation.z = THREE.MathUtils.degToRad(20);
+      sweep.position.set((SLOT_W - GAP * 1.4) / 2, 0, 0.082);
+      sweep.visible = false;
+      hinge.add(sweep);
+
+      // Padlock glyph — sealed (unavailable) doors only, gently pulsing
+      const lock = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.3, 0.3),
+        new THREE.MeshBasicMaterial({
+          map: padlockTexture, transparent: true, opacity: 0,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        })
+      );
+      lock.position.set((SLOT_W - GAP * 1.4) / 2, SLOT_H * 0.06, 0.085);
+      lock.visible = false;
+      hinge.add(lock);
+
+      // Slot decal — cabinet code only (K1..K9); the bank is labelled by its sprite
+      const num = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.15), numberMaterial(L.code));
       num.position.set((SLOT_W - GAP * 1.4) / 2, (SLOT_H - GAP * 1.4) / 2 - 0.17, 0.079);
       hinge.add(num);
 
@@ -812,15 +915,16 @@ UNITS.forEach((u, ui) => {
       glow.position.set(x, y, doorFrontZ);
       bankGroup.add(glow);
 
-      const rec = { L, hinge, door, doorMat, panelMat, handle, glow, num, tag, baseX: x, baseY: y,
+      const rec = { L, hinge, door, doorMat, panelMat, handle, glow, num, tag, sweep, lock,
+                    baseX: x, baseY: y, sweepW: SWEEP_W,
                     open: 0, targetOpen: 0, hover: 0, targetHover: 0 };
-      slotMeshes.set(L.id, rec);
+      slotMeshes.set(L.key, rec);            // keyed by NUMBER — rename-proof
 
       // ── Interaction (per-mesh raycast) ──
-      for (const m of [door, handle, panel, tag]) { m.userData.slotId = L.id; m.userData.pickable = true; }
+      for (const m of [door, handle, panel, tag]) { m.userData.slotKey = L.key; m.userData.pickable = true; }
     }
   }
-});
+}
 
 /* Room side walls (subtle) */
 const wallMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.85, metalness: 0.2 });
@@ -829,28 +933,29 @@ const backWall = new THREE.Mesh(new THREE.PlaneGeometry(60, 24), wallMat);
 backWall.position.set(0, 10, -SLOT_D - 6.8); backWall.receiveShadow = true;
 scene.add(backWall);
 
-/* Unit letter sprites floating above each bank */
-UNITS.forEach((u, ui) => {
-  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+/* Bank label sprites floating above each bank — L1..L4 */
+for (let bank = 1; bank <= BANK_COUNT; bank++) {
+  const ui = bank - 1;
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.font = '700 84px Sora, sans-serif';
+  ctx.font = '700 72px Sora, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(u, 64, 68);
+  ctx.fillText(`L${bank}`, 128, 68);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.9 }));
   const unitX = -totalBankW / 2 + ui * (UNIT_W + UNIT_GAP) + UNIT_W / 2;
-  spr.scale.set(0.9, 0.9, 1);
+  spr.scale.set(0.9, 0.45, 1);
   spr.position.set(unitX, GRID * SLOT_H + (GRID - 1) * GAP + 0.95, 0.1);
   bankGroup.add(spr);
-});
+}
 
 /* ══════════════════════════════════════════════════════════
    APPLY STATUS → MATERIAL COLOR
    ══════════════════════════════════════════════════════════ */
 function applyStatus(L, animate = true) {
-  const rec = slotMeshes.get(L.id);
+  const rec = slotMeshes.get(L.key);
   if (!rec) return;
   const cfg = STATUS[L.status];
   const target = new THREE.Color(cfg.hex);
@@ -879,9 +984,48 @@ function applyStatus(L, animate = true) {
   rec.tag.visible = !off;
 
   rec.num.material.opacity = off ? 0.1 : 0.42;
+
+  // ── Blitz sweep: sealed (locked) and held (booked) doors only ──
+  const swept = (L.status === 'unavailable' || L.status === 'booked');
+  rec.sweep.visible = swept;
+  if (swept) {
+    rec.sweep.material.color.setHex(L.status === 'booked' ? SWEEP_TINT.held : SWEEP_TINT.locked);
+    rec.sweep.material.opacity = 0;
+  }
+
+  // ── Padlock: sealed doors only ──
+  rec.lock.visible = off;
+  rec.lock.material.opacity = 0;
 }
 
 lockers.forEach(L => applyStatus(L, false));
+
+/* ── BOOT INTEGRITY CHECK ───────────────────────────────────────────────
+   display id (L2-K5) and lookup key (25) are separate, so a mismatch could
+   fail silently (door renders, click does nothing). Assert every locker
+   round-trips; if not, fail loudly here instead of mysteriously later. */
+(function assertIntegrity() {
+  const problems = [];
+  if (lockers.length !== BANK_COUNT * GRID * GRID) {
+    problems.push(`expected ${BANK_COUNT * GRID * GRID} lockers, built ${lockers.length}`);
+  }
+  lockers.forEach(L => {
+    const rec = slotMeshes.get(L.key);
+    if (!rec) { problems.push(`no mesh for key ${L.key} (${L.id})`); return; }
+    if (rec.L !== L) problems.push(`mesh/Locker mismatch for key ${L.key}`);
+    if (L.id !== lockerId(L.bank, L.slot)) problems.push(`id ${L.id} != L${L.bank}-K${L.slot}`);
+    if (L.code !== lockerCode(L.slot)) problems.push(`code ${L.code} != K${L.slot}`);
+    if (slotMeshes.has(L.id)) problems.push(`key collision: display id ${L.id} used as a key`);
+  });
+  if (problems.length) {
+    console.error('[i-Locker] INTEGRITY FAILURE:', problems);
+    const boot = document.getElementById('boot');
+    if (boot) boot.innerHTML = '<div style="color:#ff6b6b;font-family:monospace;font-size:12px;padding:20px;max-width:640px">' +
+      '<b>i-Locker failed its integrity check</b><br>' + problems.slice(0, 8).join('<br>') + '</div>';
+  } else {
+    console.log(`[i-Locker] integrity OK — ${lockers.length} cabinets, ids ${lockers[0].id}…${lockers[lockers.length-1].id}`);
+  }
+})();
 
 /* ══════════════════════════════════════════════════════════
    THEME — dark (default) / light
@@ -1060,15 +1204,15 @@ refreshStats();
 const tip = $('#tooltip');
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-let hoveredId = null;
+let hoveredKey = null;
 
-function setHover(id) {
-  if (hoveredId === id) return;
-  if (hoveredId && slotMeshes.has(hoveredId)) slotMeshes.get(hoveredId).targetHover = 0;
-  hoveredId = id;
-  if (id && slotMeshes.has(id)) {
-    slotMeshes.get(id).targetHover = 1;
-    const L = slotMeshes.get(id).L;
+function setHover(key) {
+  if (hoveredKey === key) return;
+  if (hoveredKey && slotMeshes.has(hoveredKey)) slotMeshes.get(hoveredKey).targetHover = 0;
+  hoveredKey = key;
+  if (key && slotMeshes.has(key)) {
+    slotMeshes.get(key).targetHover = 1;
+    const L = slotMeshes.get(key).L;
     $('#ttId').textContent = L.id;
     $('#ttStatus').textContent = '· ' + STATUS[L.status].label;
     $('#ttDot').style.background = STATUS[L.status].ui;
@@ -1083,7 +1227,7 @@ function pickSlot() {
   raycaster.setFromCamera(pointer, camera);
   const hits = raycaster.intersectObject(bankGroup, true);
   for (const h of hits) {
-    if (h.object.userData.pickable && h.object.userData.slotId) return h.object.userData.slotId;
+    if (h.object.userData.pickable && h.object.userData.slotKey != null) return h.object.userData.slotKey;
   }
   return null;
 }
@@ -1093,9 +1237,9 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   if (IS_TOUCH) return;         // no hover concept on a touchscreen
   pointer.x = (e.clientX / innerWidth) * 2 - 1;
   pointer.y = -(e.clientY / innerHeight) * 2 + 1;
-  const id = pickSlot();
-  if (id) {
-    setHover(id);
+  const key = pickSlot();
+  if (key != null) {
+    setHover(key);
     tip.style.left = (e.clientX + 16) + 'px';
     tip.style.top = (e.clientY + 16) + 'px';
     renderer.domElement.style.cursor = 'pointer';
@@ -1110,14 +1254,14 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   if (!IS_TOUCH) return;
   pointer.x = (e.clientX / innerWidth) * 2 - 1;
   pointer.y = -(e.clientY / innerHeight) * 2 + 1;
-  const id = pickSlot();
-  if (id && slotMeshes.has(id)) slotMeshes.get(id).targetHover = 1;
+  const key = pickSlot();
+  if (key != null && slotMeshes.has(key)) slotMeshes.get(key).targetHover = 1;
 });
 
 /* ── Drawer ───────────────────────────────────── */
 const drawer = $('#drawer');
 const DUR_WRAP = $('#dDur');
-let selectedId = null, chosenDur = 72;
+let selectedKey = null, chosenDur = 72;
 
 DURATIONS.forEach((d, i) => {
   const b = document.createElement('button');
@@ -1140,12 +1284,12 @@ function fmt(ts) {
 }
 
 function openDrawer(L) {
-  selectedId = L.id;
+  selectedKey = L.key;
   const cfg = STATUS[L.status];
-  $('#dId').textContent = L.id;
-  $('#dUnit').textContent = 'Unit ' + L.unit;
-  $('#dMetaUnit').textContent = L.unit;
-  $('#dMetaSlot').textContent = L.slot;
+  $('#dId').textContent = L.id;                 // 'L2-K5'
+  $('#dUnit').textContent = 'Locker L' + L.bank;
+  $('#dMetaUnit').textContent = 'L' + L.bank;   // 'L2'
+  $('#dMetaSlot').textContent = L.code;         // 'K5'
   const badge = $('#dBadge');
   badge.innerHTML = `<span class="dot ${L.status === 'overdue' ? 'overdue' : ''}" style="background:${cfg.ui}"></span> ${cfg.label}`;
   badge.className = 'inline-flex items-center gap-2 mt-3 px-2.5 py-1 rounded-lg text-[11px] font-600';
@@ -1197,7 +1341,7 @@ function openDrawer(L) {
 
 function closeDrawer() {
   drawer.classList.add('closed');
-  selectedId = null;
+  selectedKey = null;
   slotMeshes.forEach(r => r.targetOpen = 0);
 }
 
@@ -1218,11 +1362,11 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 
   pointer.x = (e.clientX / innerWidth) * 2 - 1;
   pointer.y = -(e.clientY / innerHeight) * 2 + 1;
-  const id = pickSlot();
-  if (id) {
-    const L = slotMeshes.get(id).L;
+  const key = pickSlot();
+  if (key != null) {
+    const L = slotMeshes.get(key).L;
     slotMeshes.forEach(r => r.targetOpen = 0);
-    slotMeshes.get(L.id).targetOpen = 1;
+    slotMeshes.get(L.key).targetOpen = 1;
     openDrawer(L);
     flyTo(L);
   }
@@ -1230,7 +1374,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 
 /* Animated status change helper */
 function flash(L, from) {
-  const rec = slotMeshes.get(L.id);
+  const rec = slotMeshes.get(L.key);
   const start = new THREE.Color(from.hex), end = new THREE.Color(STATUS[L.status].hex);
   const t0 = performance.now();
   (function step() {
@@ -1256,7 +1400,7 @@ function toast(msg, color = '#22e06a') {
 
 /* Actions */
 $('#dBook').onclick = () => {
-  const L = lockers.find(x => x.id === selectedId);
+  const L = lockers.find(x => x.key === selectedKey);
   if (!L || L.status !== 'available') return;
   const name = $('#dName').value.trim() || DEMO_NAMES[(Math.random() * DEMO_NAMES.length) | 0];
   const sid = $('#dSid').value.trim() || ('STU-' + (20000 + ((Math.random() * 999) | 0)));
@@ -1266,11 +1410,11 @@ $('#dBook').onclick = () => {
   flash(L, from); refreshStats(); openDrawer(L);
   // PDPA: never echo the holder's name into the public UI.
   toast(`${L.id} is now booked`, '#ff9526');
-  slotMeshes.get(L.id).targetOpen = 0;
+  slotMeshes.get(L.key).targetOpen = 0;
 };
 
 $('#dRelease').onclick = () => {
-  const L = lockers.find(x => x.id === selectedId);
+  const L = lockers.find(x => x.key === selectedKey);
   if (!L) return;
   const from = STATUS[L.status];
   L.status = 'available'; L.student = null; L.sid = null; L.dueAt = null; L.bookedAt = null;
@@ -1279,7 +1423,7 @@ $('#dRelease').onclick = () => {
 };
 
 $('#dOverdue').onclick = () => {
-  const L = lockers.find(x => x.id === selectedId);
+  const L = lockers.find(x => x.key === selectedKey);
   if (!L) return;
   const from = STATUS[L.status];
   L.status = 'available'; L.student = null; L.sid = null; L.dueAt = null; L.bookedAt = null;
@@ -1291,7 +1435,7 @@ $('#dOverdue').onclick = () => {
 const camAnim = { t: 1, dur: 900, from: new THREE.Vector3(), to: new THREE.Vector3(),
                   tFrom: new THREE.Vector3(), tTo: new THREE.Vector3(), start: 0 };
 function flyTo(L) {
-  const rec = slotMeshes.get(L.id);
+  const rec = slotMeshes.get(L.key);
   const wp = new THREE.Vector3(rec.baseX, rec.baseY, 0);
   bankGroup.localToWorld(wp);
   const dist = innerWidth < 768 ? 3.4 : 4.4;
@@ -1420,7 +1564,33 @@ function tick() {
       rec.glow.material.opacity += (0 - rec.glow.material.opacity) * Math.min(1, dt * 10);
       rec.tag.material.opacity += (0.06 - rec.tag.material.opacity) * Math.min(1, dt * 10);
       rec.num.material.opacity += (0.05 - rec.num.material.opacity) * Math.min(1, dt * 10);
+      rec.sweep.material.opacity += (0 - rec.sweep.material.opacity) * Math.min(1, dt * 10);
+      rec.lock.material.opacity += (0 - rec.lock.material.opacity) * Math.min(1, dt * 10);
       return;
+    }
+
+    // ── Blitz sweep: a diagonal sheen travels across sealed + held doors ──
+    // Envelope: ~1.1s of travel, then ~2.2s rest (≈3.3s cycle). Each door is
+    // phase-offset by its key so the bank doesn't sweep in lockstep.
+    if (rec.sweep.visible) {
+      const CYCLE = 3.3, TRAVEL = 1.1;
+      const phase = ((t + (rec.L.key % 9) * 0.37) % CYCLE) / CYCLE;
+      const walk = phase * CYCLE;
+      if (walk < TRAVEL) {
+        const k = walk / TRAVEL;                       // 0..1 across the door
+        const env = Math.sin(k * Math.PI);             // fade in/out, no pop
+        rec.sweep.material.opacity = env * 0.85;
+        // travel from left of the door, across, out the right side
+        const span = rec.sweepW * 1.6;
+        rec.sweep.position.x = (SLOT_W - GAP * 1.4) / 2 + (k - 0.5) * span;
+      } else {
+        rec.sweep.material.opacity += (0 - rec.sweep.material.opacity) * Math.min(1, dt * 8);
+      }
+    }
+
+    // ── Padlock: soft pulse on sealed (unavailable) doors ──
+    if (rec.lock.visible) {
+      rec.lock.material.opacity = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(t * 2.2));
     }
 
     rec.doorMat.color.copy(rec.statusTint);
