@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#07090d" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="i-Locker" />
+<title>i-Locker · 3D Smart Locker Booking</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Sora', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace']
+      },
+      colors: {
+        ink: '#07090d',
+        panel: '#0d1117'
+      }
+    }
+  }
+}
+</script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden; background: #07090d;
+    overscroll-behavior: none;               /* no pull-to-refresh while orbiting */
+    -webkit-tap-highlight-color: transparent; /* no blue flash on tap */
+    -webkit-touch-callout: none;
+  }
+  body { font-family: 'Sora', sans-serif; color: #e6edf3; -webkit-font-smoothing: antialiased; }
+
+  #scene { position: fixed; inset: 0; display: block; touch-action: none; }
+
+  /* Use the full dynamic viewport on mobile (avoids the address-bar jump) */
+  @supports (height: 100dvh) {
+    #scene { height: 100dvh; }
+  }
+
+  /* Soft vignette over the canvas for cinematic depth */
+  .vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background:
+      radial-gradient(120% 90% at 50% 8%, rgba(90,130,255,.10), transparent 55%),
+      radial-gradient(140% 120% at 50% 110%, rgba(0,0,0,.75), transparent 60%);
+  }
+
+  .glass {
+    background: linear-gradient(160deg, rgba(22,27,34,.82), rgba(13,17,23,.72));
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+
+  .chip {
+    transition: transform .18s cubic-bezier(.2,.8,.3,1.2), background-color .2s, border-color .2s, box-shadow .2s;
+  }
+  .chip:hover { transform: translateY(-2px); }
+  .chip.active { box-shadow: 0 0 0 1px currentColor, 0 8px 24px -8px currentColor; }
+
+  /* Status pulse dot */
+  .dot { width: 9px; height: 9px; border-radius: 999px; display:inline-block; }
+  @keyframes pulseRing { 0%{ box-shadow:0 0 0 0 rgba(239,68,68,.55);} 70%{ box-shadow:0 0 0 9px rgba(239,68,68,0);} 100%{box-shadow:0 0 0 0 rgba(239,68,68,0);} }
+  .dot.overdue { animation: pulseRing 1.8s infinite; }
+
+  /* Drawer — side panel on desktop, bottom sheet on phones */
+  #drawer { transition: transform .5s cubic-bezier(.16,1,.3,1), opacity .4s; }
+  #drawer.closed { transform: translateX(calc(100% + 32px)); opacity: 0; pointer-events: none; }
+
+  /* Legend collapses on small screens to keep the 3D view clear */
+  #legendCard { transition: max-height .45s cubic-bezier(.16,1,.3,1), opacity .3s; overflow: hidden; }
+  #legendCard.collapsed { max-height: 44px; }
+  #legendCard.collapsed .legend-body { opacity: 0; pointer-events: none; }
+  .legend-body { transition: opacity .2s; }
+
+  @media (max-width: 767px) {
+    /* Bottom sheet */
+    #drawer {
+      left: 0; right: 0; bottom: 0; top: auto;
+      width: 100%; max-width: 100%;
+      border-radius: 26px 26px 0 0;
+      max-height: 80dvh;
+      padding-bottom: 0;
+    }
+    #drawer.closed { transform: translateY(calc(100% + 32px)); }
+    #drawer > div { border-radius: 26px 26px 0 0; }
+    .sheet-grabber { display: flex; }
+    /* Filter chips get bigger touch targets */
+    #filters .chip { padding: .5rem .7rem; font-size: 11px; }
+    /* Comfortable tap targets */
+    #dClose { width: 44px; height: 44px; }
+    #dBook, #dRelease, #dOverdue { padding-top: .95rem; padding-bottom: .95rem; }
+  }
+  @media (min-width: 768px) {
+    .sheet-grabber { display: none; }
+  }
+
+  /* Notch / home-indicator safe areas */
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+  .btn { transition: transform .15s ease, filter .2s ease, box-shadow .25s ease; }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+  .btn:active { transform: translateY(0) scale(.98); }
+
+  /* Intro fade */
+  #boot { transition: opacity .8s ease; }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 8px; }
+
+  .toast-enter { animation: toastIn .45s cubic-bezier(.16,1,.3,1); }
+  @keyframes toastIn { from { transform: translateY(14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .legend-dot { width: 12px; height: 12px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div class="vignette"></div>
+
+<!-- ══════════ TOP BAR ══════════ -->
+<header class="fixed top-0 left-0 right-0 z-20 px-3 sm:px-6 pt-3 sm:pt-4 safe-top">
+  <div class="glass rounded-2xl px-3 sm:px-5 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-4 justify-between max-w-[1500px] mx-auto">
+    <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0"
+           style="background:linear-gradient(140deg,#22c55e,#0891b2);box-shadow:0 8px 22px -6px rgba(34,197,94,.6)">
+        <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="#04120a" stroke-width="2.1" stroke-linecap="round">
+          <rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v18M15 3v18"/><circle cx="12" cy="12" r="1.4" fill="#04120a"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <h1 class="text-[15px] sm:text-base font-800 leading-none tracking-tight">i-Locker <span class="text-emerald-400">3D</span></h1>
+        <p class="text-[11px] text-slate-400 leading-none mt-1 hidden sm:block">Tap a locker to book · drag to orbit · scroll to zoom</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-3 font-mono text-[11px] sm:text-xs">
+      <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-400/20 text-emerald-300">
+        <span class="dot" style="background:#22c55e"></span><span id="statAvail">0</span><span class="hidden sm:inline opacity-70">avail</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-orange-400/20 text-orange-300">
+        <span class="dot" style="background:#f97316"></span><span id="statBooked">0</span><span class="hidden sm:inline opacity-70">booked</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300">
+        <span class="dot overdue" style="background:#ef4444"></span><span id="statOverdue">0</span><span class="hidden sm:inline opacity-70">overdue</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ LEGEND / FILTER ══════════ -->
+<div class="fixed left-3 sm:left-6 top-[68px] sm:top-28 z-20 w-[200px] sm:w-[210px]">
+  <div id="legendCard" class="glass rounded-2xl p-3 sm:p-4">
+    <button id="legendToggle" class="w-full flex items-center justify-between">
+      <p class="text-[10px] uppercase tracking-[.18em] text-slate-400 font-600">Status Legend</p>
+      <svg id="legendChevron" viewBox="0 0 24 24" class="w-3.5 h-3.5 text-slate-500 transition-transform md:hidden" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="legend-body">
+      <div class="space-y-2 mt-3" id="legend"></div>
+      <div class="h-px bg-white/8 my-3"></div>
+      <p class="text-[10px] uppercase tracking-[.18em] text-slate-400 font-600 mb-2">Quick Filter</p>
+      <div class="flex flex-wrap gap-1.5" id="filters"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ HOVER TOOLTIP ══════════ -->
+<div id="tooltip" class="fixed z-30 pointer-events-none opacity-0 transition-opacity duration-150">
+  <div class="glass rounded-xl px-3 py-2 font-mono text-[11px] whitespace-nowrap">
+    <div class="flex items-center gap-2">
+      <span id="ttDot" class="dot"></span>
+      <span id="ttId" class="font-700 text-white"></span>
+      <span id="ttStatus" class="text-slate-400"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ DETAILS DRAWER ══════════ -->
+<aside id="drawer" class="closed fixed z-30 right-3 sm:right-6 top-24 sm:top-28 bottom-3 sm:bottom-6 w-[330px] max-w-[calc(100vw-1.5rem)]">  <div class="glass rounded-3xl h-full flex flex-col overflow-hidden safe-bottom">
+    <div class="sheet-grabber justify-center pt-2.5 pb-1">
+      <span class="w-10 h-1.5 rounded-full bg-white/25"></span>
+    </div>
+    <div class="p-5 pb-4 border-b border-white/8">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] uppercase tracking-[.2em] text-slate-400 font-600" id="dUnit">Unit A</p>
+          <h2 class="text-3xl font-800 tracking-tight mt-1" id="dId">A1</h2>
+        </div>
+        <button id="dClose" class="w-8 h-8 rounded-lg grid place-items-center text-slate-400 hover:text-white hover:bg-white/8 transition">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="dBadge" class="inline-flex items-center gap-2 mt-3 px-2.5 py-1 rounded-lg text-[11px] font-600"></div>
+    </div>
+
+    <div class="p-5 flex-1 overflow-y-auto">
+      <div id="dAvail">
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <div class="rounded-xl bg-white/4 border border-white/8 p-3">
+            <p class="text-[10px] text-slate-400 uppercase tracking-wider">Unit</p>
+            <p class="font-mono text-sm mt-1" id="dMetaUnit">A</p>
+          </div>
+          <div class="rounded-xl bg-white/4 border border-white/8 p-3">
+            <p class="text-[10px] text-slate-400 uppercase tracking-wider">Slot</p>
+            <p class="font-mono text-sm mt-1" id="dMetaSlot">1</p>
+          </div>
+        </div>
+
+        <label class="block text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Student Name</label>
+        <input id="dName" placeholder="e.g. Ahmad Faiz" class="w-full mb-3 px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 focus:border-emerald-400/60 focus:ring-0 outline-none text-sm placeholder:text-slate-600" />
+
+        <label class="block text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Student ID</label>
+        <input id="dSid" placeholder="e.g. STU-20481" class="w-full mb-3 px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 focus:border-emerald-400/60 focus:ring-0 outline-none text-sm placeholder:text-slate-600" />
+
+        <label class="block text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Duration</label>
+        <div class="flex gap-1.5 mb-4" id="dDur"></div>
+      </div>
+
+      <div id="dInfo" class="hidden space-y-2.5"></div>
+    </div>
+
+    <div class="p-4 border-t border-white/8 space-y-2">
+      <button id="dBook" class="btn w-full py-3 rounded-xl font-700 text-sm text-[#04120a]"
+              style="background:linear-gradient(140deg,#34d399,#22c55e);box-shadow:0 12px 30px -10px rgba(34,197,94,.7)">
+        Book this locker
+      </button>
+      <button id="dRelease" class="btn hidden w-full py-3 rounded-xl font-700 text-sm bg-red-500/15 text-red-300 border border-red-400/25 hover:bg-red-500/25">
+        Release locker
+      </button>
+      <button id="dOverdue" class="btn hidden w-full py-3 rounded-xl font-700 text-sm bg-orange-500/15 text-orange-300 border border-orange-400/25 hover:bg-orange-500/25">
+        Mark key returned
+      </button>
+      <button id="dCancel" class="btn w-full py-2.5 rounded-xl font-500 text-xs text-slate-400 hover:text-white hover:bg-white/6 transition">Close</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════ TOASTS ══════════ -->
+<div id="toasts" class="fixed z-40 bottom-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"></div>
+
+<!-- ══════════ HELP HINT ══════════ -->
+<div class="fixed bottom-5 right-5 z-20 hidden md:block">
+  <div class="glass rounded-xl px-3 py-2 font-mono text-[10px] text-slate-400 flex items-center gap-3">
+    <span><b class="text-slate-200">Drag</b> orbit</span>
+    <span class="opacity-30">|</span>
+    <span><b class="text-slate-200">Scroll</b> zoom</span>
+    <span class="opacity-30">|</span>
+    <span><b class="text-slate-200">Right-drag</b> pan</span>
+  </div>
+</div>
+
+<!-- ══════════ BOOT OVERLAY ══════════ -->
+<div id="boot" class="fixed inset-0 z-50 grid place-items-center" style="background:#07090d">
+  <div class="text-center">
+    <div class="w-12 h-12 mx-auto rounded-2xl spin border-2 border-white/10 border-t-emerald-400"></div>
+    <p class="mt-5 text-sm font-600 tracking-wide">Booting i-Locker 3D…</p>
+    <p class="mt-1 text-[11px] text-slate-500 font-mono">loading locker banks</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ══════════════════════════════════════════════════════════
+   STATUS COLOR SYSTEM
+   ══════════════════════════════════════════════════════════ */
+const STATUS = {
+  available:   { label: 'Available',   hex: 0x22c55e, ui: '#22c55e', text: 'text-emerald-300', desc: 'Ready to book' },
+  booked:      { label: 'Booked',      hex: 0xf97316, ui: '#f97316', text: 'text-orange-300',  desc: 'Currently reserved' },
+  overdue:     { label: 'Overdue',     hex: 0xef4444, ui: '#ef4444', text: 'text-red-300',     desc: 'Key not returned' },
+  unavailable: { label: 'Unavailable', hex: 0x6b7280, ui: '#6b7280', text: 'text-slate-400',   desc: 'Out of service' }
+};
+
+const UNITS = ['A', 'B', 'C', 'D'];
+const GRID = 3;                    // 3 x 3 slots per unit
+const SLOT_W = 1.0, SLOT_H = 1.0, SLOT_D = 1.25;
+const GAP = 0.06;
+const UNIT_W = GRID * SLOT_W + (GRID - 1) * GAP;
+const UNIT_GAP = 0.7;
+
+/* ══════════════════════════════════════════════════════════
+   IN-MEMORY DEMO DATA  (swap for backend later)
+   ══════════════════════════════════════════════════════════ */
+const DEMO_NAMES = ['Ahmad Faiz','Nur Aisyah','Lim Wei Jian','Priya Devi','Muhd Haziq','Tan Mei Ling',
+  'Siti Zulaikha','Raj Kumar','Chong Xin Yi','Farah Nabila','Amirul Hakim','Grace Wong','Danial Iman','Kavitha R.'];
+const DURATIONS = [
+  { label: '1 Day',  hrs: 24 },
+  { label: '3 Days', hrs: 72 },
+  { label: '1 Week', hrs: 168 }
+];
+let uid = 0;
+const lockers = [];
+UNITS.forEach(u => {
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      const n = r * GRID + c + 1;
+      lockers.push({
+        id: `${u}${n}`, unit: u, unitIndex: UNITS.indexOf(u), slot: n,
+        row: r, col: c, status: 'unavailable', student: null, sid: null,
+        bookedAt: null, dueAt: null, durationHrs: null, _uid: uid++
+      });
+    }
+  }
+});
+
+// Seed a believable mix so all 4 colours render immediately
+(function seed() {
+  const pool = [...lockers];
+  const shuffle = a => { for (let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
+  shuffle(pool);
+  pool.forEach((L, i) => {
+    const r = Math.random();
+    if (i < 6) {                                   // 6 overdue
+      L.status = 'overdue';
+      L.student = DEMO_NAMES[(Math.random()*DEMO_NAMES.length)|0];
+      L.sid = 'STU-' + (20000 + ((Math.random()*999)|0));
+      L.durationHrs = 72;
+      L.bookedAt = Date.now() - 5 * 864e5;
+      L.dueAt = Date.now() - 2 * 864e5;
+    } else if (i < 18) {                           // 12 booked
+      L.status = 'booked';
+      L.student = DEMO_NAMES[(Math.random()*DEMO_NAMES.length)|0];
+      L.sid = 'STU-' + (20000 + ((Math.random()*999)|0));
+      L.durationHrs = 72;
+      L.bookedAt = Date.now() - 3600e3;
+      L.dueAt = Date.now() + 60 * 3600e3;
+    } else if (i < 32) {                           // available
+      L.status = 'available';
+    } else {                                        // 4 unavailable
+      L.status = 'unavailable';
+    }
+  });
+})();
+
+/* ══════════════════════════════════════════════════════════
+   THREE.JS SCENE
+   ══════════════════════════════════════════════════════════ */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070a);
+scene.fog = new THREE.Fog(0x05070a, 22, 60);
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(7.5, 5.2, 11.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = 0.7;
+controls.zoomSpeed = 0.9;
+controls.panSpeed = 0.7;
+controls.minDistance = 4.5;
+controls.maxDistance = 60;
+controls.minPolarAngle = Math.PI * 0.16;
+controls.maxPolarAngle = Math.PI * 0.47;
+/* Keep the bank facing the viewer: allow ~75° of exploration each way */
+controls.minAzimuthAngle = -Math.PI * 0.42;
+controls.maxAzimuthAngle = Math.PI * 0.42;
+controls.target.set(0, 2.1, 0);
+
+/* ── Lighting ─────────────────────────────────── */
+scene.add(new THREE.HemisphereLight(0xe8f0ff, 0x1a2028, 0.85));
+
+const key = new THREE.DirectionalLight(0xffffff, 3.0);
+key.position.set(8, 14, 9);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 1; key.shadow.camera.far = 50;
+key.shadow.camera.left = -11; key.shadow.camera.right = 11;
+key.shadow.camera.top = 12; key.shadow.camera.bottom = -3;
+key.shadow.bias = -0.0002;
+key.shadow.normalBias = 0.02;
+scene.add(key);
+
+/* Broad frontal fills so the locker faces are actually lit (metal needs light to read) */
+const frontA = new THREE.DirectionalLight(0xffffff, 1.9);
+frontA.position.set(-3, 5, 14); scene.add(frontA);
+const frontB = new THREE.DirectionalLight(0xd8e4ff, 1.0);
+frontB.position.set(10, 4, 12); scene.add(frontB);
+
+/* Coloured rims: kept tight and low-spill so they accent edges, not flood the room */
+const rimA = new THREE.SpotLight(0x38bdf8, 55, 30, Math.PI / 6, 0.85, 1.8);
+rimA.position.set(-12, 10, -9); rimA.target.position.set(0, 2, 0);
+scene.add(rimA, rimA.target);
+
+const rimB = new THREE.SpotLight(0xa78bfa, 40, 30, Math.PI / 6, 0.9, 1.8);
+rimB.position.set(13, 8, -10); rimB.target.position.set(0, 2, 0);
+scene.add(rimB, rimB.target);
+
+const fill = new THREE.PointLight(0x22d3ee, 12, 24, 2);
+fill.position.set(0, 1.6, 11);
+scene.add(fill);
+
+/* ── Environment (procedural studio reflection) ── */
+(function buildEnv() {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  const geo = new THREE.SphereGeometry(60, 32, 32);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: {},
+    vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `
+      varying vec3 vP;
+      void main(){
+        vec3 d = normalize(vP);
+        float top = smoothstep(-0.3, 1.0, d.y);
+        vec3 sky = mix(vec3(0.10,0.12,0.16), vec3(0.72,0.82,1.0), top);
+        float band = pow(max(0.0, 1.0 - abs(d.y - 0.25)*2.6), 2.5);
+        sky += vec3(0.9,1.0,1.2) * band * 0.9;
+        float glow = pow(max(0.0, -d.z), 3.0) * 0.5;
+        sky += vec3(0.35,0.55,0.9) * glow;
+        float front = pow(max(0.0, d.z), 3.0) * 0.35;
+        sky += vec3(0.6,0.7,0.9) * front;
+        gl_FragColor = vec4(sky, 1.0);
+      }`
+  });
+  envScene.add(new THREE.Mesh(geo, mat));
+  const prevTone = renderer.toneMapping;
+  renderer.toneMapping = THREE.NoToneMapping;
+  const rt = pmrem.fromScene(envScene, 0.04);
+  renderer.toneMapping = prevTone;
+  scene.environment = rt.texture;
+  pmrem.dispose();
+})();
+
+/* ── Materials ────────────────────────────────── */
+const carcassMat = new THREE.MeshStandardMaterial({
+  color: 0x2a3038, roughness: 0.55, metalness: 0.5, envMapIntensity: 1.1
+});
+const frameEdgeMat = new THREE.MeshStandardMaterial({
+  color: 0x1a1f26, roughness: 0.45, metalness: 0.65, envMapIntensity: 1.2
+});
+const handleMat = new THREE.MeshStandardMaterial({
+  color: 0xcfd6dd, roughness: 0.22, metalness: 1.0, envMapIntensity: 1.5
+});
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0x0a0d11, roughness: 0.92, metalness: 0.05, envMapIntensity: 0.25
+});
+
+/* ── Groups ───────────────────────────────────── */
+const world = new THREE.Group();
+scene.add(world);
+
+const bankGroup = new THREE.Group();     // whole bank, idle float
+world.add(bankGroup);
+
+/* ── Floor + grid ─────────────────────────────── */
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.01;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const grid = new THREE.GridHelper(80, 80, 0x232b36, 0x151b23);
+grid.material.transparent = true; grid.material.opacity = 0.28;
+scene.add(grid);
+
+/* Ground pool of light */
+const pool = new THREE.Mesh(
+  new THREE.CircleGeometry(11, 64),
+  new THREE.MeshBasicMaterial({ color: 0x0e5f43, transparent: true, opacity: 0.16 })
+);
+pool.rotation.x = -Math.PI / 2; pool.position.y = 0.005;
+scene.add(pool);
+
+/* ══════════════════════════════════════════════════════════
+   BUILD LOCKER GEOMETRY
+   ══════════════════════════════════════════════════════════ */
+const slotMeshes = new Map();   // id -> { group, door, glow, baseY, ... }
+
+const doorGeo = new THREE.BoxGeometry(SLOT_W - GAP * 1.4, SLOT_H - GAP * 1.4, 0.07);
+doorGeo.translate(0, 0, 0.035);       // back face at pivot plane
+const handleGeo = new THREE.BoxGeometry(0.05, 0.34, 0.05);
+handleGeo.translate(0, 0, 0.05);
+const glowGeo = new THREE.PlaneGeometry(SLOT_W * 0.9, SLOT_H * 0.9);
+const panelGeo = new THREE.BoxGeometry(SLOT_W - GAP * 1.4 - 0.16, SLOT_H - GAP * 1.4 - 0.16, 0.014);
+const tagGeo = new THREE.BoxGeometry(0.16, 0.16, 0.02);
+const doorFrontZ = 0.115;     // world z of a closed door's front face
+
+/* Shared neutral metal — status is conveyed by glow + tag, not by dyeing the door */
+const panelMat = new THREE.MeshStandardMaterial({
+  color: 0x9aa1a8, roughness: 0.55, metalness: 0.5, envMapIntensity: 1.2
+});
+
+/* One canvas-texture material per unit letter+slot number, generated on demand */
+function makePlateTexture(text, sub) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0, 0, 256, 128);
+  ctx.fillStyle = 'rgba(230,240,255,0.92)';
+  ctx.fillStyle = '#0b0e12';
+  ctx.font = '700 62px JetBrains Mono, monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 72);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+const numberMats = new Map();
+function numberMaterial(id) {
+  if (!numberMats.has(id)) {
+    numberMats.set(id, new THREE.MeshBasicMaterial({
+      map: makePlateTexture(id), transparent: true, opacity: 0.55,
+      depthWrite: false
+    }));
+  }
+  return numberMats.get(id);
+}
+
+const totalBankW = UNITS.length * UNIT_W + (UNITS.length - 1) * UNIT_GAP;
+
+UNITS.forEach((u, ui) => {
+  const unitX = -totalBankW / 2 + ui * (UNIT_W + UNIT_GAP) + UNIT_W / 2;
+
+  // Carcass: a solid dark box behind the doors
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(UNIT_W + 0.22, GRID * SLOT_H + (GRID - 1) * GAP, SLOT_D),
+    carcassMat
+  );
+  body.position.set(unitX, (GRID * SLOT_H + (GRID - 1) * GAP) / 2, -SLOT_D / 2 + 0.06);
+  body.castShadow = true; body.receiveShadow = true;
+  bankGroup.add(body);
+
+  // Top plinth / crown
+  const crown = new THREE.Mesh(new THREE.BoxGeometry(UNIT_W + 0.34, 0.16, SLOT_D + 0.1), frameEdgeMat);
+  crown.position.set(unitX, GRID * SLOT_H + (GRID - 1) * GAP + 0.16, -SLOT_D / 2 + 0.1);
+  crown.castShadow = true;
+  bankGroup.add(crown);
+
+  // Base feet
+  const base = new THREE.Mesh(new THREE.BoxGeometry(UNIT_W + 0.34, 0.22, SLOT_D + 0.06), frameEdgeMat);
+  base.position.set(unitX, -0.11, -SLOT_D / 2 + 0.08);
+  base.castShadow = true; base.receiveShadow = true;
+  bankGroup.add(base);
+
+  // Unit letter plate on crown
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.6, 0.24),
+    new THREE.MeshStandardMaterial({ color: 0x1c222b, roughness: 0.5, metalness: 0.7, emissive: 0x0a0e13, emissiveIntensity: 0.4 })
+  );
+  plate.position.set(unitX, GRID * SLOT_H + (GRID - 1) * GAP + 0.17, -SLOT_D / 2 + 0.11 + 0.001);
+  bankGroup.add(plate);
+
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      const n = r * GRID + c + 1;
+      const L = lockers.find(x => x.unit === u && x.slot === n);
+
+      const x = unitX - UNIT_W / 2 + SLOT_W / 2 + c * (SLOT_W + GAP);
+      const y = (GRID - 1 - r) * (SLOT_H + GAP) + SLOT_H / 2;   // row 0 = top
+
+      // Recess liner
+      const liner = new THREE.Mesh(
+        new THREE.BoxGeometry(SLOT_W - 0.02, SLOT_H - 0.02, 0.06),
+        new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.9, metalness: 0.3 })
+      );
+      liner.position.set(x, y, 0.005);
+      bankGroup.add(liner);
+
+      // Door group (swings on left hinge)
+      const hinge = new THREE.Group();
+      hinge.position.set(x - (SLOT_W - GAP * 1.4) / 2, y, 0.03);
+      bankGroup.add(hinge);
+
+      const doorMat = new THREE.MeshStandardMaterial({
+        color: 0x9aa1a8, roughness: 0.46, metalness: 0.55, envMapIntensity: 1.4
+      });
+      const door = new THREE.Mesh(doorGeo, doorMat);
+      door.castShadow = true; door.receiveShadow = true;
+      door.position.x = (SLOT_W - GAP * 1.4) / 2;
+      hinge.add(door);
+
+      // Recessed panel → catches light, reads as a real locker door
+      const panel = new THREE.Mesh(panelGeo, panelMat);
+      panel.position.set((SLOT_W - GAP * 1.4) / 2, 0, 0.062);
+      panel.castShadow = false; panel.receiveShadow = true;
+      hinge.add(panel);
+
+      // Status edge tag (thin glowing bar on the door's outer edge)
+      const tag = new THREE.Mesh(tagGeo, new THREE.MeshBasicMaterial({
+        color: STATUS[L.status].hex, transparent: true, opacity: 0.95,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      }));
+      tag.position.set((SLOT_W - GAP * 1.4) - 0.09, 0, 0.088);
+      hinge.add(tag);
+
+      // Handle
+      const handle = new THREE.Mesh(handleGeo, handleMat);
+      handle.castShadow = true;
+      handle.position.set((SLOT_W - GAP * 1.4) - 0.11, 0, 0.055);
+      hinge.add(handle);
+
+      // Slot number decal (canvas)
+      const num = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.15), numberMaterial(L.id));
+      num.position.set((SLOT_W - GAP * 1.4) / 2, (SLOT_H - GAP * 1.4) / 2 - 0.17, 0.079);
+      hinge.add(num);
+
+      // Status glow (front plane, additive) — sits proud of the closed door face
+      const glow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({
+        color: STATUS[L.status].hex, transparent: true, opacity: 0.0,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      }));
+      glow.position.set(x, y, doorFrontZ);
+      bankGroup.add(glow);
+
+      const rec = { L, hinge, door, doorMat, handle, glow, num, tag, baseX: x, baseY: y,
+                    open: 0, targetOpen: 0, hover: 0, targetHover: 0 };
+      slotMeshes.set(L.id, rec);
+
+      // ── Interaction (per-mesh raycast) ──
+      for (const m of [door, handle, panel, tag]) { m.userData.slotId = L.id; m.userData.pickable = true; }
+    }
+  }
+});
+
+/* Room side walls (subtle) */
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.85, metalness: 0.2 });
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(60, 24), wallMat);
+backWall.position.set(0, 10, -SLOT_D - 6.8); backWall.receiveShadow = true;
+scene.add(backWall);
+
+/* Unit letter sprites floating above each bank */
+UNITS.forEach((u, ui) => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.font = '700 84px Sora, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(u, 64, 68);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.9 }));
+  const unitX = -totalBankW / 2 + ui * (UNIT_W + UNIT_GAP) + UNIT_W / 2;
+  spr.scale.set(0.9, 0.9, 1);
+  spr.position.set(unitX, GRID * SLOT_H + (GRID - 1) * GAP + 0.95, 0.1);
+  bankGroup.add(spr);
+});
+
+/* ══════════════════════════════════════════════════════════
+   APPLY STATUS → MATERIAL COLOR
+   ══════════════════════════════════════════════════════════ */
+function applyStatus(L, animate = true) {
+  const rec = slotMeshes.get(L.id);
+  if (!rec) return;
+  const cfg = STATUS[L.status];
+  const target = new THREE.Color(cfg.hex);
+  const off = (L.status === 'unavailable');
+
+  // Door keeps a metallic grey base but carries a clear status tint so the
+  // colour reads from any angle (green/orange/red), grey when unavailable.
+  const tint = off ? new THREE.Color(0x9aa1a8) : target.clone().lerp(new THREE.Color(0xb9c0c8), 0.42);
+  rec.statusTint = tint;
+  rec.doorMat.color.copy(tint);
+  rec.doorMat.emissive.copy(target).multiplyScalar(off ? 0.02 : 0.14);
+  rec.doorMat.emissiveIntensity = 1.0;
+  rec.doorMat.needsUpdate = true;
+
+  rec.glow.material.color.copy(target);
+  rec.glow.material.opacity = off ? 0.0 : 0.22;
+
+  rec.tag.material.color.copy(target);
+  rec.tag.material.opacity = off ? 0.25 : 0.95;
+  rec.tag.visible = !off;
+
+  rec.num.material.opacity = off ? 0.1 : 0.42;
+}
+
+lockers.forEach(L => applyStatus(L, false));
+
+/* ══════════════════════════════════════════════════════════
+   UI WIRING
+   ══════════════════════════════════════════════════════════ */
+const $ = s => document.querySelector(s);
+const legendEl = $('#legend'), filtersEl = $('#filters');
+let activeFilter = null;
+
+/* Touch device? Hover tooltips are meaningless on touch. */
+const IS_TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
+
+/* Collapsible legend on phones */
+const legendCard = $('#legendCard'), legendToggle = $('#legendToggle'), legendChevron = $('#legendChevron');
+if (IS_TOUCH && innerWidth < 768) {
+  legendCard.classList.add('collapsed');
+  legendChevron.style.transform = 'rotate(-90deg)';
+}
+legendToggle.addEventListener('click', () => {
+  if (innerWidth >= 768) return;
+  const c = legendCard.classList.toggle('collapsed');
+  legendChevron.style.transform = c ? 'rotate(-90deg)' : 'rotate(0deg)';
+});
+legendCard.addEventListener('click', (e) => {
+  if (innerWidth >= 768) return;
+  if (e.target.closest('#legendToggle')) return;
+  if (legendCard.classList.contains('collapsed')) {
+    legendCard.classList.remove('collapsed');
+    legendChevron.style.transform = 'rotate(0deg)';
+  }
+});
+
+/* Legend rows */
+Object.entries(STATUS).forEach(([k, v]) => {
+  const count = lockers.filter(L => L.status === k).length;
+  const row = document.createElement('div');
+  row.className = 'flex items-center justify-between text-xs';
+  row.innerHTML = `<div class="flex items-center gap-2.5">
+      <span class="legend-dot" style="background:${v.ui}"></span>
+      <span class="text-slate-300">${v.label}</span>
+    </div>
+    <span class="font-mono text-slate-500" data-count="${k}">${count}</span>`;
+  legendEl.appendChild(row);
+});
+
+/* Filter chips */
+const FILTERS = [
+  { k: null,           l: 'All' },
+  { k: 'available',    l: 'Available' },
+  { k: 'booked',       l: 'Booked' },
+  { k: 'overdue',      l: 'Overdue' }
+];
+FILTERS.forEach((f, i) => {
+  const b = document.createElement('button');
+  b.className = `chip text-[10px] px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/4 text-slate-300 font-600 ${i === 0 ? 'active' : ''}`;
+  if (f.k) { b.style.color = STATUS[f.k].ui; b.style.borderColor = STATUS[f.k].ui + '40'; }
+  b.textContent = f.l;
+  b.onclick = () => {
+    activeFilter = f.k;
+    [...filtersEl.children].forEach(c => c.classList.remove('active'));
+    b.classList.add('active');
+    lockers.forEach(L => applyStatus(L));
+    // On phones, fold the legend away so the 3D view is clear again
+    if (IS_TOUCH && innerWidth < 768) {
+      legendCard.classList.add('collapsed');
+      legendChevron.style.transform = 'rotate(-90deg)';
+    }
+  };
+  filtersEl.appendChild(b);
+});
+
+/* Stats */
+const STAT_IDS = { available: 'statAvail', booked: 'statBooked', overdue: 'statOverdue' };
+function refreshStats() {
+  Object.entries(STAT_IDS).forEach(([k, id]) => {
+    const n = lockers.filter(L => L.status === k).length;
+    const el = document.getElementById(id);
+    if (el) el.textContent = n;
+    const c = document.querySelector(`[data-count="${k}"]`);
+    if (c) c.textContent = n;
+  });
+}
+refreshStats();
+
+/* Tooltip */
+const tip = $('#tooltip');
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hoveredId = null;
+
+function setHover(id) {
+  if (hoveredId === id) return;
+  if (hoveredId && slotMeshes.has(hoveredId)) slotMeshes.get(hoveredId).targetHover = 0;
+  hoveredId = id;
+  if (id && slotMeshes.has(id)) {
+    slotMeshes.get(id).targetHover = 1;
+    const L = slotMeshes.get(id).L;
+    $('#ttId').textContent = L.id;
+    $('#ttStatus').textContent = '· ' + STATUS[L.status].label;
+    $('#ttDot').style.background = STATUS[L.status].ui;
+    $('#ttDot').className = 'dot' + (L.status === 'overdue' ? ' overdue' : '');
+    tip.style.opacity = '1';
+  } else {
+    tip.style.opacity = '0';
+  }
+}
+
+function pickSlot() {
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(bankGroup, true);
+  for (const h of hits) {
+    if (h.object.userData.pickable && h.object.userData.slotId) return h.object.userData.slotId;
+  }
+  return null;
+}
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (e.buttons) return;        // don't hover-flicker while orbiting
+  if (IS_TOUCH) return;         // no hover concept on a touchscreen
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  const id = pickSlot();
+  if (id) {
+    setHover(id);
+    tip.style.left = (e.clientX + 16) + 'px';
+    tip.style.top = (e.clientY + 16) + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+  } else {
+    setHover(null);
+    renderer.domElement.style.cursor = 'grab';
+  }
+});
+
+/* On touch, a tap should "preview" the locker under the finger too */
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!IS_TOUCH) return;
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  const id = pickSlot();
+  if (id && slotMeshes.has(id)) slotMeshes.get(id).targetHover = 1;
+});
+
+/* ── Drawer ───────────────────────────────────── */
+const drawer = $('#drawer');
+const DUR_WRAP = $('#dDur');
+let selectedId = null, chosenDur = 72;
+
+DURATIONS.forEach((d, i) => {
+  const b = document.createElement('button');
+  b.className = `dur chip flex-1 text-[11px] py-2 rounded-lg border font-600 ${i === 1 ? 'active' : ''} ${d.hrs === chosenDur ? 'active' : ''}`;
+  b.style.color = '#34d399'; b.style.borderColor = '#34d39940'; b.style.background = d.hrs === chosenDur ? '#34d39918' : 'transparent';
+  b.textContent = d.label;
+  b.onclick = () => {
+    chosenDur = d.hrs;
+    [...DUR_WRAP.children].forEach(c => { c.classList.remove('active'); c.style.background = 'transparent'; });
+    b.classList.add('active'); b.style.background = '#34d39918';
+  };
+  DUR_WRAP.appendChild(b);
+});
+
+function fmt(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
+         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function openDrawer(L) {
+  selectedId = L.id;
+  const cfg = STATUS[L.status];
+  $('#dId').textContent = L.id;
+  $('#dUnit').textContent = 'Unit ' + L.unit;
+  $('#dMetaUnit').textContent = L.unit;
+  $('#dMetaSlot').textContent = L.slot;
+  const badge = $('#dBadge');
+  badge.innerHTML = `<span class="dot ${L.status === 'overdue' ? 'overdue' : ''}" style="background:${cfg.ui}"></span> ${cfg.label}`;
+  badge.className = 'inline-flex items-center gap-2 mt-3 px-2.5 py-1 rounded-lg text-[11px] font-600';
+  badge.style.color = cfg.ui; badge.style.background = cfg.ui + '1a'; badge.style.border = `1px solid ${cfg.ui}33`;
+
+  const isAvail = L.status === 'available';
+  $('#dAvail').classList.toggle('hidden', !isAvail);
+  $('#dInfo').classList.toggle('hidden', isAvail);
+  $('#dBook').classList.toggle('hidden', !isAvail);
+  $('#dRelease').classList.toggle('hidden', !(L.status === 'booked' || L.status === 'overdue'));
+  $('#dOverdue').classList.toggle('hidden', L.status !== 'booked');
+
+  if (!isAvail) {
+    const overdue = L.status === 'overdue';
+    $('#dInfo').innerHTML = `
+      <div class="rounded-xl bg-white/4 border border-white/8 p-3.5">
+        <p class="text-[10px] text-slate-400 uppercase tracking-wider">Student</p>
+        <p class="text-sm mt-1 font-600">${L.student || '—'}</p>
+        <p class="font-mono text-[11px] text-slate-500 mt-0.5">${L.sid || ''}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-xl bg-white/4 border border-white/8 p-3">
+          <p class="text-[10px] text-slate-400 uppercase tracking-wider">Booked</p>
+          <p class="font-mono text-[11px] mt-1 text-slate-300">${fmt(L.bookedAt)}</p>
+        </div>
+        <div class="rounded-xl p-3 border" style="background:${overdue ? '#ef444414' : '#ffffff08'};border-color:${overdue ? '#ef444433' : 'rgba(255,255,255,.08)'}">
+          <p class="text-[10px] uppercase tracking-wider" style="color:${overdue ? '#fca5a5' : '#94a3b8'}">Due</p>
+          <p class="font-mono text-[11px] mt-1" style="color:${overdue ? '#fecaca' : '#e2e8f0'}">${fmt(L.dueAt)}</p>
+        </div>
+      </div>
+      ${overdue ? `<div class="rounded-xl bg-red-500/10 border border-red-400/25 p-3 flex items-start gap-2">
+        <span class="text-red-400 text-sm leading-none mt-0.5">!</span>
+        <p class="text-[11px] text-red-200 leading-snug">Key not returned. Overdue since ${fmt(L.dueAt)}.</p>
+      </div>` : ''}
+    `;
+  }
+  drawer.classList.remove('closed');
+}
+
+function closeDrawer() {
+  drawer.classList.add('closed');
+  selectedId = null;
+  slotMeshes.forEach(r => r.targetOpen = 0);
+}
+
+$('#dClose').onclick = closeDrawer;
+$('#dCancel').onclick = closeDrawer;
+
+/* Selection on pointerup (OrbitControls consumes pointerdown, so `click`
+   never fires). Only treat it as a pick if the pointer barely moved. */
+let downPos = null;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  downPos = { x: e.clientX, y: e.clientY };
+});
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if (moved > 6) return;   // it was an orbit drag, not a tap
+
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  const id = pickSlot();
+  if (id) {
+    const L = slotMeshes.get(id).L;
+    slotMeshes.forEach(r => r.targetOpen = 0);
+    slotMeshes.get(L.id).targetOpen = 1;
+    openDrawer(L);
+    flyTo(L);
+  }
+});
+
+/* Animated status change helper */
+function flash(L, from) {
+  const rec = slotMeshes.get(L.id);
+  const start = new THREE.Color(from.hex), end = new THREE.Color(STATUS[L.status].hex);
+  const t0 = performance.now();
+  (function step() {
+    const k = Math.min(1, (performance.now() - t0) / 550);
+    const e = 1 - Math.pow(1 - k, 3);
+    rec.glow.material.color.copy(start).lerp(end, e);
+    rec.tag.material.color.copy(start).lerp(end, e);
+    rec.glow.material.opacity = 0.6 * (1 - e) + (L.status === 'unavailable' ? 0 : 0.16);
+    rec.glow.scale.setScalar(1 + Math.sin(k * Math.PI) * 0.14);
+    if (k < 1) requestAnimationFrame(step);
+    else { rec.glow.scale.setScalar(1); applyStatus(L); }
+  })();
+}
+
+function toast(msg, color = '#22c55e') {
+  const el = document.createElement('div');
+  el.className = 'toast-enter glass rounded-xl px-4 py-2.5 text-xs font-600 flex items-center gap-2';
+  el.innerHTML = `<span class="dot" style="background:${color}"></span>${msg}`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.transition = 'all .4s'; el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; }, 2400);
+  setTimeout(() => el.remove(), 2900);
+}
+
+/* Actions */
+$('#dBook').onclick = () => {
+  const L = lockers.find(x => x.id === selectedId);
+  if (!L || L.status !== 'available') return;
+  const name = $('#dName').value.trim() || DEMO_NAMES[(Math.random() * DEMO_NAMES.length) | 0];
+  const sid = $('#dSid').value.trim() || ('STU-' + (20000 + ((Math.random() * 999) | 0)));
+  const from = STATUS[L.status];
+  L.status = 'booked'; L.student = name; L.sid = sid;
+  L.bookedAt = Date.now(); L.durationHrs = chosenDur; L.dueAt = Date.now() + chosenDur * 3600e3;
+  flash(L, from); refreshStats(); openDrawer(L);
+  toast(`${L.id} booked for ${name}`, '#f97316');
+  slotMeshes.get(L.id).targetOpen = 0;
+};
+
+$('#dRelease').onclick = () => {
+  const L = lockers.find(x => x.id === selectedId);
+  if (!L) return;
+  const from = STATUS[L.status];
+  L.status = 'available'; L.student = null; L.sid = null; L.dueAt = null; L.bookedAt = null;
+  flash(L, from); refreshStats(); openDrawer(L);
+  toast(`${L.id} released — now available`, '#22c55e');
+};
+
+$('#dOverdue').onclick = () => {
+  const L = lockers.find(x => x.id === selectedId);
+  if (!L) return;
+  const from = STATUS[L.status];
+  L.status = 'available'; L.student = null; L.sid = null; L.dueAt = null; L.bookedAt = null;
+  flash(L, from); refreshStats(); openDrawer(L);
+  toast(`Key returned · ${L.id} is available`, '#22c55e');
+};
+
+/* ── Camera fly-to ────────────────────────────── */
+const camAnim = { t: 1, dur: 900, from: new THREE.Vector3(), to: new THREE.Vector3(),
+                  tFrom: new THREE.Vector3(), tTo: new THREE.Vector3(), start: 0 };
+function flyTo(L) {
+  const rec = slotMeshes.get(L.id);
+  const wp = new THREE.Vector3(rec.baseX, rec.baseY, 0);
+  bankGroup.localToWorld(wp);
+  const dist = innerWidth < 768 ? 3.4 : 4.4;
+  const rise = innerWidth < 768 ? 0.2 : 0.4;
+  const camTo = wp.clone().add(new THREE.Vector3(0, rise, dist));
+  camAnim.from.copy(camera.position); camAnim.to.copy(camTo);
+  camAnim.tFrom.copy(controls.target); camAnim.tTo.copy(wp.clone().add(new THREE.Vector3(0, -0.05, 0)));
+  camAnim.t = 0; camAnim.start = performance.now();
+}
+
+/* Auto-fit the whole bank in view for the current aspect ratio.
+   Portrait phones use a straight-on, slightly raised angle so the full
+   4-bank row fills the screen instead of cutting a diagonal. */
+const DEFAULT_VIEW = new THREE.Vector3(7.5, 5.2, 11.5);   // desktop 3/4 view
+function fitCamera() {
+  const aspect = innerWidth / innerHeight;
+  const portrait = aspect < 1.05;
+
+  const bankW = totalBankW + 2.4;                 // bank + margin
+  const bankH = 5.4;                              // height incl. letter sprites
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+
+  const distW = (bankW / 2) / Math.tan(hFov / 2);
+  const distH = (bankH / 2) / Math.tan(vFov / 2);
+  let dist = Math.max(distW, distH) * 1.06;
+  // Portrait: the bank is width-limited, so pull a little closer for presence
+  if (portrait) dist *= 0.94;
+
+  // Direction: portrait = face the bank almost head-on; desktop = 3/4 view
+  const dir = portrait
+    ? new THREE.Vector3(0, 0.14, 1).normalize()
+    : DEFAULT_VIEW.clone().normalize();
+
+  camera.position.copy(dir.multiplyScalar(dist));
+  controls.target.set(0, 2.1, 0);
+  controls.update();
+}
+
+/* ── Resize / orientation change ──────────────── */
+function onResize(refit = false) {
+  camera.aspect = innerWidth / innerHeight;
+  // On portrait phones widen the FOV a touch so the 4-bank row still fits
+  camera.fov = innerWidth < 768 ? 52 : 40;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  if (refit) fitCamera();
+}
+addEventListener('resize', () => onResize(false));
+addEventListener('orientationchange', () => setTimeout(() => onResize(true), 250));
+onResize(false);
+if (innerWidth < 768) fitCamera();
+
+/* ══════════════════════════════════════════════════════════
+   RENDER LOOP
+   ══════════════════════════════════════════════════════════ */
+const clock = new THREE.Clock();
+
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05) || 0.016;
+  const t = clock.elapsedTime;
+
+  // Idle life: gentle float + sway on the whole bank
+  bankGroup.position.y = Math.sin(t * 0.7) * 0.015;
+  bankGroup.rotation.y = Math.sin(t * 0.28) * 0.01;
+
+  // Camera fly animation
+  if (camAnim.t < 1) {
+    camAnim.t = Math.min(1, (performance.now() - camAnim.start) / camAnim.dur);
+    const e = 1 - Math.pow(1 - camAnim.t, 3);
+    camera.position.lerpVectors(camAnim.from, camAnim.to, e);
+    controls.target.lerpVectors(camAnim.tFrom, camAnim.tTo, e);
+  }
+
+  // Per-slot spring animation (hover nudge + door swing)
+  slotMeshes.forEach(rec => {
+    rec.hover += (rec.targetHover - rec.hover) * Math.min(1, dt * 12);
+    rec.open += (rec.targetOpen - rec.open) * Math.min(1, dt * 8);
+
+    const swing = rec.open * (Math.PI * 0.42);
+    rec.hinge.rotation.y = -swing;
+    rec.hinge.position.z = 0.03 + rec.hover * 0.09 + rec.open * 0.2;
+
+    const isOverdue = rec.L.status === 'overdue';
+    const isOff = rec.L.status === 'unavailable';
+    const match = !activeFilter || rec.L.status === activeFilter;
+    const dim = match ? 1 : 0.1;
+
+    // Filter dimming: non-matching lockers desaturate toward dark grey so the
+    // matching status is unmistakable.
+    if (activeFilter && !match) {
+      rec.doorMat.color.copy(rec.statusTint).lerp(new THREE.Color(0x394049), 0.82);
+      rec.doorMat.emissive.set(0x000000);
+      rec.doorMat.emissiveIntensity = 0;
+      rec.glow.material.opacity += (0 - rec.glow.material.opacity) * Math.min(1, dt * 10);
+      rec.tag.material.opacity += (0.06 - rec.tag.material.opacity) * Math.min(1, dt * 10);
+      rec.num.material.opacity += (0.05 - rec.num.material.opacity) * Math.min(1, dt * 10);
+      return;
+    }
+
+    rec.doorMat.color.copy(rec.statusTint);
+
+    // Subtle emissive lift on hover/open only (doors stay metal)
+    const lift = rec.hover * 0.45 + rec.open * 0.3;
+    const overduePulse = isOverdue ? (0.25 + Math.sin(t * 3.2) * 0.18) : 0.08;
+    rec.doorMat.emissiveIntensity = overduePulse + lift;
+    rec.doorMat.emissive.copy(rec.tag.material.color).multiplyScalar(isOff ? 0.02 : 1);
+
+    // Glow target — status base + interaction + overdue pulse
+    let pulse;
+    if (isOff) pulse = 0;
+    else if (isOverdue) pulse = 0.18 + Math.abs(Math.sin(t * 2.6)) * 0.3;
+    else pulse = 0.16 + rec.hover * 0.28 + rec.open * 0.18;
+    rec.glow.material.opacity += (pulse - rec.glow.material.opacity) * Math.min(1, dt * 8);
+    // Glow tracks the door as it nudges out / swings open
+    rec.glow.position.set(rec.baseX, rec.baseY, doorFrontZ + rec.hover * 0.09 + rec.open * 0.22);
+
+    // Tag + number respond to interaction / filter
+    rec.tag.material.opacity = isOff ? 0.2 : (0.85 + rec.hover * 0.15);
+    rec.num.material.opacity = isOff ? 0.1 : 0.55 + rec.hover * 0.35;
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ── Kick off ─────────────────────────────────── */
+setTimeout(() => {
+  const boot = document.getElementById('boot');
+  boot.style.opacity = '0';
+  setTimeout(() => boot.remove(), 850);
+}, 550);
+
+tick();
+</script>
+</body>
+</html>

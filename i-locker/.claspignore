@@ -1,0 +1,8 @@
+# Placeholder — will matter only once Code.gs / appsscript.json are added.
+#
+# Planned setup: the UI is served by GitHub Pages, and clasp pushes ONLY the
+# backend (Code.gs + appsscript.json) to Apps Script — never a second copy of
+# index.html. See the README for the intended architecture.
+**/**
+!Code.gs
+!appsscript.json
