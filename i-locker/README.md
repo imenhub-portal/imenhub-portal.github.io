@@ -30,6 +30,31 @@ https://imenhub-portal.github.io/i-locker/
 - Auto-framing for phone, tablet and desktop; bottom-sheet drawer on phones
 - Runs offline-friendly as a single file (Three.js + Tailwind from CDN)
 
+## Privacy / PDPA
+
+This page is **public** (GitHub Pages, fully readable in View Source), so it is
+built to hold **no personal data**:
+
+- The demo uses non-identifying pseudonyms (`Student 01`…), not real people.
+- Student references are synthetic and always displayed **masked**
+  (`STU-••••81`). Full values are never written into the DOM.
+- The locker detail panel shows occupancy (Booked / Overdue / dates) but marks
+  the holder's identity **RESTRICTED** and hides it.
+- Booking toasts never echo the holder's name.
+- The booking form carries a purpose-limitation notice; details entered are used
+  only to identify the booking and are not persisted in this page.
+
+Any future backend must keep real records **server-side** (Apps Script / Sheet)
+and reveal identity only to an authenticated owner or admin — never to this
+public page.
+
+## Touch / mobile
+
+- Tap targets are ≥44px (Apple HIG / Material).
+- One-finger drag orbits, pinch zooms; the page never scrolls behind the canvas.
+- Bottom-sheet drawer, collapsible legend, safe-area insets and PWA meta for
+  Add to Home Screen.
+
 ## Running locally
 
 Open `index.html` in a browser, or serve the folder:

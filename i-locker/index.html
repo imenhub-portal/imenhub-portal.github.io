@@ -106,11 +106,15 @@ tailwind.config = {
     #drawer.closed { transform: translateY(calc(100% + 32px)); }
     #drawer > div { border-radius: 26px 26px 0 0; }
     .sheet-grabber { display: flex; }
-    /* Filter chips get bigger touch targets */
-    #filters .chip { padding: .5rem .7rem; font-size: 11px; }
-    /* Comfortable tap targets */
+    /* Comfortable tap targets (Apple HIG ≥44px, Material ≥48dp) */
     #dClose { width: 44px; height: 44px; }
     #dBook, #dRelease, #dOverdue { padding-top: .95rem; padding-bottom: .95rem; }
+    #dCancel { min-height: 44px; }
+    #legendToggle { min-height: 44px; margin: -0.5rem 0; padding: 0 .25rem; }
+    #dDur .chip { min-height: 44px; }
+    #filters .chip { min-height: 44px; padding: .5rem .8rem; font-size: 11px; }
+    #dName, #dSid { min-height: 48px; }
+    .legend-dot { width: 14px; height: 14px; }
   }
   @media (min-width: 768px) {
     .sheet-grabber { display: none; }
@@ -232,13 +236,21 @@ tailwind.config = {
         </div>
 
         <label class="block text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Student Name</label>
-        <input id="dName" placeholder="e.g. Ahmad Faiz" class="w-full mb-3 px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 focus:border-emerald-400/60 focus:ring-0 outline-none text-sm placeholder:text-slate-600" />
+        <input id="dName" autocomplete="off" placeholder="Your name" class="w-full mb-3 px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 focus:border-emerald-400/60 focus:ring-0 outline-none text-sm placeholder:text-slate-600" />
 
         <label class="block text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Student ID</label>
-        <input id="dSid" placeholder="e.g. STU-20481" class="w-full mb-3 px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 focus:border-emerald-400/60 focus:ring-0 outline-none text-sm placeholder:text-slate-600" />
+        <input id="dSid" autocomplete="off" placeholder="Your student ID" class="w-full mb-3 px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 focus:border-emerald-400/60 focus:ring-0 outline-none text-sm placeholder:text-slate-600" />
 
         <label class="block text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Duration</label>
-        <div class="flex gap-1.5 mb-4" id="dDur"></div>
+        <div class="flex gap-1.5 mb-3" id="dDur"></div>
+
+        <!-- PDPA notice: purpose limitation + retention -->
+        <div class="rounded-xl bg-emerald-500/6 border border-emerald-400/15 p-2.5 flex items-start gap-2">
+          <svg viewBox="0 0 24 24" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-400/80" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <p class="text-[10px] text-slate-400 leading-snug">
+            Your details are used <b class="text-slate-300">only</b> to identify this locker booking. They are never shown publicly and are not stored in this page. Collected under the University's PDPA notice.
+          </p>
+        </div>
       </div>
 
       <div id="dInfo" class="hidden space-y-2.5"></div>
@@ -306,9 +318,33 @@ const UNIT_GAP = 0.7;
 
 /* ══════════════════════════════════════════════════════════
    IN-MEMORY DEMO DATA  (swap for backend later)
+
+   ── PDPA / PRIVACY ─────────────────────────────────────────
+   This file is served publicly (GitHub Pages) and is fully
+   readable in View Source. Therefore NO real personal data may
+   ever be written into it, and none is:
+     • Names are non-identifying pseudonyms ("Student 01").
+     • Student IDs are synthetic references, shown masked
+       (e.g. "STU-••••81") and only ever in full to the owner.
+     • Nothing here maps back to a real individual.
+   The real records stay server-side (Apps Script / Sheet) and
+   must only ever be revealed to an authenticated owner or admin.
    ══════════════════════════════════════════════════════════ */
-const DEMO_NAMES = ['Ahmad Faiz','Nur Aisyah','Lim Wei Jian','Priya Devi','Muhd Haziq','Tan Mei Ling',
-  'Siti Zulaikha','Raj Kumar','Chong Xin Yi','Farah Nabila','Amirul Hakim','Grace Wong','Danial Iman','Kavitha R.'];
+
+/* Pseudonymous labels — deliberately generic, not real people. */
+const DEMO_NAMES = ['Student 01','Student 02','Student 03','Student 04','Student 05',
+  'Student 06','Student 07','Student 08','Student 09','Student 10','Student 11',
+  'Student 12','Student 13','Student 14'];
+
+/* Mask a student reference for display: STU-20481 → STU-••••81.
+   Full values are never rendered in the public UI. */
+function maskRef(ref) {
+  if (!ref) return '';
+  const s = String(ref);
+  if (s.length <= 3) return '•••';
+  return s.slice(0, 4) + '••••' + s.slice(-2);
+}
+
 const DURATIONS = [
   { label: '1 Day',  hrs: 24 },
   { label: '3 Days', hrs: 72 },
@@ -339,14 +375,14 @@ UNITS.forEach(u => {
     if (i < 6) {                                   // 6 overdue
       L.status = 'overdue';
       L.student = DEMO_NAMES[(Math.random()*DEMO_NAMES.length)|0];
-      L.sid = 'STU-' + (20000 + ((Math.random()*999)|0));
+      L.sid = 'STU-' + (20000 + ((Math.random()*999)|0));   // synthetic, not real
       L.durationHrs = 72;
       L.bookedAt = Date.now() - 5 * 864e5;
       L.dueAt = Date.now() - 2 * 864e5;
     } else if (i < 18) {                           // 12 booked
       L.status = 'booked';
       L.student = DEMO_NAMES[(Math.random()*DEMO_NAMES.length)|0];
-      L.sid = 'STU-' + (20000 + ((Math.random()*999)|0));
+      L.sid = 'STU-' + (20000 + ((Math.random()*999)|0));   // synthetic, not real
       L.durationHrs = 72;
       L.bookedAt = Date.now() - 3600e3;
       L.dueAt = Date.now() + 60 * 3600e3;
@@ -892,11 +928,21 @@ function openDrawer(L) {
 
   if (!isAvail) {
     const overdue = L.status === 'overdue';
+    // ── PDPA ──────────────────────────────────────────────
+    // Occupancy (booked / overdue) is operational data and may be
+    // shown. The HOLDER'S IDENTITY is personal data: it is masked
+    // here and never written to this public page in the clear.
+    // Revealing it must happen server-side, only to the owner or an
+    // authenticated admin.
+    const holderLabel = L.student ? maskRef(L.student) : '••••••';
     $('#dInfo').innerHTML = `
       <div class="rounded-xl bg-white/4 border border-white/8 p-3.5">
-        <p class="text-[10px] text-slate-400 uppercase tracking-wider">Student</p>
-        <p class="text-sm mt-1 font-600">${L.student || '—'}</p>
-        <p class="font-mono text-[11px] text-slate-500 mt-0.5">${L.sid || ''}</p>
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] text-slate-400 uppercase tracking-wider">Held by</p>
+          <span class="text-[9px] font-600 px-1.5 py-0.5 rounded bg-white/6 text-slate-400 border border-white/10">RESTRICTED</span>
+        </div>
+        <p class="text-sm mt-1 font-600 text-slate-300">${holderLabel}</p>
+        <p class="font-mono text-[11px] text-slate-500 mt-0.5">Identity hidden (PDPA)</p>
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-xl bg-white/4 border border-white/8 p-3">
@@ -986,7 +1032,8 @@ $('#dBook').onclick = () => {
   L.status = 'booked'; L.student = name; L.sid = sid;
   L.bookedAt = Date.now(); L.durationHrs = chosenDur; L.dueAt = Date.now() + chosenDur * 3600e3;
   flash(L, from); refreshStats(); openDrawer(L);
-  toast(`${L.id} booked for ${name}`, '#f97316');
+  // PDPA: never echo the holder's name into the public UI.
+  toast(`${L.id} is now booked`, '#f97316');
   slotMeshes.get(L.id).targetOpen = 0;
 };
 
