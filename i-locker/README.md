@@ -25,7 +25,7 @@ silently break a lookup. A boot-time integrity check asserts all 36 cabinets
 round-trip and fails loudly if they ever don't.
 
 
-> **Stage: live demo (UI only).** All data is in-memory and resets on refresh.
+> **Stage: local demo (UI only).** Bookings reset on refresh; fob mappings and theme preferences persist in this browser.
 > There is **no backend wired up yet** — booking/release actions are dummy
 > operations so the interface can be shown and tested.
 
@@ -40,16 +40,15 @@ https://imenhub-portal.github.io/i-locker/
 | Green  | Available      |
 | Orange | Booked         |
 | Red    | Overdue (pulses / breathes) |
-| Grey   | Unavailable    |
+| Blue   | On Hold — key collected |
 
 Doors are painted in bold status colours (not just tinted grey), so the state
 reads from any angle. Overdue lockers breathe — the door glow and edge tag swell
 and fade on a ~2.9s cycle, matching the pulsing dot in the header.
 
-**Locked and held cabinets** get a *blitz sweep*: a diagonal light sheen travels
-across the door every few seconds (each door phase-offset so they don't move in
-lockstep). Grey/sealed doors also show a gently pulsing padlock; orange/held
-doors get the warm-tinted sweep without the padlock.
+Booked means awaiting collection. The due clock starts at collection; an On Hold
+cabinet automatically becomes Overdue when its due date passes. Collection and
+return by physical scan are deferred; scans currently register fobs only.
 
 ## Controls
 
@@ -62,18 +61,18 @@ doors get the warm-tinted sweep without the padlock.
 ## Features
 
 - Full 3D locker bank with recessed panels, handles and slot-number decals
-- Orbit / zoom / pan (drag, scroll, right-drag); az/ polar angles clamped so the bank never leaves view
+- Fixed front view with a slight downward angle; left/right buttons slide the view
 - Hover nudge + tooltip (desktop); tap-to-open (mobile)
-- Click a locker → door swings open, camera flies in, details drawer slides in
+- Click an available cabinet → door opens and camera zooms in. Held cabinets stay shut and shake with a red flash. Close returns to the overview.
 - Book flow: student name + ID + duration → door closes, locker turns orange
-- Legend with quick filters (All / Available / Booked / Overdue)
+- Legend with quick filters (All / Available / Booked / On Hold / Overdue)
 - Auto-framing for phone, tablet and desktop; bottom-sheet drawer on phones
-- Runs offline-friendly as a single file (Three.js + Tailwind from CDN)
+- Single HTML file; internet is required for CDN dependencies
 
 ## Privacy / PDPA
 
-This page is **public** (GitHub Pages, fully readable in View Source), so it is
-built to hold **no personal data**:
+This is a public static demo, not a certification of PDPA compliance. Use fictitious
+student details and test fobs only. Browser-side masking and a PIN are not access control.
 
 - The demo uses non-identifying pseudonyms (`Student 01`…), not real people.
 - Student references are synthetic and always displayed **masked**
@@ -81,8 +80,8 @@ built to hold **no personal data**:
 - The locker detail panel shows occupancy (Booked / Overdue / dates) but marks
   the holder's identity **RESTRICTED** and hides it.
 - Booking toasts never echo the holder's name.
-- The booking form carries a purpose-limitation notice; details entered are used
-  only to identify the booking and are not persisted in this page.
+- Form entries remain in this tab's memory until refresh. They are not sent to a backend.
+- Fob mappings are stored in localStorage and accessible to anyone using that browser profile.
 
 Any future backend must keep real records **server-side** (Apps Script / Sheet)
 and reveal identity only to an authenticated owner or admin — never to this
@@ -91,9 +90,24 @@ public page.
 ## Touch / mobile
 
 - Tap targets are ≥44px (Apple HIG / Material).
-- One-finger drag orbits, pinch zooms; the page never scrolls behind the canvas.
+- Tap to inspect; use the left/right buttons to slide. Navigation is disabled while inspecting a cabinet.
 - Bottom-sheet drawer, collapsible legend, safe-area insets and PWA meta for
   Add to Home Screen.
+
+## PC admin and USB reader
+
+Admin appears only for a fine-pointer, hover-capable viewport at least 1024px wide.
+Unlock using demo PIN **1234**. This is a cosmetic SHA-256 PIN check, not real authentication.
+Select a cabinet, choose **Register fob**, then tap the USB keyboard-wedge reader.
+The focused browser receives digits followed by Enter; no USB bridge or port is used.
+Input normalization matches the reference: digits only, last ten digits, minimum eight.
+There is a 600ms inter-key buffer reset and a manual entry fallback.
+
+Bindings are one-to-one. Registering replaces a cabinet's old binding and moves an
+already-bound fob from its former cabinet. `ilocker-fobs` persists only in this
+browser/origin; it does not synchronize between devices. The reference file was
+removed and is not part of the app. Real-reader testing on the focused kiosk PC
+is still required. GitHub Pages can receive these standard keyboard events.
 
 ## Running locally
 
