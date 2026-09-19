@@ -103,8 +103,9 @@ The focused browser receives digits followed by Enter; no USB bridge or port is 
 Input normalization matches the reference: digits only, last ten digits, minimum eight.
 There is a 600ms inter-key buffer reset and a manual entry fallback.
 
-Bindings are one-to-one. Registering replaces a cabinet's old binding and moves an
-already-bound fob from its former cabinet. `ilocker-fobs` persists only in this
+Bindings are one-to-one. Registering a new, unassigned fob replaces a cabinet's old
+binding. A fob already assigned to another cabinet is rejected with that cabinet's
+ID; unregister it there first to reassign it. `ilocker-fobs` persists only in this
 browser/origin; it does not synchronize between devices. The reference file was
 removed and is not part of the app. Real-reader testing on the focused kiosk PC
 is still required. GitHub Pages can receive these standard keyboard events.

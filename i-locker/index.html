@@ -1114,8 +1114,15 @@ function handleFobUid(raw) {
   if (!canAdmin() || waitingFobKey == null || waitingFobKey !== selectedKey) return;
   const uid = normalizeFob(raw);
   if (!/^\d{8,10}$/.test(uid)) { $('#fobMessage').textContent = 'Expected 8–10 digits.'; return; }
+  const registeredKey = fobMappings[uid];
+  if (registeredKey != null && registeredKey !== waitingFobKey) {
+    const cabinetId = slotMeshes.get(registeredKey).L.id;
+    $('#fobMessage').textContent = `This fob is already registered to cabinet ${cabinetId}. Unregister it there before assigning it to another cabinet.`;
+    $('#fobUid').value = '';
+    return;
+  }
   const next = { ...fobMappings };
-  for (const old of Object.keys(next)) if (next[old] === waitingFobKey || old === uid) delete next[old];
+  for (const old of Object.keys(next)) if (next[old] === waitingFobKey) delete next[old];
   next[uid] = waitingFobKey;
   try {
     saveFobs(next);
