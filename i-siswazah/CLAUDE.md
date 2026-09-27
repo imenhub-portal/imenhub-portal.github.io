@@ -4,6 +4,22 @@ Baca fail ini dahulu sebelum membuat sebarang perubahan dalam folder ini. Ia dit
 supaya sesi AI pada PC/laptop lain boleh menyambung kerja tanpa perlu meneliti
 sejarah chat yang panjang.
 
+## Status semasa (kemas kini bila keadaan berubah)
+
+- **Fasa**: Prototaip demo **sudah go-live**. Frontend siap dan diuji; pengesahan
+  workflow dengan pengendali sedang berjalan.
+- **Live URL**: `https://imenhub-portal.github.io/i-siswazah/`
+- **Committed**: `index.html`, `styles.css`, `app.js`, `CLAUDE.md`, dan 12 fail CSV.
+- **Git**: selaras dengan `origin/main` (`imenhub-portal/imenhub-portal.github.io`).
+- **Belum dibuat**: `Code.gs` (backend Apps Script) — rancangan penuh di bawah.
+- **Data**: masih **data contoh kecil** dalam `app.js` + `localStorage`. Belum import
+  penuh CSV ke jadual, belum cleansing data sebenar.
+
+### Langkah seterusnya yang dijangkakan
+1. Tunjuk demo kepada pengendali, kumpul maklum balas workflow.
+2. Selaraskan header/kolum dengan fail Excel sebenar (kekal teks asal).
+3. Bila workflow dipersetujui → bersihkan CSV → bina `Code.gs` → sambung backend.
+
 ## Apa ini
 
 Webapp **frontend sahaja** (mod demo) untuk pengurusan operasi siswazah / pascasiswazah
@@ -133,18 +149,58 @@ Corak ujian yang digunakan: muat `index.html` + `app.js` dalam jsdom, tambah
 - Tambah rekod → baris masuk ke **bawah** (bukan atas)
 - Padam → masuk Arkib → boleh pulih
 
-## Aliran kerja go-live (pindah ke backend sebenar)
+## Rancangan `Code.gs` (backend Google Apps Script — AKAN DIBINA)
 
-1. **Bersihkan data CSV** — buang baris/kolum kosong, betulkan format tarikh bercampur,
-   asingkan medan gabungan (nama + no. matrik), sahkan format no. matrik/IC.
-2. **Sediakan `Code.gs`** — Apps Script membaca/menulis Google Sheets. Setiap rekod
-   mesti ada **ID kekal**; kemas kini ikut ID, bukan nombor baris.
-3. **Hoskan frontend** — melalui GitHub Pages dan/atau Apps Script `doGet`
-   (rujuk corak `i-nstrumen/CLAUDE.md`).
-4. **Ganti `seedData()`** dengan panggilan API sebenar.
+`Code.gs` **belum wujud** dalam folder ini. Bila sedia, ia akan dibina di sini dan
+kemudian **dipindah secara manual** oleh pengguna ke editor Apps Script. `git push`
+TIDAK auto-deploy backend. Rancangan penuh:
 
-**Penting**: `git push` TIDAK auto-deploy backend Apps Script. Pengguna memindahkan
-`Code.gs` ke editor Apps Script secara manual.
+### Peranan `Code.gs`
+Backend yang membaca/menulis **Google Sheets** (satu sheet = satu workspace, nama tab
+ringkas seperti `pendaftaran`, `viva`, `pdpl`). Berfungsi sebagai API untuk `app.js`.
+
+### Corak yang akan digunakan (selaras `i-nstrumen/`)
+- `doGet(e)` — hidangkan `index.html` (fetch dari `raw.githubusercontent.com` supaya
+  satu sumber; fallback salinan tempatan).
+- `doPost(e)` — kemas kini data. Body JSON `{ action, wsId, payload }`.
+- Sumber data **satu**: Google Sheet yang diikat pada projek Apps Script.
+
+### API yang diperlukan oleh frontend
+| Fungsi frontend sekarang | API `Code.gs` nanti |
+|---|---|
+| `seedData()` | `getAllData()` → pulangkan semua rekod + tetapan |
+| `commitEdits()` | `updateRecord(wsId, id, changes)` |
+| `addRow()` | `createRecord(wsId, record)` |
+| `doDelete()` | `deleteRecord(wsId, id)` (soft delete ke tab `Trash`) |
+| `restoreTrash()` | `restoreRecord(wsId, id)` |
+| `save()` (tetapan) | `saveSettings(settings)` |
+
+### Peraturan data WAJIB
+- Setiap rekod mesti ada **ID kekal** (`id`, jana di backend). Kemas kini ikut **ID**,
+  **bukan nombor baris** — baris boleh berubah bila disusun.
+- `bil` ialah nombor paparan sahaja, bukan kunci.
+- Simpan no. matrik / IC / telefon sebagai **teks** (elak sifar di hadapan hilang dan
+  notasi saintifik seperti `8.80927E+11`).
+- Tabar `history` dan `trash` sebagai tab berasingan untuk jejak audit.
+- **Tiada rahsia dalam kod** — repo awam. Token/kata laluan disimpan dalam
+  Script Properties, bukan dalam fail.
+
+### Aliran kerja go-live
+1. **Bersihkan data CSV** — buang baris/kolum kosong, betulkan format tarikh bercampur
+   (contoh `15/092026`, tahun 2006/2002 di tengah rekod 2026), asingkan medan gabungan
+   (nama + no. matrik), sahkan format no. matrik/IC.
+2. **Sediakan `Code.gs`** mengikut spesifikasi di atas.
+3. **Pindah Google Sheets + `Code.gs`** ke editor Apps Script, deploy sebagai Web App.
+4. **Tukar sumber frontend** — ganti `seedData()`/`save()` dengan panggilan API sebenar
+   (Frontend kekal GitHub Pages; backend panggil guna `fetch`).
+5. **Uji** — tambah/edit/padam rekod melalui webapp, pastikan Google Sheets terkemas kini.
+
+### Titik sambungan dalam kod sekarang
+- `seedData()` — ganti dengan muat dari API.
+- `save()` / `load()` — ganti `localStorage` dengan panggilan API.
+- Semua mutasi (`commitEdits`, `addRow`, `doDelete`, `restoreTrash`) — tambah panggilan
+  API di samping kemas kini state tempatan.
+- `API_URL` belum wujud — akan ditambah sebagai pemalar di atas `app.js`.
 
 ## Deployment
 
@@ -155,6 +211,25 @@ git commit -m "i-siswazah: <ringkasan>"
 git push origin main
 ```
 URL selepas deploy: `https://imenhub-portal.github.io/i-siswazah/`
+
+Sama seperti `i-nstrumen/`, cara pindah kerja antara mesin ialah `git push` di sini,
+`sit pull`/`git pull` di mesin lain. **Kod backend berasingan**: `Code.gs` mesti
+dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
+
+## Cara menyambung sesi di PC/laptop lain
+
+1. `git pull` — fail frontend + `CLAUDE.md` + CSV akan muncul.
+2. Minta AI **baca `CLAUDE.md` ini dahulu** sebelum mengubah apa-apa.
+3. Baca "Status semasa" di atas untuk tahu fasa kerja terkini.
+4. Ikut "Prinsip reka bentuk" — jangan ubah header/wording tanpa kebenaran pengguna.
+5. Jalankan semakan dalam "Ujian" sebelum push semula.
+
+## Log sesi (ringkas — tambah semasa sesi bermakna)
+
+- **Sesi 1** — Bina frontend demo penuh: `index.html`, `styles.css`, `app.js`.
+  12 workspace jadual boleh edit, dashboard, carian, salin workspace, reminder,
+  sejarah, Arkib Padaman, tab Admin & Tetapan, responsif PC/tablet/telefon,
+  format tarikh penuh Melayu. Go-live ke GitHub Pages. `Code.gs` sengaja belum dibina.
 
 ## Kredit
 
