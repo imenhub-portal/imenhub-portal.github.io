@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sistem Pengurusan Siswazah</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar" aria-label="Navigasi utama">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 10 12 5 2 10l10 5 10-5Z"/>
+          <path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/>
+          <path d="M22 10v6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar__title">Sistem Pengurusan Siswazah</div>
+        <div class="sidebar__subtitle">IMEN &middot; UKM</div>
+      </div>
+    </div>
+    <nav class="sidebar__nav" id="sidebarNav"></nav>
+    <div class="sidebar__foot">
+      <span class="demo-badge">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+        MOD DEMO
+      </span>
+      <button class="btn btn--ghost btn--sm" id="resetDemoBtn" title="Reset data demo" style="height:30px;padding:0 10px;font-size:11px;background:transparent;border-color:rgba(255,255,255,.2);color:#cdd6e8">Reset</button>
+    </div>
+    <div class="sidebar__credit">
+      Developed by: <strong>Hab Digital IMEN</strong>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Buka menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+
+      <div class="global-search" id="globalSearchWrap">
+        <svg class="global-search__icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="search" id="globalSearch" placeholder="Cari pelajar merentas semua workspace (nama atau no. matrik)…" autocomplete="off" aria-label="Carian global pelajar">
+        <div class="global-search__results hidden" id="globalResults"></div>
+      </div>
+
+      <div class="topbar__spacer"></div>
+
+      <div class="topbar__user">
+        <div class="avatar">PN</div>
+        <div class="topbar__user-info">
+          <div class="topbar__user-name">Pentadbir Sistem</div>
+          <div class="topbar__user-role">Pengendali</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
