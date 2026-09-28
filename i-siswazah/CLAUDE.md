@@ -186,9 +186,14 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
     wajib tarikh; lain optional. `syncGraduan()` **auto-sync** pelajar bergraduasi ke
     workspace `graduan` (padanan `noPelajar` + `_syncPelajarId`); bila status ditukar
     balik ke Aktif, rekod graduan yang dijana auto **dibuang**.
-18. **Semester Master** — `settings.semesterAktif = { sesi, semesterPengajian }`,
-    diedit di Admin (dropdown sesi dari `generateSemesterOptions()`). Menjana label
-    sesi secara dinamik supaya sistem kekal relevan bila semester bertukar.
+18. **Semester Master** — `settings.semesterAktif = { sesi, semesterPengajian }`.
+    **Had terkini**: semua dropdown sesi dalam worksheet (Papar sesi, sejarah
+    semester, pemilih sesi) **tidak boleh melebihi sesi aktif**. `generateSemesterOptions()`
+    menjana dari sesi aktif ke belakang (6 semester) sahaja — tiada advance ke hadapan.
+    `allSessions()` juga ditapis pada sesi aktif. Pemilih **sesi aktif di Admin** guna
+    `generateAdminSemesterOptions()` yang boleh jangkau sampai tahun sistem semasa
+    (supaya pengendali boleh memajukan sesi dari semasa ke semasa). Tukar sesi aktif
+    akan menetapkan semula sesi paparan. `sesiOrdinal()` digunakan untuk perbandingan.
 
 ## Prinsip reka bentuk (JANGAN langgar)
 

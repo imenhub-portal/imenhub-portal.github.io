@@ -818,7 +818,7 @@ function renderAdmin() {
   html += adminField('set-pageSize', 'Bilangan Baris Sehalaman', s.pageSize, 'number');
   html += adminField('set-upcomingDays', 'Horizon Countdown (hari)', s.attentionThresholds.upcomingDays, 'number');
   html += adminField('set-vivaSoonDays', 'Ambang "Viva Terdekat" (hari)', s.attentionThresholds.vivaSoonDays, 'number');
-  html += '<div class="field" style="margin-top:12px"><label>Sesi Aktif (Semester Semasa)</label><select id="set-sesiAktif">' + selectOptions(generateSemesterOptions(), s.semesterAktif.sesi) + '</select><span class="field__hint">Digunakan untuk label "SEM. PENGAJIAN" dalam Senarai Pelajar Mengikut Penyelia.</span></div>';
+  html += '<div class="field" style="margin-top:12px"><label>Sesi Aktif (Semester Semasa)</label><select id="set-sesiAktif">' + selectOptions(generateAdminSemesterOptions(), s.semesterAktif.sesi) + '</select><span class="field__hint">Had terkini untuk semua dropdown semester. Worksheet tidak boleh memilih sesi melebihi sesi ini.</span></div>';
   html += '</div></section>';
 
   /* Kad 4: Peraturan Perhatian */
@@ -886,17 +886,56 @@ function adminField(id, label, value, type, maxlength) {
     '<input id="' + id + '" type="' + type + '" value="' + esc(value) + '"' + (maxlength ? ' maxlength="' + maxlength + '"' : '') + '></div>';
 }
 
-/* ---------- WORKSPACE PENYELIA-PELAJAR (bersarang) ---------- */
-/* Penjana senarai sesi semester (dropdown) — 3 ke belakang, 1 ke hadapan */
+/* Penjana senarai sesi semester (dropdown).
+   Terikat pada SESI AKTIF (dari Admin) sebagai had TERKINI:
+   - Tidak boleh menjana sesi melebihi sesi aktif (tiada advance ke hadapan).
+   - Ke belakang 6 sesi (3 tahun) supaya sejarah tersedia.
+   Jika sesi aktif tidak sah, jatuh balik ke tahun sistem semasa. */
+function parseSesi(sesi) {
+  const m = String(sesi || '').match(/^([12])\/(\d{4})-(\d{4})$/);
+  if (!m) return null;
+  return { sem: parseInt(m[1], 10), start: parseInt(m[2], 10), end: parseInt(m[3], 10) };
+}
+
 function generateSemesterOptions() {
+  const aktif = parseSesi(ensureSettings().semesterAktif && ensureSettings().semesterAktif.sesi);
+  let capSem, capStart;
+  if (aktif) { capSem = aktif.sem; capStart = aktif.start; }
+  else { const y = new Date().getFullYear(); capSem = 2; capStart = y; }
+
+  /* Sesi terakhir yang dibenarkan = sesi aktif. */
+  const out = [];
+  const BACK = 6; /* bilangan semester ke belakang */
+  /* Bina senarai dari sesi aktif ke belakang mengikut turutan semester. */
+  let sem = capSem, start = capStart;
+  for (let i = 0; i <= BACK; i++) {
+    out.push(sem + '/' + start + '-' + (start + 1));
+    if (sem === 1) { sem = 2; start -= 1; }
+    else { sem = 1; }
+  }
+  out.reverse(); /* tertua → terkini */
+  return out;
+}
+
+/* Penjana untuk pemilih SESI AKTIF di Admin.
+   Boleh jangkau sehingga sesi semasa tahun sistem (supaya pengendali boleh
+   memajukan sesi aktif dari semasa ke semasa), tetapi tidak melebihi tahun itu. */
+function sesiOrdinal(s) {
+  const m = String(s || '').match(/^([12])\/(\d{4})-\d{4}$/);
+  return m ? Number(m[2]) * 2 + Number(m[1]) - 1 : 0;
+}
+
+function generateAdminSemesterOptions() {
   const now = new Date();
   const y = now.getFullYear();
   const out = [];
-  for (let sy = y - 3; sy <= y + 1; sy++) {
+  for (let sy = y - 3; sy <= y; sy++) {
     out.push('1/' + sy + '-' + (sy + 1));
     out.push('2/' + sy + '-' + (sy + 1));
   }
-  return out;
+  const aktif = ensureSettings().semesterAktif && ensureSettings().semesterAktif.sesi;
+  if (aktif && out.indexOf(aktif) === -1) out.push(aktif);
+  return out.sort(function (a, b) { return sesiOrdinal(a) - sesiOrdinal(b); });
 }
 
 function renderPenyeliaWorkspace() {
@@ -1664,7 +1703,11 @@ function bindContent() {
     'set-vivaSoonDays': function (v) { ensureSettings().attentionThresholds.vivaSoonDays = Math.max(1, parseInt(v, 10) || 14); },
     'set-trashRetentionDays': function (v) { ensureSettings().trashRetentionDays = Math.max(1, parseInt(v, 10) || 30); },
     'set-confirmDelete': function (v) { ensureSettings().confirmDelete = v === '1'; },
-    'set-sesiAktif': function (v) { ensureSettings().semesterAktif.sesi = v; delete ui.penyeliaSession; }
+    'set-sesiAktif': function (v) {
+      ensureSettings().semesterAktif.sesi = v;
+      /* Tetapkan semula sesi paparan supaya ia kembali kepada sesi aktif baharu. */
+      delete ui.penyeliaSession;
+    }
   };
   Object.keys(adminBind).forEach(function (id) {
     const el = document.getElementById(id);

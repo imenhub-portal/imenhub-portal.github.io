@@ -152,9 +152,11 @@ function recentSessions() {
     .sort((a,b) => semesterIndex(a)-semesterIndex(b)).slice(-3);
 }
 function allSessions() {
-  return [...new Set([...generateSemesterOptions(), ensureSettings().semesterAktif.sesi,
+  const activeIndex = semesterIndex(ensureSettings().semesterAktif.sesi);
+  const list = [...new Set([...generateSemesterOptions(), ensureSettings().semesterAktif.sesi,
     ...(state.records.penyeliaPelajar || []).flatMap(g => (g.pelajar || []).flatMap(p => (p.sejarahSemester || []).map(s => s.sesi)))])].filter(Boolean)
-    .sort((a,b) => (semesterIndex(a) ?? 0) - (semesterIndex(b) ?? 0));
+    .filter(s => semesterIndex(s) !== null && (activeIndex === null || semesterIndex(s) <= activeIndex));
+  return list.sort((a,b) => semesterIndex(a) - semesterIndex(b));
 }
 function snapshot(p, sesi) {
   const found = (p.sejarahSemester || []).find(s => s.sesi === sesi);
