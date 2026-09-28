@@ -92,7 +92,8 @@ const WORKSPACES = [
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhTerima', header: 'TARIKH TERIMA PENCALONAN', type: 'date' },
       { key: 'tarikhLulus', header: 'TARIKH PENCALONAN DILULUSKAN', type: 'date' },
-      { key: 'pemeriksa', header: 'NAMA PEMERIKSA', type: 'textarea' },
+      { key: 'pemeriksaLuar', header: 'PEMERIKSA LUAR (PL)', type: 'text', multi: true },
+      { key: 'pemeriksaDalam', header: 'PEMERIKSA DALAM (PD)', type: 'text', multi: true },
       { key: 'tarikhHantar', header: 'TARIKH HANTAR TESIS KEPADA PDPL', type: 'date' },
       { key: 'tarikhUpdate', header: 'TARIKH UPDATE DALAM SMP', type: 'date' }
     ] },
@@ -340,9 +341,42 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed && parsed.records) { state = parsed; return true; }
+    if (parsed && parsed.records) { state = parsed; migrateRecords(); return true; }
   } catch (e) { console.warn('Gagal muat', e); }
   return false;
+}
+
+/* Migrasi data: pecahkan kolum lama 'pemeriksa' (pencalonan pdpl) kepada
+   pemeriksaLuar (PL) dan pemeriksaDalam (PD). Idempotent. */
+function migrateRecords() {
+  const recs = (state.records && state.records.pdpl) || [];
+  let changed = false;
+  recs.forEach(function (r) {
+    if (r.pemeriksa !== undefined) {
+      const split = splitPemeriksa(r.pemeriksa);
+      if (r.pemeriksaLuar === undefined) r.pemeriksaLuar = split.luar;
+      if (r.pemeriksaDalam === undefined) r.pemeriksaDalam = split.dalam;
+      delete r.pemeriksa;
+      changed = true;
+    }
+  });
+  if (changed) save();
+}
+
+/* Pisahkan teks pemeriksa lama: nama berlabel (PD) atau tanpa label universiti = Pemeriksa Dalam;
+   nama berlabel universiti (UM/USM/UiTM/INOR dll) = Pemeriksa Luar. */
+function splitPemeriksa(val) {
+  const luar = [], dalam = [];
+  String(val || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
+    if (/\(\s*PD\s*\)/i.test(line)) {
+      dalam.push(line.replace(/\s*\(\s*PD\s*\)\s*$/i, '').trim());
+    } else if (/\((UM|USM|UiTM|INOR|UPM|UTM|UNITEN|UIA|IIUM|UNIMAS|UMS|USM|UTHM|UMPSA|Uni[^)]*)\)/i.test(line)) {
+      luar.push(line.trim());
+    } else {
+      dalam.push(line.trim());
+    }
+  });
+  return { luar: luar.join('\n'), dalam: dalam.join('\n') };
 }
 
 function toast(msg, type) {
@@ -454,8 +488,8 @@ function seedData() {
       { id: uid('r'), bil: 2, tarikhPermohonan: '', nama: 'Syahirah Hinayadullah', noMatrik: '', penyelia: 'Dr. Abdul Rahman Mohmad', alasan: '', semester: '', tarikhTindakan: '', tarikhLulus: '' }
     ],
     pdpl: [
-      { id: uid('r'), bil: 1, tarikhPermohonan: '', nama: 'Muhammad Faris Musawwi bin Ruslan', noMatrik: 'P125395', penyelia: 'Dr. Abdul Rahman Mohmad', semester: '', tarikhTerima: '2026-02-12', tarikhLulus: '', pemeriksa: 'Dr. Dilla Duryha Berhanuddin (PD)\nProf. Dr. Goh Boon Tong (UM)', tarikhHantar: '', tarikhUpdate: '2026-03-05' },
-      { id: uid('r'), bil: 2, tarikhPermohonan: '', nama: 'Mohd Erwan bin Basiron', noMatrik: 'P130002', penyelia: 'Prof. Dr. Azman bin Jalar', semester: '', tarikhTerima: '', tarikhLulus: '', pemeriksa: 'Dr. Muhammad Aniq Shazni bin Mohammad Haniff (PD)\nProf. Madya Dr. Abdullah Aziz bin Saad (USM)', tarikhHantar: '', tarikhUpdate: '' }
+      { id: uid('r'), bil: 1, tarikhPermohonan: '', nama: 'Muhammad Faris Musawwi bin Ruslan', noMatrik: 'P125395', penyelia: 'Dr. Abdul Rahman Mohmad', semester: '', tarikhTerima: '2026-02-12', tarikhLulus: '', pemeriksaLuar: 'Prof. Dr. Goh Boon Tong (UM)', pemeriksaDalam: 'Dr. Dilla Duryha Berhanuddin', tarikhHantar: '', tarikhUpdate: '2026-03-05' },
+      { id: uid('r'), bil: 2, tarikhPermohonan: '', nama: 'Mohd Erwan bin Basiron', noMatrik: 'P130002', penyelia: 'Prof. Dr. Azman bin Jalar', semester: '', tarikhTerima: '', tarikhLulus: '', pemeriksaLuar: 'Prof. Madya Dr. Abdullah Aziz bin Saad (USM)', pemeriksaDalam: 'Dr. Muhammad Aniq Shazni bin Mohammad Haniff', tarikhHantar: '', tarikhUpdate: '' }
     ],
     senat: [
       { id: uid('r'), bil: 1, nama: 'Nur Nazhifah binti Yusoff (P100212)', program: 'Sarjana Sains', penyelia: 'Penyelia Utama\nDr. Norhayati binti Abu Bakar', semester: '13', terimaTesis: '', permohonanPTSL: '', pengesahanPTSL: '', permohonanJPS: '', kelulusanJPS: '', hantarSenat: '', tarikhUpdate: '' },

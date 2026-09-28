@@ -131,6 +131,11 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
     lembut (`is-locked`). Klik Edit pada rekod terkunci → pengesahan buka kunci
     kemudian terus masuk mod Edit. Medan: `locked`, `lockedAt`. Terpakai semua 12
     workspace. Rekod terkunci **tidak** dikira "Perlu Perhatian".
+16. **Pemeriksa PL & PD berasingan** (`pdpl`) — kolum `pemeriksa` lama dipecahkan
+    kepada **`pemeriksaLuar` (PL = Pemeriksa Luar)** dan **`pemeriksaDalam`
+    (PD = Pemeriksa Dalam)**, kedua-duanya `multi: true`. `migrateRecords()` +
+    `splitPemeriksa()` memisahkan data lama secara automatik semasa `load()`
+    (nama berlabel `(PD)` → Dalam; label universiti UM/USM/UiTM/INOR dll → Luar).
 
 ## Prinsip reka bentuk (JANGAN langgar)
 
@@ -249,6 +254,15 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
   rekod dikunci dipindah ke panel collapsible "Rekod Dikunci" di bawah jadual utama;
   jadual utama hanya rekod aktif; buka kunci perlu pengesahan; Edit pada rekod
   terkunci minta buka kunci dahulu.
+- **Sesi 3** — (a) Pisah pemeriksa `pdpl` kepada **PL (Pemeriksa Luar)** dan
+  **PD (Pemeriksa Dalam)**, kedua-duanya multi. Migrasi automatik data lama.
+
+### Belum siap (dropdown & format — menunggu pengesahan)
+Permintaan yang belum dilaksanakan (lihat perbincangan terakhir):
+- `BENTUK PENDAFTARAN` → dropdown (Sepenuh masa / Separuh masa)
+- `PROGRAM PENGAJIAN` → hanya 2 pilihan (buang "Sarjana Sains")
+- `SEMESTER PENGAJIAN` → dropdown format `1/2025-2026` (pilihan C), semua 9 kolum
+- Enforce nilai dropdown sahaja; data lama akan dikemas kini manual kemudian
 
 ## Kredit
 
