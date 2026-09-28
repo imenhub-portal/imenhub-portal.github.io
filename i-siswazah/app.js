@@ -18,7 +18,7 @@ const WORKSPACES = [
       { key: 'tarikh', header: 'TARIKH', type: 'date' },
       { key: 'semester', header: 'SEMESTER', type: 'text', identity: true },
       { key: 'nama', header: 'NAMA PELAJAR', type: 'text', identity: true, required: true },
-      { key: 'cadanganPenyelia', header: 'CADANGAN PENYELIA', type: 'text', identity: true },
+      { key: 'cadanganPenyelia', header: 'CADANGAN PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'noPelajar', header: 'NO. PELAJAR/N IC/Passport', type: 'text', identity: true },
       { key: 'program', header: 'PROGRAM PENGAJIAN', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'tajuk', header: 'TAJUK TESIS', type: 'textarea' },
@@ -36,7 +36,7 @@ const WORKSPACES = [
       { key: 'noPelajar', header: 'NO. PELAJAR/N IC/Passport', type: 'text', identity: true },
       { key: 'program', header: 'PROGRAM PENGAJIAN', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'tajuk', header: 'TAJUK TESIS', type: 'textarea' },
-      { key: 'penyelia', header: 'PENYELIA UTAMA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA UTAMA', type: 'text', identity: true, multi: true },
       { key: 'bentuk', header: 'BENTUK PENDAFTARAN', type: 'text' },
       { key: 'tarikhMendaftar', header: 'TARIKH MENDAFTAR', type: 'date' },
       { key: 'semester', header: 'SEMESTER', type: 'text', identity: true },
@@ -49,7 +49,7 @@ const WORKSPACES = [
       { key: 'tarikhPermohonan', header: 'TARIKH PERMOHONAN', type: 'date' },
       { key: 'nama', header: 'NAMA PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'alasan', header: 'ALASAN PERMOHONAN', type: 'textarea' },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhTindakan', header: 'TARIKH TINDAKAN DIAMBIL', type: 'date' },
@@ -62,7 +62,7 @@ const WORKSPACES = [
       { key: 'tarikhPermohonan', header: 'TARIKH PERMOHONAN', type: 'date' },
       { key: 'nama', header: 'NAMA PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'alasan', header: 'ALASAN PERMOHONAN', type: 'textarea' },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhLulus', header: 'TARIKH DILULUSKAN', type: 'date' }
@@ -74,7 +74,7 @@ const WORKSPACES = [
       { key: 'tarikhPermohonan', header: 'TARIKH PERMOHONAN DITERIMA', type: 'date' },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhTerima', header: 'TARIKH TERIMA', type: 'date' },
@@ -88,7 +88,7 @@ const WORKSPACES = [
       { key: 'tarikhPermohonan', header: 'TARIKH PERMOHONAN DITERIMA', type: 'date' },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhTerima', header: 'TARIKH TERIMA PENCALONAN', type: 'date' },
       { key: 'tarikhLulus', header: 'TARIKH PENCALONAN DILULUSKAN', type: 'date' },
@@ -103,7 +103,7 @@ const WORKSPACES = [
       { key: 'tarikhPermohonan', header: 'TARIKH PERMOHONAN DITERIMA', type: 'date' },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhHantar', header: 'TARIKH HANTAR TESIS KEPADA PDPL', type: 'date' },
       { key: 'laporanPL', header: 'TARIKH TERIMA LAPORAN DARI PL', type: 'date' },
@@ -117,7 +117,7 @@ const WORKSPACES = [
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhHantar', header: 'TARIKH HANTAR TESIS KEPADA PDPL', type: 'date' },
       { key: 'tarikhTerimaLaporan', header: 'TARIKH TERIMA LAPORAN DARIPADA PDPL', type: 'date' },
@@ -131,7 +131,7 @@ const WORKSPACES = [
       { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true, multi: true, autoLabel: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'terimaTesis', header: 'TARIKH TERIMA TESIS SELEPAS PEMBETULAN', type: 'date' },
       { key: 'permohonanPTSL', header: 'TARIKH PERMOHONAN PENGESAHAN PTSL', type: 'date' },
@@ -147,7 +147,7 @@ const WORKSPACES = [
       { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
-      { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true },
+      { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true, multi: true, autoLabel: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'catatan', header: 'Catatan', type: 'text' }
     ] },
@@ -237,6 +237,7 @@ let ui = {
   filter: {},
   query: {},
   page: {},
+  lockedOpen: {},
   pageSize: 25
 };
 
@@ -274,7 +275,10 @@ const ICONS = {
   restore: '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 8v4l3 2"/>',
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  lockOpen: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  chevronDown: '<path d="M6 9l6 6 6-6"/>'
 };
 
 function icon(name, size) {
@@ -355,6 +359,58 @@ function nextId(wsId) {
   let max = 0;
   recs.forEach(function (r) { const n = parseInt(r.bil, 10); if (!isNaN(n) && n > max) max = n; });
   return max + 1;
+}
+
+/* ---------- PENYELIA (senarai & auto-label) ---------- */
+/* Ekstrak nama penyelia sahaja daripada teks tersimpan.
+   Membuang label seperti "Penyelia Utama", "Pengerusi JK Penyeliaan", "i)" dsb. */
+function extractPenyeliaNames(val) {
+  if (!val) return [];
+  const labels = /^(penyelia utama|penyelia bersama|pengerusi (jk|jawatankuasa) penyeliaan|ahli (jk|jawatankuasa) penyeliaan|penyelia)\s*:?\s*$/i;
+  let s = String(val).replace(/\\n/g, '\n');
+  let out = [];
+  s.split('\n').forEach(function (line) {
+    let t = line.trim();
+    if (!t) return;
+    if (labels.test(t)) return;
+    t = t.replace(/^(i{1,3}|iv|v|vi{0,3}|ix|x)[.)]\s*/i, '');
+    t = t.replace(/^[-•*]\s*/, '');
+    t = t.replace(/^(dr|prof|ts|pm|ym|ir)\.?\s*$/i, '');
+    t = t.trim();
+    if (t) out.push(t);
+  });
+  return out;
+}
+
+/* Jana semula label penyelia mengikut bilangan:
+   1 → Penyelia Utama
+   2 → Penyelia Utama + Penyelia Bersama
+   3+ → Pengerusi Jawatankuasa Penyeliaan + Ahli (i, ii, iii…) */
+function formatPenyelia(names) {
+  const list = (names || []).map(function (n) { return String(n).trim(); }).filter(Boolean);
+  if (!list.length) return '';
+  if (list.length === 1) {
+    return 'Penyelia Utama\n' + list[0];
+  }
+  if (list.length === 2) {
+    return 'Penyelia Utama\n' + list[0] + '\n\nPenyelia Bersama\n' + list[1];
+  }
+  const roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+  let s = 'Pengerusi Jawatankuasa Penyeliaan\n' + list[0] + '\n\nAhli Jawatankuasa Penyeliaan';
+  for (let i = 1; i < list.length; i++) {
+    s += '\n' + (roman[i - 1] || (i + 1)) + ') ' + list[i];
+  }
+  return s;
+}
+
+/* Baca nilai senarai penyelia daripada DOM untuk kolum multi */
+function readMultiValue(key) {
+  const wrap = document.querySelector('.penyelia-list[data-multi-key="' + key + '"]');
+  if (!wrap) return null;
+  const inputs = wrap.querySelectorAll('.penyelia-input');
+  const names = [];
+  inputs.forEach(function (inp) { const v = inp.value.trim(); if (v) names.push(v); });
+  return names;
 }
 
 /* ---------- SEED (DATA CONTOH KECIL) ---------- */
@@ -774,16 +830,18 @@ function computeUpcoming() {
 /* ---------- WORKSPACE ---------- */
 function renderWorkspace(w) {
   const cols = w.columns;
-  let rows = (state.records[w.id] || []).slice();
+  const allRows = (state.records[w.id] || []).slice();
   const q = (ui.query[w.id] || '').toLowerCase().trim();
-  if (q) rows = rows.filter(function (r) { return cols.some(function (c) { return String(r[c.key] || '').toLowerCase().indexOf(q) !== -1; }); });
-
   const fk = ui.filter[w.id] || 'all';
-  rows = applyChipFilter(w, rows, fk);
-
   const s = ui.sort[w.id];
-  if (s) {
-    rows.sort(function (a, b) {
+
+  function matchQuery(rows) {
+    if (!q) return rows;
+    return rows.filter(function (r) { return cols.some(function (c) { return String(r[c.key] || '').toLowerCase().indexOf(q) !== -1; }); });
+  }
+  function doSort(rows) {
+    if (!s) return rows;
+    return rows.slice().sort(function (a, b) {
       const av = a[s.key] == null ? '' : String(a[s.key]);
       const bv = b[s.key] == null ? '' : String(b[s.key]);
       const ad = parseDate(av), bd = parseDate(bv);
@@ -794,6 +852,15 @@ function renderWorkspace(w) {
     });
   }
 
+  /* Pisah rekod aktif vs terkunci */
+  const activeRows = allRows.filter(function (r) { return !r.locked; });
+  const lockedRows = allRows.filter(function (r) { return r.locked; });
+
+  let rows = matchQuery(applyChipFilter(w, activeRows, fk));
+  rows = doSort(rows);
+
+  const lockedSearch = doSort(matchQuery(lockedRows));
+
   const total = rows.length;
   const page = ui.page[w.id] || 1;
   const pageCount = Math.max(1, Math.ceil(total / ui.pageSize));
@@ -801,6 +868,7 @@ function renderWorkspace(w) {
   const start = (curPage - 1) * ui.pageSize;
   const pageRows = rows.slice(start, start + ui.pageSize);
   const chips = chipDefs(w);
+  const lockedCount = lockedRows.length;
 
   let html = '<div class="page-head">';
   html += '<div><h1 class="page-head__title">' + esc(w.name) + '</h1><p class="page-head__desc">' + esc(w.desc || '') + '</p></div>';
@@ -812,7 +880,7 @@ function renderWorkspace(w) {
   html += '<input type="search" data-ws-search="' + w.id + '" value="' + esc(ui.query[w.id] || '') + '" placeholder="Cari dalam ' + esc(w.name) + '…" aria-label="Cari dalam workspace">';
   html += '<button class="ws-search__clear" data-ws-clear="' + w.id + '" aria-label="Kosongkan carian">' + icon('x', 15) + '</button></div>';
   html += '<button class="btn btn--ghost" data-export="' + w.id + '">' + icon('download', 16) + '<span class="btn-label">Eksport</span></button>';
-  html += '<span class="badge badge--info">' + total + ' rekod' + ((q || fk !== 'all') ? ' ditapis' : '') + '</span></div>';
+  html += '<span class="badge badge--info">' + total + ' rekod aktif' + (lockedCount ? ' · ' + lockedCount + ' dikunci' : '') + ((q || fk !== 'all') ? ' · ditapis' : '') + '</span></div>';
 
   if (chips.length > 1) {
     html += '<div class="chip-row">' + chips.map(function (ch) {
@@ -826,10 +894,10 @@ function renderWorkspace(w) {
   }).join('');
   html += '<th class="col-actions">TINDAKAN</th></tr></thead><tbody>';
   if (pageRows.length) html += pageRows.map(function (r) { return renderRow(w, r); }).join('');
-  else html += '<tr><td colspan="' + (cols.length + 1) + '">' + emptyState('Tiada rekod', (q || fk !== 'all') ? 'Cuba tukar carian atau penapis.' : 'Klik Tambah Rekod untuk mula.') + '</td></tr>';
+  else html += '<tr><td colspan="' + (cols.length + 1) + '">' + emptyState('Tiada rekod aktif', (q || fk !== 'all') ? 'Cuba tukar carian atau penapis.' : 'Klik Tambah Rekod untuk mula.') + '</td></tr>';
   html += '</tbody></table></div>';
 
-  html += '<div class="table-foot"><span>' + (total ? (start + 1) + '–' + Math.min(start + ui.pageSize, total) + ' daripada ' + total + ' rekod' : 'Tiada rekod') + '</span>';
+  html += '<div class="table-foot"><span>' + (total ? (start + 1) + '–' + Math.min(start + ui.pageSize, total) + ' daripada ' + total + ' rekod aktif' : 'Tiada rekod aktif') + '</span>';
   if (pageCount > 1) {
     html += '<div class="pagination">';
     html += '<button class="page-btn" data-page="' + w.id + '|' + (curPage - 1) + '" ' + (curPage <= 1 ? 'disabled' : '') + '>' + icon('chevronLeft', 14) + '</button>';
@@ -837,6 +905,35 @@ function renderWorkspace(w) {
     html += '<button class="page-btn" data-page="' + w.id + '|' + (curPage + 1) + '" ' + (curPage >= pageCount ? 'disabled' : '') + '>' + icon('chevronRight', 14) + '</button></div>';
   }
   html += '</div></div>';
+
+  /* Panel Rekod Dikunci (collapsible) */
+  if (lockedCount) html += renderLockedPanel(w, lockedSearch);
+
+  return html;
+}
+
+/* Panel collapsible untuk rekod dikunci */
+function renderLockedPanel(w, lockedRows) {
+  const open = ui.lockedOpen && ui.lockedOpen[w.id];
+  let html = '<section class="locked-panel' + (open ? ' is-open' : '') + '" id="lockedPanel">';
+  html += '<button class="locked-panel__head" data-toggle-locked="' + w.id + '">';
+  html += '<span class="locked-panel__chev">' + icon('chevronRight', 16) + '</span>';
+  html += '<span class="locked-panel__icon">' + icon('lock', 15) + '</span>';
+  html += '<span class="locked-panel__title">Rekod Dikunci</span>';
+  html += '<span class="badge badge--warn">' + lockedRows.length + '</span>';
+  html += '<span class="locked-panel__hint">Rekod muktamad — buka kunci untuk edit</span>';
+  html += '</button>';
+
+  if (open) {
+    html += '<div class="locked-panel__body"><div class="table-scroll"><table class="grid locked-table"><thead><tr>';
+    html += w.columns.map(function (c, i) {
+      return '<th class="' + colClass(c, i) + '" title="' + esc(c.header) + '">' + esc(c.header) + '</th>';
+    }).join('');
+    html += '<th class="col-actions">TINDAKAN</th></tr></thead><tbody>';
+    html += lockedRows.map(function (r) { return renderRow(w, r); }).join('');
+    html += '</tbody></table></div></div>';
+  }
+  html += '</section>';
   return html;
 }
 
@@ -905,16 +1002,20 @@ function renderRow(w, r) {
     return '<td class="' + cls + '">' + esc(val) + '</td>';
   }).join('');
 
+  const lockIcon = r.locked ? '<span class="row-lock-mark" title="Rekod dikunci">' + icon('lock', 12) + '</span>' : '';
+
   const actions = editing
     ? '<div class="cell-actions"><button class="row-action" data-save-row="' + w.id + '|' + r.id + '" title="Semak & Simpan" style="color:var(--accent);border-color:var(--accent)">' + icon('save', 15) + '</button>' +
       '<button class="row-action is-danger" data-cancel-row="' + r.id + '" title="Batal">' + icon('x', 15) + '</button></div>'
     : '<div class="cell-actions"><button class="row-action" data-edit-row="' + w.id + '|' + r.id + '" title="Edit">' + icon('edit', 15) + '</button>' +
       '<button class="row-action" data-row-menu="' + w.id + '|' + r.id + '" title="Lagi tindakan">' + icon('more', 15) + '</button></div>';
 
-  return '<tr class="' + (editing ? 'is-editing' : '') + '" data-record="' + r.id + '">' + cells + '<td class="col-actions">' + actions + '</td></tr>';
+  const rowCls = [editing ? 'is-editing' : '', r.locked ? 'is-locked' : ''].filter(Boolean).join(' ');
+  return '<tr class="' + rowCls + '" data-record="' + r.id + '">' + cells + '<td class="col-actions">' + lockIcon + actions + '</td></tr>';
 }
 
 function renderCellInput(c, val) {
+  if (c.multi) return renderMultiInput(c, val);
   if (c.type === 'select') {
     let opts = '<option value=""></option>';
     (c.options || []).forEach(function (o) { opts += '<option value="' + esc(o) + '"' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>'; });
@@ -929,6 +1030,30 @@ function renderCellInput(c, val) {
   }
   if (c.type === 'number') return '<input type="text" inputmode="numeric" class="cell-input" data-field="' + c.key + '" value="' + esc(val) + '">';
   return '<input type="text" class="cell-input" data-field="' + c.key + '" value="' + esc(val) + '">';
+}
+
+/* Input senarai boleh ulang untuk medan penyelia (1 hingga banyak) */
+function renderMultiInput(c, val) {
+  let names = '';
+  if (c.autoLabel) {
+    names = extractPenyeliaNames(val);
+  } else {
+    names = String(val || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  if (!names.length) names = [''];
+
+  let rows = names.map(function (n) {
+    return '<div class="penyelia-row">' +
+      '<input type="text" class="cell-input penyelia-input" data-field="' + c.key + '" data-multi="1" value="' + esc(n) + '" placeholder="Nama penyelia…">' +
+      '<button type="button" class="penyelia-remove" data-remove-penyelia title="Buang">' + icon('x', 13) + '</button>' +
+      '</div>';
+  }).join('');
+
+  return '<div class="penyelia-list" data-multi-key="' + c.key + '">' +
+    '<div class="penyelia-rows">' + rows + '</div>' +
+    '<button type="button" class="penyelia-add" data-add-penyelia="' + c.key + '">' + icon('plus', 13) + ' Tambah Penyelia</button>' +
+    (c.autoLabel ? '<span class="penyelia-hint">Label (Penyelia Utama / Bersama / Pengerusi) dijana automatik.</span>' : '') +
+    '</div>';
 }
 
 /* ---------- EVENT BINDING ---------- */
@@ -994,6 +1119,43 @@ function bindContent() {
   });
 
   c.querySelectorAll('[data-export]').forEach(function (b) { b.addEventListener('click', function () { exportWorkspace(b.dataset.export); }); });
+
+  /* Senarai penyelia: tambah / buang baris (dalam mod edit) */
+  c.querySelectorAll('[data-add-penyelia]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const wrap = b.closest('.penyelia-list');
+      if (!wrap) return;
+      const rows = wrap.querySelector('.penyelia-rows');
+      const div = document.createElement('div');
+      div.className = 'penyelia-row';
+      div.innerHTML = '<input type="text" class="cell-input penyelia-input" data-field="' + b.dataset.addPenyelia + '" data-multi="1" value="" placeholder="Nama penyelia…">' +
+        '<button type="button" class="penyelia-remove" data-remove-penyelia title="Buang">' + icon('x', 13) + '</button>';
+      rows.appendChild(div);
+      bindPenyeliaRemove(div.querySelector('[data-remove-penyelia]'));
+      div.querySelector('input').focus();
+    });
+  });
+  function bindPenyeliaRemove(btn) {
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      const row = btn.closest('.penyelia-row');
+      const wrap = btn.closest('.penyelia-list');
+      if (!wrap) return;
+      const rows = wrap.querySelectorAll('.penyelia-row');
+      if (rows.length <= 1) { row.querySelector('input').value = ''; return; }
+      row.remove();
+    });
+  }
+  c.querySelectorAll('[data-remove-penyelia]').forEach(bindPenyeliaRemove);
+
+  /* Panel Rekod Dikunci: buka/tutup */
+  c.querySelectorAll('[data-toggle-locked]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const id = b.dataset.toggleLocked;
+      ui.lockedOpen[id] = !ui.lockedOpen[id];
+      render();
+    });
+  });
 
   const searchInput = c.querySelector('[data-ws-search]');
   if (searchInput) {
@@ -1063,9 +1225,50 @@ function startEdit(encoded) {
   const wsId = parts[0], id = parts[1];
   const rec = (state.records[wsId] || []).find(function (r) { return r.id === id; });
   if (!rec) return;
+  if (rec.locked) {
+    /* Rekod dikunci: minta pengesahan buka kunci dahulu, kemudian terus masuk edit (pilihan a) */
+    requestUnlock(wsId, rec, function () {
+      ui.editingRow = id;
+      ui.draft = JSON.parse(JSON.stringify(rec));
+      render();
+      focusRecord(id);
+    });
+    return;
+  }
   ui.editingRow = id;
   ui.draft = JSON.parse(JSON.stringify(rec));
   render();
+}
+
+/* Kunci rekod */
+function lockRecord(wsId, id) {
+  const rec = (state.records[wsId] || []).find(function (r) { return r.id === id; });
+  if (!rec) return;
+  rec.locked = true;
+  rec.lockedAt = new Date().toISOString();
+  save();
+  render();
+  toast('Rekod dikunci — dipindahkan ke senarai Rekod Dikunci', 'success');
+}
+
+/* Minta pengesahan untuk buka kunci. onDone dipanggil selepas berjaya. */
+function requestUnlock(wsId, rec, onDone) {
+  openModal({
+    title: 'Buka Kunci Rekod',
+    sub: esc(rec.nama || rec.perkara || 'rekod ini'),
+    body: '<div class="toast-inline" style="color:#b45309">' + icon('alert', 16) + '<span>Rekod ini dikunci. Buka kunci hanya jika anda benar-benar perlu mengeditnya.</span></div>',
+    foot: '<button class="btn btn--ghost" data-close-modal>Batal</button><button class="btn btn--primary" id="confirmUnlock">' + icon('lockOpen', 16) + ' Buka Kunci</button>',
+    onMount: function (root) {
+      root.querySelector('#confirmUnlock').addEventListener('click', function () {
+        closeModal();
+        rec.locked = false;
+        delete rec.lockedAt;
+        save();
+        if (typeof onDone === 'function') onDone();
+        else { render(); toast('Rekod dibuka kunci', 'success'); }
+      });
+    }
+  });
 }
 
 function cancelEdit() {
@@ -1089,10 +1292,23 @@ function hasChanges() {
 
 function collectDraftEdits() {
   const c = document.getElementById('content');
-  const inputs = c.querySelectorAll('tr.is-editing [data-field]');
-  inputs.forEach(function (inp) {
+  if (!ui.draft) return;
+  const w = ws(ui.view);
+  const multiKeys = {};
+  (w.columns || []).forEach(function (col) { if (col.multi) multiKeys[col.key] = col; });
+
+  c.querySelectorAll('tr.is-editing [data-field]').forEach(function (inp) {
     const key = inp.dataset.field;
-    if (ui.draft) ui.draft[key] = inp.value;
+    if (multiKeys[key]) return; /* dikendalikan di bawah */
+    ui.draft[key] = inp.value;
+  });
+
+  /* Kolum penyelia: baca senarai, jana label jika autoLabel */
+  Object.keys(multiKeys).forEach(function (key) {
+    const names = readMultiValue(key);
+    if (names == null) return;
+    const col = multiKeys[key];
+    ui.draft[key] = col.autoLabel ? formatPenyelia(names) : names.join('\n');
   });
 }
 
@@ -1273,6 +1489,9 @@ function openRowMenu(btn, encoded) {
   menu.className = 'row-menu';
   menu.id = 'rowMenu';
   menu.innerHTML =
+    (rec.locked
+      ? '<button data-act="unlock" style="color:var(--warning)">' + icon('lockOpen', 15) + ' Buka Kunci</button>'
+      : '<button data-act="lock">' + icon('lock', 15) + ' Kunci Rekod</button>') +
     '<button data-act="copy">' + icon('copy', 15) + ' Salin ke Workspace</button>' +
     '<button data-act="reminder">' + icon('bell', 15) + ' Tetapkan Peringatan</button>' +
     '<button data-act="history">' + icon('history', 15) + ' Sejarah Perubahan</button>' +
@@ -1291,7 +1510,9 @@ function openRowMenu(btn, encoded) {
     b.addEventListener('click', function () {
       closeRowMenu();
       const act = b.dataset.act;
-      if (act === 'copy') openCopyModal(wsId, rec);
+      if (act === 'lock') lockRecord(wsId, id);
+      else if (act === 'unlock') requestUnlock(wsId, rec);
+      else if (act === 'copy') openCopyModal(wsId, rec);
       else if (act === 'reminder') openReminderModal(wsId, rec);
       else if (act === 'history') openHistoryModal(wsId, id);
       else if (act === 'delete') deleteRow(wsId, id);

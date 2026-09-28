@@ -73,7 +73,7 @@ Setiap workspace mewakili satu tab Excel. Setiap kolum:
 ### State (`state` object)
 ```js
 {
-  records: { wsId: [ {id, bil, ...kolum} ] },  // data jadual
+  records: { wsId: [ {id, bil, locked?, lockedAt?, ...kolum} ] },  // data jadual
   reminders: [ {id, wsId, title, date, priority, note, done} ],
   history: [ {id, wsId, recordId, field, oldVal, newVal, at} ], // 300 entri terakhir
   trash: [ {id, wsId, record, at} ],           // Arkib Padaman (boleh pulih)
@@ -117,6 +117,20 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
 11. **Eksport CSV** per workspace (header asal dikekalkan).
 12. **Responsif** — PC/tablet/telefon. Sidebar jadi menu ☰ pada ≤900px.
     `@media (pointer: coarse)` membesarkan sasaran sentuhan 44px.
+13. **Penyelia berbilang** — 10 kolum penyelia ditanda `multi: true`. Mod Edit
+    memaparkan senarai boleh ulang (Tambah/Buang baris). Nilai disimpan sebagai
+    teks dipisah `\n` (kekal serasi CSV).
+14. **Auto-label penyelia (PENGIJAZAHAN)** — `senat` dan `graduan` ada `autoLabel: true`.
+    `extractPenyeliaNames()` buang label lama → `formatPenyelia()` jana semula:
+    1 → Penyelia Utama; 2 → Utama + Bersama; 3+ → Pengerusi Jawatankuasa Penyeliaan
+    + Ahli (i, ii, iii…). Dijana semula **setiap kali simpan**.
+15. **Kunci rekod (`locked`)** — layer kedua atas Edit. Menu 3-titik: **Kunci Rekod**
+    / **Buka Kunci** (minta pengesahan). Rekod dikunci **dipindah ke panel
+    collapsible "Rekod Dikunci"** di bawah jadual utama (default tertutup,
+    `ui.lockedOpen[wsId]`). Jadual utama hanya rekod aktif. Baris terkunci amber
+    lembut (`is-locked`). Klik Edit pada rekod terkunci → pengesahan buka kunci
+    kemudian terus masuk mod Edit. Medan: `locked`, `lockedAt`. Terpakai semua 12
+    workspace. Rekod terkunci **tidak** dikira "Perlu Perhatian".
 
 ## Prinsip reka bentuk (JANGAN langgar)
 
@@ -230,6 +244,11 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
   12 workspace jadual boleh edit, dashboard, carian, salin workspace, reminder,
   sejarah, Arkib Padaman, tab Admin & Tetapan, responsif PC/tablet/telefon,
   format tarikh penuh Melayu. Go-live ke GitHub Pages. `Code.gs` sengaja belum dibina.
+- **Sesi 2** — (a) Penyelia berbilang baris (10 kolum `multi: true`) dengan auto-label
+  penyelia untuk pengijazahan (`senat`, `graduan`). (b) Ciri **kunci rekod**:
+  rekod dikunci dipindah ke panel collapsible "Rekod Dikunci" di bawah jadual utama;
+  jadual utama hanya rekod aktif; buka kunci perlu pengesahan; Edit pada rekod
+  terkunci minta buka kunci dahulu.
 
 ## Kredit
 
