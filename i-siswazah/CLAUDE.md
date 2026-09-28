@@ -4,7 +4,45 @@ Baca fail ini dahulu sebelum membuat sebarang perubahan dalam folder ini. Ia dit
 supaya sesi AI pada PC/laptop lain boleh menyambung kerja tanpa perlu meneliti
 sejarah chat yang panjang.
 
-## Status semasa (kemas kini bila keadaan berubah)
+## Status semasa — kerja tempatan 28 September 2026
+
+### Kemas kini import tiga fail (menggantikan butiran import satu fail di bawah)
+
+Pengguna mengesahkan fail tanpa nombor ialah fail 1. Ketiga-tiga fail digunakan:
+
+| Sumber | Penyelia | Entri pelajar | Penyelia kosong |
+|---|---:|---:|---:|
+| `senarai_pelajar_Penyelia.csv` | 33 | 95 | 4 |
+| `senarai_pelajar_Penyelia2.csv` | 33 | 94 | 4 |
+| `senarai_pelajar_Penyelia3.csv` (semakan 18 Jun 2026) | 33 | 86 | 5 |
+
+- Union: **34 penyelia unik, 95 pelajar unik, 5 penyelia kosong**. 275 kemunculan pelajar → 180 kemunculan bertindih. 22 pelajar mempunyai 24 perubahan medan bukan kosong (termasuk satu pertukaran parent); ini disimpan sebagai `conflicts`, bukan dibuang. Tiada nama tepat sama dengan matrik berlainan dalam audit; nama mirip tidak digunakan untuk menyatukan identiti.
+- **91 aktif, 4 Rekod Lepas: 2 graduasi, 2 diberhentikan, 0 menarik diri.** Graduasi: P86119 (`GRADUAN 2024`) dan P119396 (`KONVO 2024`), kedua-duanya `tahunGraduasi: 2024`, tarikh kosong, `needsDateReview: true`. Diberhentikan: P107661 dan P108824, berdasarkan nota jelas. Bukti lengkap di `statusEvidence`.
+- `classify()` hanya menerima teks afirmatif keseluruhan `GRADUAN <tahun>`, `KONVO <tahun>`, `TELAH BERGRADUASI [tahun]`, awalan `DIBERHENTIKAN`, atau `MENARIK DIRI`/`TELAH MENARIK DIRI [DARIPADA PENGAJIAN]`. `AKTIF SEMULA` ialah reaktivasi eksplisit. BAKAL GRADUAN, pending Senat, pembetulan, tangguh, tidak mendaftar/tidak dapat dikesan tidak membuktikan graduasi/penamatan. Tiada tarikh direka. Bukti final lama dikekalkan jika sumber kemudian tiada reaktivasi/final baru.
+- Fail 3 mempunyai 15 kolum termasuk ringkasan PhD/MSc; fail 1/2 mempunyai 12. Semua baris/header/sel asal termasuk jumlah 47/39/86 dan ringkasan disimpan di `sources`; semua versi pelajar di `sourceVersions`. Snapshot/medan semasa menggunakan nilai bukan kosong terakhir mengikut 1→2→3; kosong tidak memadam nilai lama. Fail 1/2 tiada tarikh semakan eksplisit; urutan nombor ialah aturan tie-break yang didokumenkan, bukan tarikh andaian.
+- **9 pelajar tiada dalam fail 3 tetap dikekalkan**, ditanda `missingFromLatest`. P168677 berpindah ke Dr. Muhammad Asif Ahmad Khushaini (K025867); satu listing sahaja dalam seed. ID penyelia fail 1 dikekalkan; penyelia baharu menggunakan hash identiti, bukan nombor BIL yang berubah.
+- Import browser lama kekal opt-in. Preview memaparkan laporan dan cadangan status/parent. Lalai mengekalkan semua nilai/user lifecycle; checkbox setiap padanan tunggal membolehkan pengendali memilih versi gabungan CSV dan parent. Versi sebelum adopt disimpan dalam `importBackups`, ID browser dikekalkan. Padanan berganda tidak diadopt secara automatik. Rekod yang tiada daripada sumber tidak dipadam.
+- Graduan sejarah tanpa tarikh boleh diedit/disimpan tanpa mencipta tarikh. Peralihan manual baharu ke graduasi masih wajib tarikh. Sync undated ialah no-op; selepas tarikh disahkan, ownership v2 digunakan dengan `_syncSourceIds`. Import tidak memadam rekod graduan sedia ada.
+- Ujian terkini **lulus**: `python verify_sources.py` (parser CSV bebas, semua provenance/precedence/ID/status), `node regression.cjs` (termasuk konflik browser, backup adopt/transfer tanpa duplikasi), `node browser-regression.cjs` (Edge file:// 1440/768/390). Dua graduan masih memerlukan pengesahan tarikh sebenar; konflik 22 pelajar boleh disemak dalam drawer. Tiada blocker fail sumber. Belum commit/push/deploy.
+
+### Catatan pelaksanaan satu fail terdahulu (sejarah)
+
+- **Belum commit/push/deploy sesi ini.** Status remote tidak disahkan. Backend masih belum dibina.
+- Workspace penyelia menggunakan CSV sebenar `senarai_pelajar_Penyelia.csv`: **33 penyelia, 95 pelajar, 4 penyelia tanpa pelajar**. Workspace lain masih seed contoh. MOD DEMO merujuk frontend/localStorage, bukan jaminan bahawa semua data ialah rekaan.
+- `import_penyelia.py` menggunakan Python `csv.reader` (quoted multiline), menjana `penyelia-seed.js`. Jalankan `python import_penyelia.py` selepas menukar CSV. Fail JS statik dimuat sebelum `app.js`, serasi `file://` dan hosting statik.
+- `penyelia.js` dimuat selepas `app.js`: identiti nama/ID, nested workspace, snapshot semester, drawer, merge, typed trash, sync ownership. Ia menggantikan beberapa fungsi legacy dalam `app.js`; baca kedua-duanya sebelum mengubah logik.
+- Browser baharu menerima dataset penuh. Browser lama menggunakan **Semak Import CSV → Gabung — kekalkan suntingan**. Padanan ID/matrik mengekalkan semua nilai lama; sumber CSV penuh disimpan dalam `csvSources[hash]`, boleh dibaca dalam drawer. Tiada reset automatik. Konflik tidak diselesaikan automatik: pengendali perlu menyemak dan menyunting nilai yang dipilih. Padanan berganda juga dikekalkan.
+- `provenance.values`, `sourceRows`, `sourceValue` menyimpan nilai asal, termasuk baris ringkasan PhD/MSc dan nota semester. Ringkasan bukan penyelia/pelajar baharu. STATUS TERKINI berasingan daripada status aliran kerja. Hanya dua nota jelas “Diberhentikan…” dipetakan; tiada tarikh atau graduasi direka daripada nota. “GRADUAN 2024”/“KONVO 2024” sejarah kekal teks untuk semakan manusia, tanpa tarikh graduasi andaian.
+- Paparan nama + ID di bawah, tiada kurungan/kolum ID visual. ID masih dalam carian, edit berlabel dan eksport. Hanya suffix terminal `(Pdigits)` diekstrak; IC tidak dinormalisasi menjadi matrik.
+- Program: tepat **Doktor Falsafah** / **Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik**. Nilai SARJANA/Sarjana Sains/MSc dipetakan; nilai lama disimpan apabila migrasi.
+- Papar sesi memilih snapshot sebenar. Tiga sesi terakhir yang direkodkan/aktif sehingga sesi pilihan dipaparkan; sesi lama kekal dalam dropdown. Tiada pengiraan semester global atau extrapolasi apabila snapshot tiada. Semester lama tanpa sesi kekal dalam drawer sehingga pengendali menetapkan sesi.
+- Sync graduan v2 mempunyai `_syncOrigin: penyeliaPelajar:v2`, `_syncPelajarId`, `_syncParentId` dan ID stabil `graduan-<studentId>`. Penyelia utama ialah parent. Padanan manual/legacy tidak diambil alih. Pembalikan hanya membuang rekod milik v2; `_syncPelajarId` lama sahaja tidak membuktikan ownership dan rekod itu dipelihara.
+- Padaman nested mempunyai `kind: student|supervisor`; pelajar dipulihkan ke parent. Jika parent dipadam, pulihkan parent dahulu. Padaman penyelia membawa semua pelajar dalam satu arkib. Padaman nested tidak membalikkan status graduasi.
+- Ujian sebenar: `regression.cjs` (jsdom), `browser-regression.cjs` (Playwright + Edge), syntax JS dan `git diff --check` lulus. Kiraan CSV bebas 33/95; migrasi subset lama 8→95 tanpa menimpa nilai; merge ulangan tidak menggandakan. Edge `file://` diuji 1440/768/390, tiada page overflow, drawer muat, global search membuka rekod lepas, graduasi wajib tarikh, persistence dan tiada page errors. GitHub Pages sebenar belum diuji/deploy.
+- Dependencies ujian dipasang **hanya** di `C:\Users\ruxxz\AppData\Local\Temp\opencode`; jalankan `$env:NODE_PATH='C:\Users\ruxxz\AppData\Local\Temp\opencode\node_modules'; node regression.cjs` dan `node browser-regression.cjs`. Skrip browser memerlukan Edge; menggunakan context ujian terasing.
+- Had: storan masih satu browser/localStorage; konflik import perlu semakan manusia, bukan wizard field-by-field. Semasa sesi, fail pengguna untracked berubah daripada `Q2 17062026_...csv` kepada `senarai_pelajar_Penyelia2.csv` dan `senarai_pelajar_Penyelia3.csv`; agent tidak menulis/memadamnya dan tidak menggunakannya sebagai pengganti sumber yang diminta.
+
+## Status terdahulu (rujukan sejarah; digantikan ringkasan di atas)
 
 - **Fasa**: Prototaip demo **sudah go-live**. Frontend siap dan diuji; pengesahan
   workflow dengan pengendali sedang berjalan.
@@ -272,10 +310,10 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
   pelajar, status pelajar (graduasi/menarik diri/diberhentikan), auto-sync graduan,
   semester master di Admin.
 
-### Belum siap (dropdown & format — menunggu pengesahan)
+### Baki dropdown & format
 Permintaan yang belum dilaksanakan (lihat perbincangan terakhir):
 - `BENTUK PENDAFTARAN` → dropdown (Sepenuh masa / Separuh masa)
-- `PROGRAM PENGAJIAN` → hanya 2 pilihan (buang "Sarjana Sains")
+- `PROGRAM PENGAJIAN` → dua pilihan sudah dilaksanakan sesi 28 September 2026.
 - `SEMESTER PENGAJIAN` → dropdown format `1/2025-2026` (pilihan C), semua 9 kolum
 - Enforce nilai dropdown sahaja; data lama akan dikemas kini manual kemudian
 

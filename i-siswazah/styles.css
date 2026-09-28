@@ -1589,3 +1589,12 @@ table.grid tbody tr.is-locked:hover td { background: #fef3c7; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+/* Student identity remains one visual column; identifiers remain exportable. */
+.student-name, .student-id { display:block; }
+.student-id { color:var(--muted-fg); font-size:12px; margin-top:4px; }
+.student-identity { min-width:220px; }
+.student-identity label { display:block; margin-bottom:8px; font-size:12px; }
+.nested-actions { display:flex; flex-wrap:wrap; gap:8px; padding:12px; }
+.drawer pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+.ws-toolbar select { max-width:100%; padding:8px; }
+.drawer .field { margin-bottom:12px; }

@@ -5,7 +5,6 @@
 
 const PROGRAM_OPTIONS = [
   'Doktor Falsafah',
-  'Sarjana Sains',
   'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik'
 ];
 
@@ -457,13 +456,13 @@ function formatPenyelia(names) {
   const list = (names || []).map(function (n) { return String(n).trim(); }).filter(Boolean);
   if (!list.length) return '';
   if (list.length === 1) {
-    return 'Penyelia Utama\n' + list[0];
+    return 'Penyelia Utama:\n' + list[0];
   }
   if (list.length === 2) {
-    return 'Penyelia Utama\n' + list[0] + '\n\nPenyelia Bersama\n' + list[1];
+    return 'Penyelia Utama:\n' + list[0] + '\n\nPenyelia Bersama:\n' + list[1];
   }
   const roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
-  let s = 'Pengerusi Jawatankuasa Penyeliaan\n' + list[0] + '\n\nAhli Jawatankuasa Penyeliaan';
+  let s = 'Pengerusi Jawatankuasa Penyeliaan:\n' + list[0] + '\n\nAhli Jawatankuasa Penyeliaan:';
   for (let i = 1; i < list.length; i++) {
     s += '\n' + (roman[i - 1] || (i + 1)) + ') ' + list[i];
   }
@@ -1149,10 +1148,11 @@ function openStatusQuick(penyeliaId, pelajarId) {
       root.querySelector('#saveStatus').addEventListener('click', function () {
         const status = root.querySelector('#qStatus').value;
         const tarikh = root.querySelector('#qTarikh').value;
-        if (status === 'graduasi' && !tarikh) { toast('Tarikh wajib untuk graduasi', 'error'); return; }
+        if (status === 'graduasi' && !tarikh && !(pelajar.statusKhas === 'graduasi' && pelajar.needsDateReview)) { toast('Tarikh wajib untuk graduasi', 'error'); return; }
         const old = pelajar.statusKhas;
         pelajar.statusKhas = status;
         pelajar.tarikhStatus = tarikh;
+        pelajar.needsDateReview = status === 'graduasi' && !tarikh;
         syncGraduan(pelajar, old);
         save();
         closeModal();
@@ -1254,7 +1254,7 @@ function computeUpcoming() {
 
 /* ---------- WORKSPACE ---------- */
 function renderWorkspace(w) {
-  const cols = w.columns;
+  const cols = visibleColumns(w);
   const allRows = (state.records[w.id] || []).slice();
   const q = (ui.query[w.id] || '').toLowerCase().trim();
   const fk = ui.filter[w.id] || 'all';
@@ -1262,7 +1262,7 @@ function renderWorkspace(w) {
 
   function matchQuery(rows) {
     if (!q) return rows;
-    return rows.filter(function (r) { return cols.some(function (c) { return String(r[c.key] || '').toLowerCase().indexOf(q) !== -1; }); });
+    return rows.filter(function (r) { return w.columns.some(function (c) { return String(r[c.key] || '').toLowerCase().indexOf(q) !== -1; }); });
   }
   function doSort(rows) {
     if (!s) return rows;
@@ -1351,7 +1351,7 @@ function renderLockedPanel(w, lockedRows) {
 
   if (open) {
     html += '<div class="locked-panel__body"><div class="table-scroll"><table class="grid locked-table"><thead><tr>';
-    html += w.columns.map(function (c, i) {
+    html += visibleColumns(w).map(function (c, i) {
       return '<th class="' + colClass(c, i) + '" title="' + esc(c.header) + '">' + esc(c.header) + '</th>';
     }).join('');
     html += '<th class="col-actions">TINDAKAN</th></tr></thead><tbody>';
@@ -1418,11 +1418,19 @@ function applyChipFilter(w, rows, fk) {
 /* ---------- ROW ---------- */
 function renderRow(w, r) {
   const editing = ui.editingRow === r.id;
-  const cols = w.columns;
+  const cols = visibleColumns(w);
   const cells = cols.map(function (c, i) {
     const val = (editing && ui.draft) ? (ui.draft[c.key] || '') : (r[c.key] || '');
     const cls = colClass(c, i);
+    if (c.key === 'nama') {
+      const record = editing && ui.draft ? ui.draft : r;
+      const key = identityKey(w);
+      return '<td class="student-identity">' + (editing
+        ? '<label>Nama Pelajar' + renderCellInput(c, studentIdentity(record).nama) + '</label><label>' + esc(w.columns.find(x => x.key === key).header) + renderCellInput({key:key,type:'text'}, studentIdentity(record).id) + '</label>'
+        : studentIdentityHTML(record)) + '</td>';
+    }
     if (editing && ui.draft && !c.noEdit) return '<td class="' + cls + '">' + renderCellInput(c, val) + '</td>';
+    if (c.autoLabel && val) return '<td class="' + cls + '">' + esc(formatPenyelia(extractPenyeliaNames(val))) + '</td>';
     if (c.type === 'date' && val) return '<td class="' + cls + '" title="' + esc(fmtDateLong(val)) + '">' + esc(fmtDate(val)) + '</td>';
     return '<td class="' + cls + '">' + esc(val) + '</td>';
   }).join('');
@@ -1615,7 +1623,7 @@ function bindContent() {
     'set-vivaSoonDays': function (v) { ensureSettings().attentionThresholds.vivaSoonDays = Math.max(1, parseInt(v, 10) || 14); },
     'set-trashRetentionDays': function (v) { ensureSettings().trashRetentionDays = Math.max(1, parseInt(v, 10) || 30); },
     'set-confirmDelete': function (v) { ensureSettings().confirmDelete = v === '1'; },
-    'set-sesiAktif': function (v) { ensureSettings().semesterAktif.sesi = v; }
+    'set-sesiAktif': function (v) { ensureSettings().semesterAktif.sesi = v; delete ui.penyeliaSession; }
   };
   Object.keys(adminBind).forEach(function (id) {
     const el = document.getElementById(id);
@@ -1665,7 +1673,7 @@ function bindContent() {
       render();
     });
   });
-  c.querySelectorAll('[data-add-penyelia]').forEach(function (b) { b.addEventListener('click', function () { addPenyelia(); }); });
+  c.querySelectorAll('[data-add-penyelia=""]').forEach(function (b) { b.addEventListener('click', function () { addPenyelia(); }); });
   c.querySelectorAll('[data-edit-pelajar]').forEach(function (b) {
     b.addEventListener('click', function () {
       const parts = b.dataset.editPelajar.split('|');
@@ -1990,7 +1998,7 @@ function closeRowMenu() {
 
 /* ---------- COPY TO WORKSPACE ---------- */
 function openCopyModal(wsId, rec) {
-  const targets = WORKSPACES.filter(function (w) { return w.id !== wsId; });
+  const targets = WORKSPACES.filter(function (w) { return w.id !== wsId && !w.nested; });
   let body = '<p class="field__hint" style="margin-top:0">Pilih workspace sasaran. Hanya medan pengenalan (nama, no. matrik, program, penyelia, semester) akan dicadangkan untuk disalin.</p>';
   body += '<div class="field"><label>Workspace Sasaran</label><select id="copyTarget">';
   targets.forEach(function (t) { body += '<option value="' + t.id + '">' + esc(t.name) + '</option>'; });
@@ -2013,6 +2021,7 @@ function openCopyModal(wsId, rec) {
 
 function performCopy(srcWsId, targetId, rec) {
   const srcW = ws(srcWsId), tgtW = ws(targetId);
+  if (!tgtW || tgtW.nested || srcW.nested) return;
   const newRec = { id: uid('r'), bil: nextId(targetId) };
   tgtW.columns.forEach(function (c) { if (!c.noEdit) newRec[c.key] = ''; });
 
@@ -2245,7 +2254,7 @@ function setupGlobalSearch() {
     const ql = q.toLowerCase();
     const hits = [];
     WORKSPACES.forEach(function (w) {
-      (state.records[w.id] || []).forEach(function (r) {
+      searchableRecords(w).forEach(function (r) {
         const name = String(r.nama || '').toLowerCase();
         const idv = String(idVal(r) || '').toLowerCase();
         if (name.indexOf(ql) !== -1 || idv.indexOf(ql) !== -1) {
@@ -2289,6 +2298,7 @@ function resetDemo() {
   localStorage.removeItem(STORAGE_KEY);
   state = { records: {}, reminders: [], history: [], trash: [], lastVisit: null, seq: 1, settings: keep };
   seedData();
+  prepareStudentData(false);
   state.settings = keep;
   ui.view = 'dashboard'; ui.editingRow = null; ui.draft = null;
   ui.sort = {}; ui.filter = {}; ui.query = {}; ui.page = {};
@@ -2302,6 +2312,7 @@ function resetDemo() {
 function init() {
   const had = load();
   if (!had) seedData();
+  prepareStudentData(had);
   ensureSettings();
   ui.pageSize = state.settings.pageSize || 25;
 

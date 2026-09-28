@@ -1,0 +1,40 @@
+const {chromium} = require('playwright');
+const {pathToFileURL} = require('node:url');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+(async () => {
+  const browser = await chromium.launch({channel:'msedge',headless:true});
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror',e => errors.push(e.message));
+  await page.goto(pathToFileURL(path.resolve('index.html')).href);
+  await page.evaluate(() => { localStorage.clear(); });
+  await page.reload();
+  await page.locator('[data-go="penyeliaPelajar"]').first().click();
+  assert.equal(await page.locator('.penyelia-panel').count(),34);
+  for (const [width,height] of [[1440,900],[768,1024],[390,844]]) {
+    await page.setViewportSize({width,height});
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1), `page overflow at ${width}`);
+    await page.evaluate(() => openPelajarDrawer('csv-supervisor-2','csv-student-P93318'));
+    await page.locator('.drawer').evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+    const box = await page.locator('.drawer').boundingBox();
+    assert.ok(box.x >= -1 && box.x+box.width <= width+1, `drawer overflow at ${width}`);
+    await page.locator('[data-close-drawer]').last().click();
+  }
+  await page.setViewportSize({width:1440,height:900});
+  await page.locator('#globalSearch').fill('P108824');
+  await page.locator('[data-gresult="penyeliaPelajar|csv-student-P108824"]').click();
+  await page.locator('[data-record="csv-student-P108824"]').waitFor({state:'visible'});
+  await page.evaluate(() => openStatusQuick('csv-supervisor-2','csv-student-P93318'));
+  await page.locator('#qStatus').selectOption('graduasi');
+  await page.locator('#saveStatus').click();
+  assert.equal(await page.locator('#overlay').count(),1,'graduation requires date');
+  await page.locator('#qTarikh').fill('2026-09-28');
+  await page.locator('#saveStatus').click();
+  assert.equal(await page.evaluate(() => state.records.graduan.filter(g=>g._syncOrigin).length),1);
+  await page.reload();
+  assert.equal(await page.evaluate(() => state.records.penyeliaPelajar.flatMap(g=>g.pelajar).length),95);
+  assert.deepEqual(errors,[]);
+  console.log('PASS Edge file://: 1440/768/390 layouts, drawer fit, global nested search/focus, required graduation date, sync, persistence; no page errors.');
+  await browser.close();
+})().catch(e => {console.error(e);process.exit(1);});
