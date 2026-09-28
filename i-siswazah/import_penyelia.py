@@ -66,8 +66,12 @@ def build():
             assert re.fullmatch(r'P\d+', matric), (filename, row_number, 'unreliable matric', matric)
             source['students'] += 1
             counts[key] += 1
+            program_raw = row[4].strip()
+            program = {'SARJANA': 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik',
+                       'KEDOKTORAN': 'Doktor Falsafah'}.get(program_raw.upper())
+            assert program, (filename, row_number, 'unknown program', program_raw)
             data = dict(nama=' '.join(row[3].split()), noPelajar=matric,
-                        program={'SARJANA':'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', 'KEDOKTORAN':'Doktor Falsafah'}[row[4].strip()],
+                        program=program,
                         penyeliaBersama=row[6].strip(), semesterPengajian=row[10], statusTerkini=row[11], parentId=parent['id'])
             if matric not in students:
                 students[matric] = dict(id='csv-student-'+matric, tarikhStatus='', statusKhas='',

@@ -87,7 +87,7 @@ const WORKSPACES = [
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
-      { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
+      { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhTerima', header: 'TARIKH TERIMA', type: 'date' },
       { key: 'tarikhTerimaPencalonan', header: 'TARIKH TERIMA PENCALONAN', type: 'date' },
@@ -129,7 +129,7 @@ const WORKSPACES = [
       { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
-      { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
+      { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'tarikhHantar', header: 'TARIKH HANTAR TESIS KEPADA PDPL', type: 'date' },
@@ -143,7 +143,7 @@ const WORKSPACES = [
     columns: [
       { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
-      { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
+      { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true, multi: true, autoLabel: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'terimaTesis', header: 'TARIKH TERIMA TESIS SELEPAS PEMBETULAN', type: 'date' },
@@ -159,7 +159,7 @@ const WORKSPACES = [
     columns: [
       { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
-      { key: 'program', header: 'PROGRAM', type: 'text', identity: true },
+      { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true, multi: true, autoLabel: true },
       { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
       { key: 'catatan', header: 'Catatan', type: 'text' }
@@ -488,14 +488,14 @@ function seedData() {
       { id: uid('r'), bil: 3, tarikh: '', nama: 'VASANTHAN A/L SUBRAMANIAM', noPelajar: 'P172682', program: 'Doktor Falsafah', tajuk: '', penyelia: '', bentuk: '', tarikhMendaftar: '', semester: '', statusTawaran: 'Terima Tawaran' }
     ],
     viva: [
-      { id: uid('r'), bil: 1, nama: 'Syazwani Izrah binti Badrudin', noMatrik: 'P130001', program: 'PhD', penyelia: 'Dr. Rhonira Latif', semester: '', tarikhHantar: '', tarikhTerimaLaporan: '', tarikhViva: '2026-10-30', tarikhUpdate: '', catatan: 'pembetulan' },
-      { id: uid('r'), bil: 2, nama: 'Mohd Faris Musawwi bin Ruslan', noMatrik: 'P125395', program: 'MSc', penyelia: 'Dr. Abdul Rahman Mohmad', semester: '', tarikhHantar: '', tarikhTerimaLaporan: '', tarikhViva: '2026-10-27', tarikhUpdate: '', catatan: 'akan masuk senat sept' },
-      { id: uid('r'), bil: 3, nama: 'Aimi Nabila Efandi', noMatrik: 'P138067', program: 'MSc', penyelia: 'Prof. Dr. Mohd Yusri Abd. Rahman', semester: '', tarikhHantar: '2026-04-01', tarikhTerimaLaporan: '2026-05-06', tarikhViva: '2026-12-12', tarikhUpdate: '', catatan: 'akan masuk senat sept' }
+      { id: uid('r'), bil: 1, nama: 'Syazwani Izrah binti Badrudin', noMatrik: 'P130001', program: 'Doktor Falsafah', penyelia: 'Dr. Rhonira Latif', semester: '', tarikhHantar: '', tarikhTerimaLaporan: '', tarikhViva: '2026-10-30', tarikhUpdate: '', catatan: 'pembetulan' },
+      { id: uid('r'), bil: 2, nama: 'Mohd Faris Musawwi bin Ruslan', noMatrik: 'P125395', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', penyelia: 'Dr. Abdul Rahman Mohmad', semester: '', tarikhHantar: '', tarikhTerimaLaporan: '', tarikhViva: '2026-10-27', tarikhUpdate: '', catatan: 'akan masuk senat sept' },
+      { id: uid('r'), bil: 3, nama: 'Aimi Nabila Efandi', noMatrik: 'P138067', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', penyelia: 'Prof. Dr. Mohd Yusri Abd. Rahman', semester: '', tarikhHantar: '2026-04-01', tarikhTerimaLaporan: '2026-05-06', tarikhViva: '2026-12-12', tarikhUpdate: '', catatan: 'akan masuk senat sept' }
     ],
     notis: [
-      { id: uid('r'), bil: 1, tarikhPermohonan: '2026-08-01', nama: 'Syazwani Izrah bin Badrudin', noMatrik: '130001', penyelia: 'Dr. Rhonira Latif', program: 'PhD', semester: '', tarikhTerima: '2026-08-01', tarikhTerimaPencalonan: '2026-08-10', tarikhLulus: '2026-08-11' },
-      { id: uid('r'), bil: 2, tarikhPermohonan: '', nama: 'Muhammad Faris Musawwi bin Ruslan', noMatrik: 'P125395', penyelia: 'Dr. Abdul Rahman Mohmad', program: 'MSc', semester: '', tarikhTerima: '', tarikhTerimaPencalonan: '', tarikhLulus: '' },
-      { id: uid('r'), bil: 3, tarikhPermohonan: 'belum serah notis', nama: 'Rawhan Haque', noMatrik: 'P127643', penyelia: 'Dr. Ooi Poh Choon', program: 'PhD', semester: '', tarikhTerima: '', tarikhTerimaPencalonan: '', tarikhLulus: '' }
+      { id: uid('r'), bil: 1, tarikhPermohonan: '2026-08-01', nama: 'Syazwani Izrah bin Badrudin', noMatrik: '130001', penyelia: 'Dr. Rhonira Latif', program: 'Doktor Falsafah', semester: '', tarikhTerima: '2026-08-01', tarikhTerimaPencalonan: '2026-08-10', tarikhLulus: '2026-08-11' },
+      { id: uid('r'), bil: 2, tarikhPermohonan: '', nama: 'Muhammad Faris Musawwi bin Ruslan', noMatrik: 'P125395', penyelia: 'Dr. Abdul Rahman Mohmad', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', semester: '', tarikhTerima: '', tarikhTerimaPencalonan: '', tarikhLulus: '' },
+      { id: uid('r'), bil: 3, tarikhPermohonan: 'belum serah notis', nama: 'Rawhan Haque', noMatrik: 'P127643', penyelia: 'Dr. Ooi Poh Choon', program: 'Doktor Falsafah', semester: '', tarikhTerima: '', tarikhTerimaPencalonan: '', tarikhLulus: '' }
     ],
     serahTesis: [
       { id: uid('r'), bil: 1, tarikhPermohonan: '', nama: 'Syazwani Izrah bin Badrudin', noMatrik: '130001', penyelia: 'Dr. Rhonira Latif', semester: '', tarikhHantar: '', laporanPL: '', laporanPD: '', tarikhUpdate: '' },
@@ -524,11 +524,11 @@ function seedData() {
       { id: uid('r'), bil: 2, tarikhPermohonan: '', nama: 'Mohd Erwan bin Basiron', noMatrik: 'P130002', penyelia: 'Prof. Dr. Azman bin Jalar', semester: '', tarikhTerima: '', tarikhLulus: '', pemeriksaLuar: 'Prof. Madya Dr. Abdullah Aziz bin Saad (USM)', pemeriksaDalam: 'Dr. Muhammad Aniq Shazni bin Mohammad Haniff', tarikhHantar: '', tarikhUpdate: '' }
     ],
     senat: [
-      { id: uid('r'), bil: 1, nama: 'Nur Nazhifah binti Yusoff (P100212)', program: 'Sarjana Sains', penyelia: 'Penyelia Utama\nDr. Norhayati binti Abu Bakar', semester: '13', terimaTesis: '', permohonanPTSL: '', pengesahanPTSL: '', permohonanJPS: '', kelulusanJPS: '', hantarSenat: '', tarikhUpdate: '' },
+      { id: uid('r'), bil: 1, nama: 'Nur Nazhifah binti Yusoff (P100212)', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', penyelia: 'Penyelia Utama\nDr. Norhayati binti Abu Bakar', semester: '13', terimaTesis: '', permohonanPTSL: '', pengesahanPTSL: '', permohonanJPS: '', kelulusanJPS: '', hantarSenat: '', tarikhUpdate: '' },
       { id: uid('r'), bil: 2, nama: 'Nur Adliha binti Abdullah (P94705)', program: 'Doktor Falsafah', penyelia: 'Pengerusi JK Penyeliaan\nYM Tengku Hasnan Tengku Abdul Aziz', semester: '13', terimaTesis: '', permohonanPTSL: '', pengesahanPTSL: '', permohonanJPS: '', kelulusanJPS: '', hantarSenat: '', tarikhUpdate: '' }
     ],
     graduan: [
-      { id: uid('r'), bil: 1, nama: 'Nur Nazhifah binti Yusoff (P100212)', program: 'Sarjana Sains', penyelia: 'Penyelia Utama\nDr. Norhayati binti Abu Bakar', semester: '13', catatan: 'Senat 527' },
+      { id: uid('r'), bil: 1, nama: 'Nur Nazhifah binti Yusoff (P100212)', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', penyelia: 'Penyelia Utama\nDr. Norhayati binti Abu Bakar', semester: '13', catatan: 'Senat 527' },
       { id: uid('r'), bil: 2, nama: 'Nur Adliha binti Abdullah (P94705)', program: 'Doktor Falsafah', penyelia: 'Pengerusi JK Penyeliaan\nYM Tengku Hasnan Tengku Abdul Aziz', semester: '13', catatan: 'Senat 527' }
     ],
     honorarium: [
@@ -537,17 +537,17 @@ function seedData() {
     ],
     penyeliaPelajar: [
       { id: uid('r'), bil: 1, namaPenyelia: 'PROF. DR. AZMAN JALAR @JALIL (K007353)', pelajar: [
-        { id: uid('r'), bil: 1, nama: 'LIM EE MAY', program: 'Sarjana Sains', noPelajar: 'P137670', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR', statusKhas: '', tarikhStatus: '', semesterPengajian: 6, sejarahSemester: [
+        { id: uid('r'), bil: 1, nama: 'LIM EE MAY', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', noPelajar: 'P137670', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR', statusKhas: '', tarikhStatus: '', semesterPengajian: 6, sejarahSemester: [
           { sesi: '2/2022-2023', semesterPengajian: '6', catatan: '' },
           { sesi: '1/2023-2024', semesterPengajian: '', catatan: 'akan hantar notis dalam masa terdekat' },
           { sesi: '2/2023-2024', semesterPengajian: '6', catatan: 'Dalam tempoh pembetulan tesis.' }
         ] },
         { id: uid('r'), bil: 2, nama: 'BALOGUN BASHIR TEMITOPE', program: 'Doktor Falsafah', noPelajar: 'P117630', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR\nDR. ATIQAH BINTI MOHD AFDZALUDDIN', statusKhas: '', tarikhStatus: '', semesterPengajian: 7, sejarahSemester: [] },
-        { id: uid('r'), bil: 3, nama: 'MOHD ERWAN BIN BASIRON', program: 'Sarjana Sains', noPelajar: 'P130002', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR', statusKhas: '', tarikhStatus: '', semesterPengajian: 6, sejarahSemester: [] }
+        { id: uid('r'), bil: 3, nama: 'MOHD ERWAN BIN BASIRON', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', noPelajar: 'P130002', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR', statusKhas: '', tarikhStatus: '', semesterPengajian: 6, sejarahSemester: [] }
       ] },
       { id: uid('r'), bil: 2, namaPenyelia: 'PROF. DR. AZRUL AZLAN HAMZAH (K014762)', pelajar: [
-        { id: uid('r'), bil: 1, nama: 'ROHARSYAFINAZ BINTI ROSLAN', program: 'Sarjana Sains', noPelajar: 'P121441', penyeliaBersama: 'DR. AHMAD GHADAFI ISMAIL, PROF. MADYA DR. P. SUSTHITHA MENON', statusKhas: 'graduasi', tarikhStatus: '2024-11-15', semesterPengajian: 8, sejarahSemester: [] },
-        { id: uid('r'), bil: 2, nama: 'MANAL BINTI AMMAR', program: 'Sarjana Sains', noPelajar: 'P152989', penyeliaBersama: 'TIADA', statusKhas: '', tarikhStatus: '', semesterPengajian: 4, sejarahSemester: [] },
+        { id: uid('r'), bil: 1, nama: 'ROHARSYAFINAZ BINTI ROSLAN', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', noPelajar: 'P121441', penyeliaBersama: 'DR. AHMAD GHADAFI ISMAIL, PROF. MADYA DR. P. SUSTHITHA MENON', statusKhas: 'graduasi', tarikhStatus: '2024-11-15', semesterPengajian: 8, sejarahSemester: [] },
+        { id: uid('r'), bil: 2, nama: 'MANAL BINTI AMMAR', program: 'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik', noPelajar: 'P152989', penyeliaBersama: 'TIADA', statusKhas: '', tarikhStatus: '', semesterPengajian: 4, sejarahSemester: [] },
         { id: uid('r'), bil: 3, nama: 'ARIFAH SYAHIRAH BINTI ABDUL RAHMAN', program: 'Doktor Falsafah', noPelajar: 'P153583', penyeliaBersama: 'TIADA', statusKhas: '', tarikhStatus: '', semesterPengajian: 3, sejarahSemester: [] }
       ] },
       { id: uid('r'), bil: 3, namaPenyelia: 'PROF. DR. DEE CHANG FU (K013525)', pelajar: [

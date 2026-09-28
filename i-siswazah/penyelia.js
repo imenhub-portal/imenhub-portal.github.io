@@ -20,9 +20,11 @@ function searchableRecords(w) {
 }
 function cloneData(value) { return JSON.parse(JSON.stringify(value)); }
 function programValue(value) {
-  if (/^(SARJANA|Sarjana Sains|MSc)$/i.test(value || '')) return PROGRAM_OPTIONS[1];
-  if (/^(KEDOKTORAN|PhD)$/i.test(value || '')) return PROGRAM_OPTIONS[0];
-  return value || '';
+  const v = String(value || '').trim();
+  if (!v) return '';
+  if (/^(SARJANA|SARJANA SAINS|MSc|Master|Sarjana)$/i.test(v) || /sarjana/i.test(v)) return PROGRAM_OPTIONS[1];
+  if (/^(KEDOKTORAN|PhD|Doktor Falsafah)$/i.test(v) || /doktor|phd/i.test(v)) return PROGRAM_OPTIONS[0];
+  return v;
 }
 WORKSPACES.forEach(w => {
   if (w.columns.some(c => c.key === 'nama') && !w.columns.some(c => ['noMatrik','noPelajar'].includes(c.key))) {

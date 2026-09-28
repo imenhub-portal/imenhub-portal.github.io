@@ -34,7 +34,7 @@ Pengguna mengesahkan fail tanpa nombor ialah fail 1. Ketiga-tiga fail digunakan:
 - Browser baharu menerima dataset penuh. Browser lama menggunakan **Semak Import CSV → Gabung — kekalkan suntingan**. Padanan ID/matrik mengekalkan semua nilai lama; sumber CSV penuh disimpan dalam `csvSources[hash]`, boleh dibaca dalam drawer. Tiada reset automatik. Konflik tidak diselesaikan automatik: pengendali perlu menyemak dan menyunting nilai yang dipilih. Padanan berganda juga dikekalkan.
 - `provenance.values`, `sourceRows`, `sourceValue` menyimpan nilai asal, termasuk baris ringkasan PhD/MSc dan nota semester. Ringkasan bukan penyelia/pelajar baharu. STATUS TERKINI berasingan daripada status aliran kerja. Hanya dua nota jelas “Diberhentikan…” dipetakan; tiada tarikh atau graduasi direka daripada nota. “GRADUAN 2024”/“KONVO 2024” sejarah kekal teks untuk semakan manusia, tanpa tarikh graduasi andaian.
 - Paparan nama + ID di bawah, tiada kurungan/kolum ID visual. ID masih dalam carian, edit berlabel dan eksport. Hanya suffix terminal `(Pdigits)` diekstrak; IC tidak dinormalisasi menjadi matrik.
-- Program: tepat **Doktor Falsafah** / **Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik**. Nilai SARJANA/Sarjana Sains/MSc dipetakan; nilai lama disimpan apabila migrasi.
+- Program: **tepat dua pilihan sahaja** — **Doktor Falsafah** / **Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik**. Semua kolum program di semua workspace ialah `type: 'select'` dengan `PROGRAM_OPTIONS` (app.js) dan dikuatkuasakan penyelia.js. `programValue()` memetakan legacy (SARJANA/Sarjana Sains/MSc → pilihan 2; KEDOKTORAN/PhD → pilihan 1); nilai lama disimpan dalam `_legacyProgram` bila migrasi. Importer (`import_penyelia.py`) juga memetakan dan akan gagal jelas jika program tidak dikenali.
 - Papar sesi memilih snapshot sebenar. Tiga sesi terakhir yang direkodkan/aktif sehingga sesi pilihan dipaparkan; sesi lama kekal dalam dropdown. Tiada pengiraan semester global atau extrapolasi apabila snapshot tiada. Semester lama tanpa sesi kekal dalam drawer sehingga pengendali menetapkan sesi.
 - Sync graduan v2 mempunyai `_syncOrigin: penyeliaPelajar:v2`, `_syncPelajarId`, `_syncParentId` dan ID stabil `graduan-<studentId>`. Penyelia utama ialah parent. Padanan manual/legacy tidak diambil alih. Pembalikan hanya membuang rekod milik v2; `_syncPelajarId` lama sahaja tidak membuktikan ownership dan rekod itu dipelihara.
 - Padaman nested mempunyai `kind: student|supervisor`; pelajar dipulihkan ke parent. Jika parent dipadam, pulihkan parent dahulu. Padaman penyelia membawa semua pelajar dalam satu arkib. Padaman nested tidak membalikkan status graduasi.
@@ -313,7 +313,7 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
 ### Baki dropdown & format
 Permintaan yang belum dilaksanakan (lihat perbincangan terakhir):
 - `BENTUK PENDAFTARAN` → dropdown (Sepenuh masa / Separuh masa)
-- `PROGRAM PENGAJIAN` → dua pilihan sudah dilaksanakan sesi 28 September 2026.
+- `PROGRAM PENGAJIAN` → **dua pilihan sahaja dilaksanakan & dikoherensikan untuk semua workspace** (28 September 2026). Hanya **Doktor Falsafah** dan **Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik**.
 - `SEMESTER PENGAJIAN` → dropdown format `1/2025-2026` (pilihan C), semua 9 kolum
 - Enforce nilai dropdown sahaja; data lama akan dikemas kini manual kemudian
 
