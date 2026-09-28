@@ -28,7 +28,7 @@ const WORKSPACES = [
     columns: [
       { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
       { key: 'tarikh', header: 'TARIKH', type: 'date' },
-      { key: 'semester', header: 'SEMESTER', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER', type: 'text', identity: true, semesterSesi: true },
       { key: 'nama', header: 'NAMA PELAJAR', type: 'text', identity: true, required: true },
       { key: 'cadanganPenyelia', header: 'CADANGAN PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'noPelajar', header: 'NO. PELAJAR/N IC/Passport', type: 'text', identity: true },
@@ -51,7 +51,7 @@ const WORKSPACES = [
       { key: 'penyelia', header: 'PENYELIA UTAMA', type: 'text', identity: true, multi: true },
       { key: 'bentuk', header: 'BENTUK PENDAFTARAN', type: 'text' },
       { key: 'tarikhMendaftar', header: 'TARIKH MENDAFTAR', type: 'date' },
-      { key: 'semester', header: 'SEMESTER', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER', type: 'text', identity: true, semesterSesi: true },
       { key: 'statusTawaran', header: 'STATUS TAWARAN', type: 'select', options: ['Tawar', 'Terima Tawaran', 'Tolak Tawaran'] }
     ] },
   { id: 'tambahMasa', name: 'Permohonan Tambah Masa', group: 'PENGURUSAN PENGAJIAN', icon: 'clock',
@@ -63,7 +63,7 @@ const WORKSPACES = [
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'alasan', header: 'ALASAN PERMOHONAN', type: 'textarea' },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'tarikhTindakan', header: 'TARIKH TINDAKAN DIAMBIL', type: 'date' },
       { key: 'tarikhLulus', header: 'TARIKH DILULUSKAN', type: 'date' }
     ] },
@@ -76,7 +76,7 @@ const WORKSPACES = [
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'alasan', header: 'ALASAN PERMOHONAN', type: 'textarea' },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'tarikhLulus', header: 'TARIKH DILULUSKAN', type: 'date' }
     ] },
   { id: 'notis', name: 'Notis Serah Tesis', group: 'TESIS & PEPERIKSAAN', icon: 'fileText',
@@ -88,7 +88,7 @@ const WORKSPACES = [
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
       { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'tarikhTerima', header: 'TARIKH TERIMA', type: 'date' },
       { key: 'tarikhTerimaPencalonan', header: 'TARIKH TERIMA PENCALONAN', type: 'date' },
       { key: 'tarikhLulus', header: 'TARIKH LULUS', type: 'date' }
@@ -101,7 +101,7 @@ const WORKSPACES = [
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'tarikhTerima', header: 'TARIKH TERIMA PENCALONAN', type: 'date' },
       { key: 'tarikhLulus', header: 'TARIKH PENCALONAN DILULUSKAN', type: 'date' },
       { key: 'pemeriksaLuar', header: 'PEMERIKSA LUAR (PL)', type: 'text', multi: true },
@@ -117,7 +117,7 @@ const WORKSPACES = [
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'tarikhHantar', header: 'TARIKH HANTAR TESIS KEPADA PDPL', type: 'date' },
       { key: 'laporanPL', header: 'TARIKH TERIMA LAPORAN DARI PL', type: 'date' },
       { key: 'laporanPD', header: 'TARIKH TERIMA LAPORAN DARI PD', type: 'date' },
@@ -131,7 +131,7 @@ const WORKSPACES = [
       { key: 'noMatrik', header: 'NO. MATRIK', type: 'text', identity: true },
       { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'penyelia', header: 'PENYELIA', type: 'text', identity: true, multi: true },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'tarikhHantar', header: 'TARIKH HANTAR TESIS KEPADA PDPL', type: 'date' },
       { key: 'tarikhTerimaLaporan', header: 'TARIKH TERIMA LAPORAN DARIPADA PDPL', type: 'date' },
       { key: 'tarikhViva', header: 'TARIKH VIVA', type: 'date' },
@@ -145,7 +145,7 @@ const WORKSPACES = [
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true, multi: true, autoLabel: true },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'terimaTesis', header: 'TARIKH TERIMA TESIS SELEPAS PEMBETULAN', type: 'date' },
       { key: 'permohonanPTSL', header: 'TARIKH PERMOHONAN PENGESAHAN PTSL', type: 'date' },
       { key: 'pengesahanPTSL', header: 'TARIKH PENGESAHAN PTSL', type: 'date' },
@@ -161,7 +161,7 @@ const WORKSPACES = [
       { key: 'nama', header: 'PELAJAR', type: 'text', identity: true, required: true },
       { key: 'program', header: 'PROGRAM', type: 'select', identity: true, options: PROGRAM_OPTIONS },
       { key: 'penyelia', header: 'PENYELIA', type: 'textarea', identity: true, multi: true, autoLabel: true },
-      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true },
+      { key: 'semester', header: 'SEMESTER PENGAJIAN', type: 'text', identity: true, semesterSesi: true },
       { key: 'catatan', header: 'Catatan', type: 'text' }
     ] },
   { id: 'honorarium', name: 'Honorarium', group: 'PENTADBIRAN', icon: 'wallet',
@@ -727,6 +727,9 @@ function renderDashboard() {
   html += '<div class="mini-card"><span class="mini-card__icon g-amber">' + icon('clock', 17) + '</span><div><div class="mini-card__value">' + reminders.length + '</div><div class="mini-card__label">Menunggu Tindakan</div></div></div>';
   html += '</div>';
 
+  /* ---------- ANALISIS KESIHATAN PELAJAR ---------- */
+  html += renderAnalytics();
+
   html += '<div class="dash-grid"><div class="dash-col">';
   html += '<section class="panel" id="sec-attention"><div class="panel__head"><h2 class="section-title" style="margin:0">' + icon('alert', 17) + ' Perkara Memerlukan Perhatian</h2><span class="badge badge--warn">' + attention.length + ' item</span></div><div class="panel__body">';
   html += attention.length ? attention.slice(0, 12).map(renderAttentionItem).join('') : emptyState('Tiada perkara memerlukan perhatian', 'Semua rekod kelihatan lengkap setakat ini.');
@@ -744,9 +747,83 @@ function renderDashboard() {
   return html;
 }
 
+/* ---------- PANEL ANALISIS (dashboard) ---------- */
+function renderAnalytics() {
+  const a = computeAnalytics();
+
+  let html = '<section class="panel analytics-panel" id="sec-analytics">';
+  html += '<div class="panel__head"><h2 class="section-title" style="margin:0">' + icon('target', 17) + ' Analisis Keseluruhan Siswazah</h2>';
+  html += '<span class="badge badge--info">' + a.totalStudents + ' pelajar · ' + a.totalSupervisors + ' penyelia</span></div>';
+  html += '<div class="panel__body panel__body--pad">';
+
+  /* Baris 1: nisbah & status kesihatan */
+  html += '<div class="analytics-grid">';
+
+  /* Kad nisbah penyelia/pelajar */
+  const ratioCls = a.ratio > 4 ? 'is-warn' : 'is-ok';
+  html += '<div class="analytics-card ' + ratioCls + '">';
+  html += '<div class="analytics-card__label">' + icon('users', 15) + ' Nisbah Pelajar : Penyelia</div>';
+  html += '<div class="analytics-card__value">' + a.ratio.toFixed(1) + ' : 1</div>';
+  html += '<div class="analytics-card__sub">' + a.totalStudents + ' pelajar / ' + a.totalSupervisors + ' penyelia</div>';
+  html += '</div>';
+
+  /* Kad komposisi status */
+  const total = a.totalStudents || 1;
+  const pctAct = Math.round((a.activeCount / total) * 100);
+  const pctGrad = Math.round((a.graduated / total) * 100);
+  const pctWd = Math.round((a.withdrawn / total) * 100);
+  const pctTerm = Math.round((a.terminated / total) * 100);
+  html += '<div class="analytics-card">';
+  html += '<div class="analytics-card__label">' + icon('checkCircle', 15) + ' Kesihatan Status</div>';
+  html += '<div class="analytics-bar">';
+  html += '<span class="seg-bar seg-active" style="width:' + pctAct + '%" title="Aktif ' + pctAct + '%"></span>';
+  html += '<span class="seg-bar seg-grad" style="width:' + pctGrad + '%" title="Graduasi ' + pctGrad + '%"></span>';
+  html += '<span class="seg-bar seg-wd" style="width:' + pctWd + '%" title="Menarik diri ' + pctWd + '%"></span>';
+  html += '<span class="seg-bar seg-term" style="width:' + pctTerm + '%" title="Diberhentikan ' + pctTerm + '%"></span>';
+  html += '</div>';
+  html += '<div class="analytics-legend">';
+  html += '<span><i class="d-active"></i> Aktif <b>' + a.activeCount + '</b></span>';
+  html += '<span><i class="d-grad"></i> Graduasi <b>' + a.graduated + '</b></span>';
+  html += '<span><i class="d-wd"></i> Menarik Diri <b>' + a.withdrawn + '</b></span>';
+  html += '<span><i class="d-term"></i> Diberhentikan <b>' + a.terminated + '</b></span>';
+  html += '</div></div>';
+
+  html += '</div>'; /* analytics-grid row 1 */
+
+  /* Baris 2: kemasukan & graduasi */
+  html += '<div class="analytics-grid" style="margin-top:14px">';
+
+  /* Tawaran vs Terima vs Tolak */
+  html += '<div class="analytics-card">';
+  html += '<div class="analytics-card__label">' + icon('userPlus', 15) + ' Kemasukan (Pendaftaran)</div>';
+  html += '<div class="analytics-kv"><span>Tawaran dikeluarkan</span><b>' + a.totalTawaran + '</b></div>';
+  html += '<div class="analytics-kv"><span>Terima tawaran</span><b style="color:var(--accent)">' + a.terima + ' · ' + a.pctTerima + '%</b></div>';
+  html += '<div class="analytics-kv"><span>Tolak / tarik diri</span><b style="color:var(--destructive)">' + (a.tolak + a.withdrawn) + ' · ' + (a.pctTolak + pctWd) + '%</b></div>';
+  html += '<div class="analytics-mini-bar"><span class="seg-bar seg-active" style="width:' + a.pctTerima + '%"></span></div>';
+  html += '</div>';
+
+  /* Graduasi tahun semasa */
+  html += '<div class="analytics-card is-teal">';
+  html += '<div class="analytics-card__label">' + icon('award', 15) + ' Graduasi Tahun ' + a.currentYear + '</div>';
+  html += '<div class="analytics-card__value">' + a.gradThisYear + ' <span style="font-size:14px;font-weight:500;color:var(--muted-fg)">pelajar</span></div>';
+  html += '<div class="analytics-card__sub">Graduasi sepanjang tahun semasa (' + a.currentYear + ')</div>';
+  const years = Object.keys(a.gradYears).sort();
+  if (years.length) {
+    html += '<div class="analytics-legend" style="margin-top:10px">';
+    years.forEach(function (y) { html += '<span>' + esc(y) + ' <b>' + a.gradYears[y] + '</b></span>'; });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; /* analytics-grid row 2 */
+
+  html += '<p class="field__hint" style="margin-top:12px">' + icon('info', 12) + ' Analisis dikira daripada data Semua Pelajar (termasuk rekod lepas). Nisbah &amp; peratusan dikemas kini secara automatik.</p>';
+  html += '</div></section>';
+  return html;
+}
+
 function renderAttentionItem(a) {
-  return '<button class="attention-item" data-go="' + a.wsId + '" data-focus="' + (a.recordId || '') + '">' +
-    '<span class="attention-item__pri p-' + a.prio + '"></span>' +
+  return '<button class="attention-item" data-go="' + a.wsId + '" data-focus="' + (a.recordId || '') + '">' +    '<span class="attention-item__pri p-' + a.prio + '"></span>' +
     '<span class="attention-item__main"><span class="attention-item__title">' + esc(a.title) + '</span>' +
     '<span class="attention-item__meta">' + esc(a.meta) + '</span></span>' +
     '<span class="attention-item__tag">' + esc(a.tag) + '</span></button>';
@@ -936,6 +1013,47 @@ function generateAdminSemesterOptions() {
   const aktif = ensureSettings().semesterAktif && ensureSettings().semesterAktif.sesi;
   if (aktif && out.indexOf(aktif) === -1) out.push(aktif);
   return out.sort(function (a, b) { return sesiOrdinal(a) - sesiOrdinal(b); });
+}
+
+/* ---------- SEMESTER-SESI (2 kotak) ----------
+   Format simpanan kanonikal: "Sem N · S/YYYY-YYYY" cth "Sem 3 · 1/2025-2026".
+   Nilai lama yang tidak mengikut format ini tetap dipaparkan APA ADANYA. */
+function parseSemesterSesi(val) {
+  const s = String(val || '').trim();
+  if (!s) return { sem: '', sesi: '', legacy: '' };
+  let m = s.match(/^Sem\s*([0-9]+)\s*[·\|\/-]\s*([12]\/\d{4}-\d{4})$/i);
+  if (m) return { sem: m[1], sesi: m[2], legacy: '' };
+  m = s.match(/^([0-9]+)\s*[·\|\/-]\s*([12]\/\d{4}-\d{4})$/);
+  if (m) return { sem: m[1], sesi: m[2], legacy: '' };
+  m = s.match(/^([12]\/\d{4}-\d{4})$/);
+  if (m) return { sem: '', sesi: m[1], legacy: '' };
+  m = s.match(/^([0-9]+)$/);
+  if (m) return { sem: m[1], sesi: '', legacy: '' };
+  return { sem: '', sesi: '', legacy: s };
+}
+
+function formatSemesterSesi(sem, sesi) {
+  const semN = String(sem || '').trim().replace(/^sem\s*/i, '');
+  const sesiN = String(sesi || '').trim();
+  if (!semN && !sesiN) return '';
+  if (semN && sesiN) return 'Sem ' + semN + ' · ' + sesiN;
+  if (semN) return 'Sem ' + semN;
+  return sesiN;
+}
+
+/* Input 2 kotak: Semester (nombor) + Sesi (dropdown) */
+function renderSemesterSesiInput(c, val) {
+  const parsed = parseSemesterSesi(val);
+  const sesiOpts = generateSemesterOptions();
+  return '<div class="sem-sesi-input" data-sesesi-key="' + c.key + '">' +
+    '<input type="text" inputmode="numeric" class="cell-input sesesi-sem" data-field="' + c.key + '" data-part="sem" value="' + esc(parsed.sem) + '" placeholder="Sem" title="Nombor semester">' +
+    '<select class="cell-select sesesi-sesi" data-field="' + c.key + '" data-part="sesi" title="Sesi">' +
+    '<option value=""></option>' +
+    sesiOpts.map(function (s) { return '<option value="' + esc(s) + '"' + (s === parsed.sesi ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('') +
+    (parsed.sesi && sesiOpts.indexOf(parsed.sesi) === -1 ? '<option value="' + esc(parsed.sesi) + '" selected>' + esc(parsed.sesi) + ' (lama)</option>' : '') +
+    '</select>' +
+    (parsed.legacy ? '<span class="sesesi-legacy" title="Nilai lama">' + esc(parsed.legacy) + '</span>' : '') +
+    '</div>';
 }
 
 function renderPenyeliaWorkspace() {
@@ -1332,6 +1450,72 @@ function computeUpcoming() {
     .sort(function (a, b) { return (parseDate(a.date) || 0) - (parseDate(b.date) || 0); });
 }
 
+/* ---------- ANALISIS DASHBOARD ---------- */
+function computeAnalytics() {
+  const groups = state.records.penyeliaPelajar || [];
+  const students = [];
+  groups.forEach(function (g) {
+    (g.pelajar || []).forEach(function (p) { students.push({ p: p, g: g }); });
+  });
+
+  const totalStudents = students.length;
+  const totalSupervisors = groups.length;
+  const activeCount = students.filter(function (s) { return !s.p.statusKhas; }).length;
+  const graduated = students.filter(function (s) { return s.p.statusKhas === 'graduasi'; });
+  const withdrawn = students.filter(function (s) { return s.p.statusKhas === 'menarik_diri'; });
+  const terminated = students.filter(function (s) { return s.p.statusKhas === 'diberhentikan'; });
+
+  /* Nisbah pelajar : penyelia */
+  const ratio = totalSupervisors ? (totalStudents / totalSupervisors) : 0;
+
+  /* Pendaftaran (tawaran vs terima vs tolak) */
+  const pendaftaran = state.records.pendaftaran || [];
+  const tawar = pendaftaran.filter(function (r) { return /tawar/i.test(r.statusTawaran || '') && !/terima|tolak/i.test(r.statusTawaran || ''); });
+  const terima = pendaftaran.filter(function (r) { return /terima/i.test(r.statusTawaran || ''); });
+  const tolak = pendaftaran.filter(function (r) { return /tolak/i.test(r.statusTawaran || ''); });
+  const totalTawaran = pendaftaran.length || 1;
+
+  /* Graduasi mengikut tahun */
+  const gradYears = {};
+  graduated.forEach(function (s) {
+    let year = s.p.tahunGraduasi;
+    if (!year && s.p.tarikhStatus) { const d = parseDate(s.p.tarikhStatus); if (d) year = d.getFullYear(); }
+    if (!year) year = 'Tiada tahun';
+    gradYears[year] = (gradYears[year] || 0) + 1;
+  });
+  const currentYear = new Date().getFullYear();
+
+  /* Trend kemasukan mengikut sesi */
+  const sessionCount = {};
+  groups.forEach(function (g) {
+    (g.pelajar || []).forEach(function (p) {
+      const sesi = p.sesiSemesterPengajian || (p.sejarahSemester || []).map(function (s) { return s.sesi; }).filter(Boolean)[0];
+      if (sesi) sessionCount[sesi] = (sessionCount[sesi] || 0) + 1;
+    });
+  });
+
+  return {
+    totalStudents: totalStudents,
+    totalSupervisors: totalSupervisors,
+    activeCount: activeCount,
+    ratio: ratio,
+    graduated: graduated.length,
+    withdrawn: withdrawn.length,
+    terminated: terminated.length,
+    gradYears: gradYears,
+    currentYear: currentYear,
+    gradThisYear: gradYears[currentYear] || 0,
+    tawar: tawar.length,
+    terima: terima.length,
+    tolak: tolak.length,
+    totalTawaran: totalTawaran,
+    pctTerima: Math.round((terima.length / totalTawaran) * 100),
+    pctTolak: Math.round((tolak.length / totalTawaran) * 100),
+    sessionCount: sessionCount,
+    groups: groups
+  };
+}
+
 /* ---------- WORKSPACE ---------- */
 function renderWorkspace(w) {
   const cols = visibleColumns(w);
@@ -1529,6 +1713,7 @@ function renderRow(w, r) {
 
 function renderCellInput(c, val) {
   if (c.multi) return renderMultiInput(c, val);
+  if (c.semesterSesi) return renderSemesterSesiInput(c, val);
   if (c.type === 'select') {
     let opts = '<option value=""></option>';
     (c.options || []).forEach(function (o) { opts += '<option value="' + esc(o) + '"' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>'; });
@@ -1848,12 +2033,29 @@ function collectDraftEdits() {
   if (!ui.draft) return;
   const w = ws(ui.view);
   const multiKeys = {};
-  (w.columns || []).forEach(function (col) { if (col.multi) multiKeys[col.key] = col; });
+  const sesesiKeys = {};
+  (w.columns || []).forEach(function (col) {
+    if (col.multi) multiKeys[col.key] = col;
+    if (col.semesterSesi) sesesiKeys[col.key] = col;
+  });
 
   c.querySelectorAll('tr.is-editing [data-field]').forEach(function (inp) {
     const key = inp.dataset.field;
     if (multiKeys[key]) return; /* dikendalikan di bawah */
+    if (sesesiKeys[key]) return; /* dikendalikan di bawah */
     ui.draft[key] = inp.value;
+  });
+
+  /* Kolum semester-sesi: gabung 2 kotak */
+  Object.keys(sesesiKeys).forEach(function (key) {
+    const wrap = c.querySelector('.sem-sesi-input[data-sesesi-key="' + key + '"]');
+    if (!wrap) return;
+    const sem = (wrap.querySelector('.sesesi-sem') || {}).value || '';
+    const sesi = (wrap.querySelector('.sesesi-sesi') || {}).value || '';
+    const legacy = (wrap.querySelector('.sesesi-legacy') || {}).textContent || '';
+    const combined = formatSemesterSesi(sem, sesi);
+    /* Jika pengendali tidak sentuh dan ada nilai lama, kekalkan nilai lama. */
+    ui.draft[key] = combined || legacy || '';
   });
 
   /* Kolum penyelia: baca senarai, jana label jika autoLabel */

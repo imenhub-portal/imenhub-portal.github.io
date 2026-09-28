@@ -194,6 +194,16 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
     `generateAdminSemesterOptions()` yang boleh jangkau sampai tahun sistem semasa
     (supaya pengendali boleh memajukan sesi dari semasa ke semasa). Tukar sesi aktif
     akan menetapkan semula sesi paparan. `sesiOrdinal()` digunakan untuk perbandingan.
+19. **Panel Analisis dashboard** (`renderAnalytics()` + `computeAnalytics()`) — nisbah
+    pelajar:penyelia, bar kesihatan status (aktif/graduasi/menarik diri/diberhentikan),
+    kemasukan (tawaran/terima/tolak & peratusan), dan graduasi tahun semasa + pecahan
+    mengikut tahun. Dikira daripada data Semua Pelajar (termasuk rekod lepas).
+20. **Semester-Sesi (2 kotak)** — 10 kolum `semester` ditanda `semesterSesi: true`.
+    Semasa edit, papar **2 kotak**: nombor semester + dropdown sesi (dihadkan sesi
+    aktif). Format simpanan kanonikal `"Sem N · S/YYYY-YYYY"` (`formatSemesterSesi()`),
+    dihurai oleh `parseSemesterSesi()`. Nilai lama tak dikenali dikekalkan sebagai
+    `legacy` dan dipaparkan sebagai "Nilai lama:" tanpa hilang. `collectDraftEdits()`
+    menggabungkan kedua-dua kotak.
 
 ## Prinsip reka bentuk (JANGAN langgar)
 
@@ -318,6 +328,10 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
   PENYELIA-PELAJAR): panel penyelia collapsible, toggle Aktif/Semua, drawer edit
   pelajar, status pelajar (graduasi/menarik diri/diberhentikan), auto-sync graduan,
   semester master di Admin.
+- **Sesi 5** — (a) Panel **Analisis Keseluruhan Siswazah** pada dashboard: nisbah
+  pelajar:penyelia, bar kesihatan status, kadar kemasukan (tawaran/terima/tolak),
+  graduasi tahun semasa. (b) Kolum **Semester-Sesi 2 kotak** pada 10 kolum semester.
+  (c) Had sesi: dropdown tidak melebihi sesi aktif Admin.
 
 ### Baki dropdown & format
 Permintaan yang belum dilaksanakan (lihat perbincangan terakhir):
