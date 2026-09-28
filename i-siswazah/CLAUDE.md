@@ -162,6 +162,10 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
     `extractPenyeliaNames()` buang label lama → `formatPenyelia()` jana semula:
     1 → Penyelia Utama; 2 → Utama + Bersama; 3+ → Pengerusi Jawatankuasa Penyeliaan
     + Ahli (i, ii, iii…). Dijana semula **setiap kali simpan**.
+    **Pengecualian penting:** medan `PENYELIA BERSAMA` (workspace Senarai Pelajar
+    Mengikut Penyelia) guna `formatPenyeliaBersama()` — nama **sentiasa** dilabel
+    `Penyelia Bersama:` (1 orang pun), bukan `Penyelia Utama`, kerana jadual itu
+    sendiri sudah mewakili penyelia utama. `prepareStudentData()` memigrasi label lama.
 15. **Kunci rekod (`locked`)** — layer kedua atas Edit. Menu 3-titik: **Kunci Rekod**
     / **Buka Kunci** (minta pengesahan). Rekod dikunci **dipindah ke panel
     collapsible "Rekod Dikunci"** di bawah jadual utama (default tertutup,

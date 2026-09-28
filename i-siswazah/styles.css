@@ -1372,12 +1372,13 @@ table.grid tbody tr.is-locked:hover td { background: #fef3c7; }
 .seg.is-active { background: var(--primary); color: #fff; }
 
 .penyelia-panel {
-  margin-bottom: 14px;
-  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  border: 1px solid var(--border-2);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow);
   overflow: hidden;
+  border-left: 4px solid var(--primary);
 }
 .penyelia-panel__head {
   display: flex;
@@ -1386,23 +1387,80 @@ table.grid tbody tr.is-locked:hover td { background: #fef3c7; }
   width: 100%;
   padding: 14px 16px;
   border: 0;
-  background: var(--muted);
+  background: linear-gradient(180deg, #f2f6fd 0%, #eaf1fb 100%);
   text-align: left;
   cursor: pointer;
   font-size: 14px;
   color: var(--fg);
   transition: background .15s ease;
+  border-bottom: 1px solid var(--border);
 }
-.penyelia-panel__head:hover { background: #eaf0fb; }
+.penyelia-panel__head:hover { background: #e2ebfa; }
+.penyelia-panel:not(.is-open) .penyelia-panel__head { border-bottom: 0; }
 .penyelia-panel__chev { display: inline-grid; place-items: center; color: var(--muted-fg); transition: transform .2s ease; }
 .penyelia-panel__chev svg { width: 16px; height: 16px; }
 .penyelia-panel.is-open .penyelia-panel__chev { transform: rotate(90deg); }
-.penyelia-panel__icon { display: inline-grid; place-items: center; color: var(--primary); }
+.penyelia-panel__icon {
+  display: inline-grid; place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  flex-shrink: 0;
+}
 .penyelia-panel__icon svg { width: 15px; height: 15px; }
-.penyelia-panel__title { font-weight: 700; flex: 1; }
-.penyelia-panel__body { border-top: 1px solid var(--border); }
+.penyelia-panel__title { font-weight: 700; flex: 1; min-width: 0; }
+.penyelia-panel__body { border-top: 0; }
 
+.penyelia-table { border-collapse: separate; border-spacing: 0; }
+.penyelia-table thead th {
+  background: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: .03em;
+  border-bottom: 2px solid var(--border-2);
+}
 .penyelia-table tbody td { font-size: 13px; }
+.penyelia-table tbody tr:nth-child(even) td { background: #fafcff; }
+.penyelia-table tbody tr:hover td { background: var(--primary-soft); }
+.penyelia-table .empty-cell { text-align: center; color: var(--muted-fg); padding: 18px; }
+
+/* Nested table action column holds two labeled buttons */
+.penyelia-table thead th.col-actions,
+.penyelia-table tbody td.col-actions {
+  width: auto;
+  min-width: 190px;
+  max-width: none;
+}
+.nested-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fbfcfe;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Labeled row buttons for nested table */
+.row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.row-btn svg { width: 14px; height: 14px; color: var(--muted-fg); }
+.row-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.row-btn:hover svg { color: var(--primary); }
+.row-btn:active { transform: scale(.97); }
 
 .lepas-panel {
   margin: 0 0 0;

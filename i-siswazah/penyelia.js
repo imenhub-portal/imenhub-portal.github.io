@@ -58,6 +58,15 @@ function prepareStudentData(had) {
     state.penyeliaImportVersion = window.PENYELIA_SEED.version;
     state.penyeliaSourceManifest = cloneData(window.PENYELIA_SEED.sources);
   }
+  /* Migrasi label: medan penyeliaBersama mesti sentiasa 'Penyelia Bersama', bukan 'Penyelia Utama'. */
+  (state.records.penyeliaPelajar || []).forEach(g => (g.pelajar || []).forEach(p => {
+    if (!p.penyeliaBersama) return;
+    const fixed = formatPenyeliaBersama(extractPenyeliaNames(p.penyeliaBersama));
+    if (fixed && fixed !== p.penyeliaBersama) {
+      p._legacyPenyeliaBersama = p._legacyPenyeliaBersama || p.penyeliaBersama;
+      p.penyeliaBersama = fixed;
+    }
+  }));
   save();
 }
 
@@ -191,11 +200,15 @@ renderPenyeliaTable = function(students, sesi, parentId) {
   sessions.forEach(s => { html += '<th>SEM. PENGAJIAN<br>' + esc(s) + '</th>'; });
   html += '<th>STATUS TERKINI</th><th>STATUS</th><th>TINDAKAN</th></tr></thead><tbody>';
   students.forEach(p => {
-    html += '<tr data-pelajar="' + esc(p.id) + '" data-record="' + esc(p.id) + '"><td>' + esc(p.bil) + '</td><td class="student-identity">' + studentIdentityHTML(p) + '</td><td>' + esc(p.program) + '</td><td>' + esc(formatPenyelia(extractPenyeliaNames(p.penyeliaBersama))) + '</td>';
+    html += '<tr data-pelajar="' + esc(p.id) + '" data-record="' + esc(p.id) + '"><td>' + esc(p.bil) + '</td><td class="student-identity">' + studentIdentityHTML(p) + '</td><td>' + esc(p.program) + '</td><td>' + esc(formatPenyeliaBersama(extractPenyeliaNames(p.penyeliaBersama))) + '</td>';
     sessions.forEach(s => { const snap = snapshot(p,s); html += '<td>' + (snap ? esc(snap.semesterPengajian) + (snap.catatan ? '<div class="student-id">' + esc(snap.catatan) + '</div>' : '') : '—') + '</td>'; });
-    html += '<td>' + esc(p.statusTerkini || '') + '</td><td>' + esc(statusPelajarLabel(p.statusKhas)) + '<div class="student-id">' + esc(fmtDate(p.tarikhStatus)) + (p.needsDateReview ? 'Tahun ' + esc(p.tahunGraduasi || 'tidak diketahui') + ' — tarikh perlu semakan' : '') + '</div></td><td><button class="row-action" data-edit-pelajar="' + esc(parentId + '|' + p.id) + '">Edit</button><button class="row-action" data-status-pelajar="' + esc(parentId + '|' + p.id) + '">Ubah Status</button></td></tr>';
+    html += '<td>' + esc(p.statusTerkini || '') + '</td><td>' + esc(statusPelajarLabel(p.statusKhas)) + '<div class="student-id">' + esc(fmtDate(p.tarikhStatus)) + (p.needsDateReview ? 'Tahun ' + esc(p.tahunGraduasi || 'tidak diketahui') + ' — tarikh perlu semakan' : '') + '</div></td>';
+    html += '<td class="col-actions"><div class="cell-actions">' +
+      '<button class="row-btn" data-edit-pelajar="' + esc(parentId + '|' + p.id) + '" title="Edit pelajar">' + icon('edit', 14) + ' Edit</button>' +
+      '<button class="row-btn" data-status-pelajar="' + esc(parentId + '|' + p.id) + '" title="Ubah status">' + icon('checkCircle', 14) + ' Status</button>' +
+      '</div></td></tr>';
   });
-  if (!students.length) html += '<tr><td colspan="10">Tiada pelajar aktif.</td></tr>';
+  if (!students.length) html += '<tr><td colspan="' + (sessions.length + 7) + '" class="empty-cell">Tiada pelajar aktif.</td></tr>';
   return html + '</tbody></table></div>';
 };
 
@@ -304,8 +317,9 @@ function saveNestedStudent(root,parent,student) {
     }
   }
   const record = student || {id:uid('student'),bil:Math.max(0,...parent.pelajar.map(p => Number(p.bil)||0))+1};
+  const pbNames = [...root.querySelectorAll('#dPenyeliaBersamaList .penyelia-input')].map(i => i.value.trim()).filter(Boolean);
   Object.assign(record,{nama:name,noPelajar:value('dNoPelajar').trim(),program:value('dProgram'),
-    penyeliaBersama:formatPenyelia(extractPenyeliaNames(value('dPenyeliaBersama'))),
+    penyeliaBersama:formatPenyeliaBersama(pbNames),
     semesterPengajian:count,sesiSemesterPengajian:session,sejarahSemester:nonempty,
     statusTerkini:value('dStatusTerkini'),statusKhas:status,tarikhStatus:date});
   record.needsDateReview = status === 'graduasi' && !date;

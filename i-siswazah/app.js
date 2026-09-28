@@ -469,6 +469,20 @@ function formatPenyelia(names) {
   return s;
 }
 
+/* Label khusus untuk medan PENYELIA BERSAMA (workspace Senarai Pelajar Mengikut Penyelia).
+   Semua nama dalam medan ini dianggap Penyelia Bersama, tidak kira berapa orang. */
+function formatPenyeliaBersama(names) {
+  const list = (names || []).map(function (n) { return String(n).trim(); }).filter(Boolean);
+  if (!list.length) return '';
+  if (list.length === 1) return 'Penyelia Bersama:\n' + list[0];
+  const roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+  let s = 'Penyelia Bersama:';
+  list.forEach(function (n, i) {
+    s += '\n' + (roman[i] || (i + 1)) + ') ' + n;
+  });
+  return s;
+}
+
 /* Baca nilai senarai penyelia daripada DOM untuk kolum multi */
 function readMultiValue(key) {
   const wrap = document.querySelector('.penyelia-list[data-multi-key="' + key + '"]');
@@ -1023,7 +1037,13 @@ function openPelajarDrawer(penyeliaId, pelajarId) {
   body += '<div class="field"><label>Nama Pelajar <span class="req">*</span></label><input id="dNama" value="' + esc(rec.nama) + '"></div>';
   body += '<div class="field" style="margin-top:12px"><label>Program</label><select id="dProgram">' + selectOptions(PROGRAM_OPTIONS, rec.program) + '</select></div>';
   body += '<div class="field" style="margin-top:12px"><label>No. Pelajar</label><input id="dNoPelajar" value="' + esc(rec.noPelajar) + '"></div>';
-  body += '<div class="field" style="margin-top:12px"><label>Penyelia Bersama</label><textarea id="dPenyeliaBersama">' + esc(rec.penyeliaBersama) + '</textarea></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Penyelia Bersama</label><div id="dPenyeliaBersamaList" class="penyelia-list">';
+  const pbNames = extractPenyeliaNames(rec.penyeliaBersama);
+  const pbList = pbNames.length ? pbNames : [''];
+  pbList.forEach(function (n) {
+    body += '<div class="penyelia-row"><input type="text" class="cell-input penyelia-input" data-field="penyeliaBersama" data-multi="1" value="' + esc(n) + '" placeholder="Nama penyelia bersama…"><button type="button" class="penyelia-remove" data-remove-penyelia title="Buang">' + icon('x', 13) + '</button></div>';
+  });
+  body += '</div><button type="button" class="penyelia-add" data-add-penyelia-bersama>' + icon('plus', 13) + ' Tambah Penyelia Bersama</button><span class="field__hint">Semua nama di sini dikira sebagai Penyelia Bersama.</span></div>';
   body += '<div class="field" style="margin-top:12px"><label>Semester Pengajian (semasa)</label><input id="dSemesterPengajian" value="' + esc(rec.semesterPengajian) + '"></div>';
   body += '<div class="field" style="margin-top:12px"><label>Status Pelajar</label><select id="dStatus">' + selectOptions(STATUS_PELAJAR_OPTIONS, rec.statusKhas) + '</select></div>';
   body += '<div class="field" style="margin-top:12px"><label>Tarikh Status</label><input type="date" id="dTarikhStatus" value="' + esc(rec.tarikhStatus) + '"><span class="field__hint">Wajib untuk graduasi; optional untuk menarik diri / diberhentikan.</span></div>';
@@ -1051,6 +1071,27 @@ function openPelajarDrawer(penyeliaId, pelajarId) {
       });
       root.querySelectorAll('[data-remove-sejarah]').forEach(function (b) {
         b.addEventListener('click', function () { b.closest('.sejarah-row').remove(); });
+      });
+      /* Senarai penyelia bersama */
+      function bindRemove(btn) {
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          const row = btn.closest('.penyelia-row');
+          const wrap = btn.closest('.penyelia-list');
+          if (wrap.querySelectorAll('.penyelia-row').length <= 1) { row.querySelector('input').value = ''; return; }
+          row.remove();
+        });
+      }
+      root.querySelectorAll('#dPenyeliaBersamaList [data-remove-penyelia]').forEach(bindRemove);
+      const addPb = root.querySelector('[data-add-penyelia-bersama]');
+      if (addPb) addPb.addEventListener('click', function () {
+        const list = root.querySelector('#dPenyeliaBersamaList');
+        const div = document.createElement('div');
+        div.className = 'penyelia-row';
+        div.innerHTML = '<input type="text" class="cell-input penyelia-input" data-field="penyeliaBersama" data-multi="1" value="" placeholder="Nama penyelia bersama…"><button type="button" class="penyelia-remove" data-remove-penyelia title="Buang">' + icon('x', 13) + '</button>';
+        list.appendChild(div);
+        bindRemove(div.querySelector('[data-remove-penyelia]'));
+        div.querySelector('input').focus();
       });
       root.querySelector('#dStatus').addEventListener('change', function () {
         const tgl = root.querySelector('#dTarikhStatus');
@@ -1105,7 +1146,7 @@ function savePelajarFromDrawer(root) {
     nama: nama,
     program: root.querySelector('#dProgram').value,
     noPelajar: root.querySelector('#dNoPelajar').value,
-    penyeliaBersama: root.querySelector('#dPenyeliaBersama').value,
+    penyeliaBersama: formatPenyeliaBersama([...root.querySelectorAll('#dPenyeliaBersamaList .penyelia-input')].map(function (i) { return i.value.trim(); }).filter(Boolean)),
     semesterPengajian: root.querySelector('#dSemesterPengajian').value,
     statusKhas: statusKhas,
     tarikhStatus: tarikhStatus,
