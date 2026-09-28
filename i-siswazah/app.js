@@ -270,6 +270,7 @@ let ui = {
   lockedOpen: {},
   penyeliaOpen: {},
   lepasOpen: {},
+  analyticsPeriod: 'semua',
   pageSize: 25
 };
 
@@ -748,12 +749,39 @@ function renderDashboard() {
 }
 
 /* ---------- PANEL ANALISIS (dashboard) ---------- */
+/* Tempoh analisis: 'semua' atau julat tahun 'YYYY-YYYY'. */
+function analyticsPeriodOptions() {
+  const years = [];
+  (state.records.penyeliaPelajar || []).forEach(function (g) {
+    (g.pelajar || []).forEach(function (p) {
+      let y = p.tahunGraduasi;
+      if (!y && p.tarikhStatus) { const d = parseDate(p.tarikhStatus); if (d) y = d.getFullYear(); }
+      if (y) years.push(Number(y));
+    });
+  });
+  const thisYear = new Date().getFullYear();
+  const opts = [{ value: 'semua', label: 'Semua' }];
+  if (years.length) {
+    const minY = Math.min.apply(null, years);
+    opts.push({ value: minY + '-' + thisYear, label: minY + '–' + thisYear });
+  }
+  return opts;
+}
+
+function periodSelect() {
+  const opts = analyticsPeriodOptions();
+  const cur = ui.analyticsPeriod || 'semua';
+  return '<select id="analyticsPeriod">' + opts.map(function (o) {
+    return '<option value="' + esc(o.value) + '"' + (o.value === cur ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+  }).join('') + '</select>';
+}
+
 function renderAnalytics() {
   const a = computeAnalytics();
 
   let html = '<section class="panel analytics-panel" id="sec-analytics">';
   html += '<div class="panel__head"><h2 class="section-title" style="margin:0">' + icon('target', 17) + ' Analisis Keseluruhan Siswazah</h2>';
-  html += '<span class="badge badge--info">' + a.totalStudents + ' pelajar · ' + a.totalSupervisors + ' penyelia</span></div>';
+  html += '<div class="analytics-head-right"><label class="period-pick">Tempoh ' + periodSelect() + '</label><span class="badge badge--info">' + a.totalStudents + ' pelajar · ' + a.totalSupervisors + ' penyelia</span></div></div>';
   html += '<div class="panel__body panel__body--pad">';
 
   /* Baris 1: nisbah & status kesihatan */
@@ -804,18 +832,58 @@ function renderAnalytics() {
 
   /* Graduasi tahun semasa */
   html += '<div class="analytics-card is-teal">';
-  html += '<div class="analytics-card__label">' + icon('award', 15) + ' Graduasi Tahun ' + a.currentYear + '</div>';
-  html += '<div class="analytics-card__value">' + a.gradThisYear + ' <span style="font-size:14px;font-weight:500;color:var(--muted-fg)">pelajar</span></div>';
-  html += '<div class="analytics-card__sub">Graduasi sepanjang tahun semasa (' + a.currentYear + ')</div>';
-  const years = Object.keys(a.gradYears).sort();
+  html += '<div class="analytics-card__label">' + icon('award', 15) + ' Graduasi — ' + esc(a.periodLabel) + '</div>';
+  html += '<div class="analytics-card__value">' + (a.periodLabel === 'Semua' ? a.graduated : a.gradInPeriod) + ' <span style="font-size:14px;font-weight:500;color:var(--muted-fg)">pelajar</span></div>';
+  html += '<div class="analytics-card__sub">Tahun semasa (' + a.currentYear + '): <b>' + a.gradThisYear + '</b> pelajar</div>';
+  const years = Object.keys(a.gradYearsFiltered).sort();
   if (years.length) {
     html += '<div class="analytics-legend" style="margin-top:10px">';
-    years.forEach(function (y) { html += '<span>' + esc(y) + ' <b>' + a.gradYears[y] + '</b></span>'; });
+    years.forEach(function (y) { html += '<span>' + esc(y) + ' <b>' + a.gradYearsFiltered[y] + '</b></span>'; });
     html += '</div>';
   }
   html += '</div>';
 
   html += '</div>'; /* analytics-grid row 2 */
+
+  /* Baris 3: beban penyeliaan & sebaran semester pengajian */
+  html += '<div class="analytics-grid" style="margin-top:14px">';
+
+  /* Kad kadar penyeliaan (beban) */
+  const loadCls = a.avgLoad > 4 ? 'is-warn' : 'is-ok';
+  html += '<div class="analytics-card ' + loadCls + '">';
+  html += '<div class="analytics-card__label">' + icon('users', 15) + ' Beban Penyeliaan (pelajar aktif)</div>';
+  html += '<div class="analytics-card__value">' + a.avgLoad.toFixed(1) + ' <span style="font-size:14px;font-weight:500;color:var(--muted-fg)">purata</span></div>';
+  html += '<div class="analytics-kv"><span>Maksimum (penyelia terbesar)</span><b>' + a.maxLoad + '</b></div>';
+  html += '<div class="analytics-kv"><span>Minimum</span><b>' + a.minLoad + '</b></div>';
+  html += '<div class="analytics-kv"><span>Penyelia beban tinggi (≥6)</span><b style="color:var(--warning)">' + a.overloaded + '</b></div>';
+  html += '<div class="analytics-kv"><span>Penyelia tanpa pelajar aktif</span><b>' + a.emptySupervisors + '</b></div>';
+  html += '</div>';
+
+  /* Kad sebaran semester pengajian */
+  html += '<div class="analytics-card is-teal">';
+  html += '<div class="analytics-card__label">' + icon('clock', 15) + ' Sebaran Semester Pengajian</div>';
+  html += '<div class="analytics-card__sub" style="margin-top:0">Bilangan pelajar mengikut semester (tertinggi → terendah)</div>';
+  if (a.semKeys.length) {
+    const top = Math.max.apply(null, a.semKeys.map(function (k) { return a.semSpread[k]; })) || 1;
+    html += '<div class="sem-spread" style="margin-top:10px">';
+    a.semKeys.forEach(function (k) {
+      const cnt = a.semSpread[k];
+      const w = Math.round((cnt / top) * 100);
+      html += '<div class="sem-spread__row"><span class="sem-spread__label">Sem ' + k + '</span>' +
+        '<span class="sem-spread__bar"><span style="width:' + w + '%"></span></span>' +
+        '<span class="sem-spread__count">' + cnt + '</span></div>';
+    });
+    html += '</div>';
+    html += '<div class="analytics-legend" style="margin-top:10px">';
+    html += '<span>Semester tertinggi <b>' + a.maxSem + '</b> (' + a.semMax + ' pelajar)</span>';
+    html += '<span>Semester terendah <b>' + a.semKeys[a.semKeys.length - 1] + '</b> (' + a.semMin + ' pelajar)</span>';
+    html += '</div>';
+  } else {
+    html += '<div class="analytics-card__sub">Tiada data semester pengajian.</div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; /* analytics-grid row 3 */
 
   html += '<p class="field__hint" style="margin-top:12px">' + icon('info', 12) + ' Analisis dikira daripada data Semua Pelajar (termasuk rekod lepas). Nisbah &amp; peratusan dikemas kini secara automatik.</p>';
   html += '</div></section>';
@@ -927,6 +995,25 @@ function renderAdmin() {
   html += '<button class="btn btn--ghost" data-reset-demo>' + icon('history', 16) + ' Reset Data Demo</button>';
   html += '</div>';
   html += '<p class="field__hint" style="margin-top:10px">Eksport JSON berguna sebagai sandaran penuh sebelum reset atau sebelum pindah ke backend sebenar.</p>';
+  html += '</div></section>';
+
+  /* Kad 7: Semakan Konsistensi Identiti */
+  const issues = registryAudit();
+  html += '<section class="panel"><div class="panel__head"><h2 class="section-title" style="margin:0">' + icon('shield', 17) + ' Semakan Konsistensi Identiti</h2>';
+  html += '<span class="badge ' + (issues.length ? 'badge--warn' : 'badge--success') + '">' + issues.length + ' isu</span></div>';
+  html += '<div class="panel__body panel__body--pad">';
+  if (!issues.length) {
+    html += '<div class="empty-state" style="padding:14px">' + icon('checkCircle', 28) + '<div>Nama &amp; program selaras dengan registri (Senarai Pelajar Mengikut Penyelia).</div></div>';
+  } else {
+    html += '<p class="field__hint" style="margin-top:0">Nama/program dalam worksheet berikut tidak selaras dengan registri. Klik untuk buka rekod.</p>';
+    issues.slice(0, 40).forEach(function (it) {
+      html += '<button class="attention-item" data-go="' + it.wsId + '" data-focus="' + it.recordId + '">' +
+        '<span class="attention-item__pri p-med"></span>' +
+        '<span class="attention-item__main"><span class="attention-item__title">' + esc(it.field) + ' — ' + esc(it.entered) + '</span>' +
+        '<span class="attention-item__meta">' + esc(it.wsName) + ' · matrik ' + esc(it.matric) + ' · registri: ' + esc(it.canonical) + '</span></span>' +
+        '<span class="attention-item__tag">Buka</span></button>';
+    });
+  }
   html += '</div></section>';
 
   html += '</div>'; /* admin-grid */
@@ -1485,6 +1572,22 @@ function computeAnalytics() {
   });
   const currentYear = new Date().getFullYear();
 
+  /* Penapis tempoh (julat tahun) — terpakai kepada pecahan graduasi */
+  const period = ui.analyticsPeriod || 'semua';
+  let periodLabel = 'Semua';
+  let periodRange = null;
+  if (period !== 'semua') {
+    const mm = String(period).match(/^(\d{4})-(\d{4})$/);
+    if (mm) { periodRange = [Number(mm[1]), Number(mm[2])]; periodLabel = mm[1] + '–' + mm[2]; }
+  }
+  const gradYearsFiltered = {};
+  Object.keys(gradYears).forEach(function (y) {
+    if (!periodRange) { gradYearsFiltered[y] = gradYears[y]; return; }
+    const yn = Number(y);
+    if (!isNaN(yn) && yn >= periodRange[0] && yn <= periodRange[1]) gradYearsFiltered[y] = gradYears[y];
+  });
+  const gradInPeriod = Object.keys(gradYearsFiltered).reduce(function (s, y) { return s + gradYearsFiltered[y]; }, 0);
+
   /* Trend kemasukan mengikut sesi */
   const sessionCount = {};
   groups.forEach(function (g) {
@@ -1493,6 +1596,29 @@ function computeAnalytics() {
       if (sesi) sessionCount[sesi] = (sessionCount[sesi] || 0) + 1;
     });
   });
+
+  /* Beban penyeliaan: bilangan pelajar aktif setiap penyelia */
+  const loadList = groups.map(function (g) {
+    const active = (g.pelajar || []).filter(function (p) { return !p.statusKhas; }).length;
+    return { nama: g.namaPenyelia, count: active };
+  }).sort(function (a, b) { return b.count - a.count; });
+  const loads = loadList.map(function (l) { return l.count; });
+  const maxLoad = loads.length ? Math.max.apply(null, loads) : 0;
+  const minLoad = loads.length ? Math.min.apply(null, loads) : 0;
+  const avgLoad = loads.length ? (loads.reduce(function (s, n) { return s + n; }, 0) / loads.length) : 0;
+  const overloaded = loadList.filter(function (l) { return l.count >= 6; }).length;
+  const emptySupervisors = loadList.filter(function (l) { return l.count === 0; }).length;
+
+  /* Sebaran semester pengajian: dari semester tertinggi → terendah, kiraan pelajar */
+  const semSpread = {};
+  students.forEach(function (s) {
+    const n = parseInt(String(s.p.semesterPengajian || '').replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(n) && n > 0) semSpread[n] = (semSpread[n] || 0) + 1;
+  });
+  const semKeys = Object.keys(semSpread).map(Number).sort(function (a, b) { return b - a; });
+  const maxSem = semKeys.length ? semKeys[0] : 0;
+  const semMax = semKeys.length ? semSpread[semKeys[0]] : 0;
+  const semMin = semKeys.length ? semSpread[semKeys[semKeys.length - 1]] : 0;
 
   return {
     totalStudents: totalStudents,
@@ -1503,6 +1629,9 @@ function computeAnalytics() {
     withdrawn: withdrawn.length,
     terminated: terminated.length,
     gradYears: gradYears,
+    gradYearsFiltered: gradYearsFiltered,
+    gradInPeriod: gradInPeriod,
+    periodLabel: periodLabel,
     currentYear: currentYear,
     gradThisYear: gradYears[currentYear] || 0,
     tawar: tawar.length,
@@ -1512,6 +1641,17 @@ function computeAnalytics() {
     pctTerima: Math.round((terima.length / totalTawaran) * 100),
     pctTolak: Math.round((tolak.length / totalTawaran) * 100),
     sessionCount: sessionCount,
+    loadList: loadList,
+    maxLoad: maxLoad,
+    minLoad: minLoad,
+    avgLoad: avgLoad,
+    overloaded: overloaded,
+    emptySupervisors: emptySupervisors,
+    semSpread: semSpread,
+    semKeys: semKeys,
+    maxSem: maxSem,
+    semMax: semMax,
+    semMin: semMin,
     groups: groups
   };
 }
@@ -1774,6 +1914,9 @@ function bindContent() {
   });
 
   c.querySelectorAll('[data-add-reminder]').forEach(function (b) { b.addEventListener('click', function () { openReminderModal(); }); });
+
+  const apSel = c.querySelector('#analyticsPeriod');
+  if (apSel) apSel.addEventListener('change', function () { ui.analyticsPeriod = apSel.value; render(); });
 
   c.querySelectorAll('[data-reminder-done]').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -2099,9 +2242,65 @@ function requestSave(encoded) {
 
   if (!diffs.length) { ui.editingRow = null; ui.draft = null; render(); toast('Tiada perubahan'); return; }
 
+  /* Semak konflik identiti (matrik sama, nama/program berbeza daripada registri). */
+  const conflict = registryConflictForDraft(w, ui.draft);
+  if (conflict && conflict.conflicts.length) {
+    openRegistryConflictModal(conflict, function () {
+      const important = diffs.some(function (d) { return d.important; });
+      if (important) { openDiffReview(wsId, id, rec, diffs); }
+      else commitEdits(wsId, id, rec, diffs);
+    });
+    return;
+  }
+
   const important = diffs.some(function (d) { return d.important; });
   if (important) { openDiffReview(wsId, id, rec, diffs); }
   else commitEdits(wsId, id, rec, diffs);
+}
+
+/* Bina konflik registri daripada draf semasa (guna medan nama + matrik yg wujud). */
+function registryConflictForDraft(w, draft) {
+  const key = identityKey(w);
+  const matric = draft[key] || '';
+  if (!matric) return null;
+  const hasNama = w.columns.some(function (c) { return c.key === 'nama'; });
+  const hasProgram = w.columns.some(function (c) { return c.key === 'program'; });
+  return registryConflict(matric, hasNama ? draft.nama : '', hasProgram ? draft.program : '');
+}
+
+/* Modal amaran konflik identiti — pengendali boleh pilih guna nilai kanonikal atau kekal. */
+function openRegistryConflictModal(conflict, onProceed) {
+  let body = '<div class="toast-inline" style="color:#b45309">' + icon('alert', 16) + '<span>Matrik <strong>' + esc((conflict.ref && conflict.ref.nama) || '') + '</strong> sudah ada dalam sistem dengan butiran berbeza.</span></div>';
+  body += '<div class="diff-list" style="margin-top:12px">';
+  conflict.conflicts.forEach(function (c) {
+    body += '<div class="diff-row"><div class="diff-row__label">' + esc(c.field) + '</div><div class="diff-row__vals">' +
+      '<span class="diff-old">Ditaip: ' + esc(c.entered) + '</span><span class="diff-arrow">↔</span>' +
+      '<span class="diff-new">Registri: ' + esc(c.canonical) + '</span></div></div>';
+  });
+  body += '</div>';
+  body += '<p class="field__hint" style="margin-top:12px">Disyorkan guna nilai <strong>registri</strong> supaya semua worksheet selaras.</p>';
+  openModal({
+    title: 'Butiran Tidak Selaras',
+    wide: true,
+    body: body,
+    foot: '<button class="btn btn--ghost" data-close-modal>Kembali Edit</button>' +
+      '<button class="btn btn--ghost" id="keepEntered">Kekal Taipan Saya</button>' +
+      '<button class="btn btn--primary" id="useCanonical">' + icon('checkCircle', 16) + ' Guna Nilai Registri</button>',
+    onMount: function (root) {
+      root.querySelector('#useCanonical').addEventListener('click', function () {
+        conflict.conflicts.forEach(function (c) {
+          if (c.field === 'NAMA') ui.draft.nama = c.canonical;
+          if (c.field === 'PROGRAM') ui.draft.program = c.canonical;
+        });
+        closeModal();
+        onProceed();
+      });
+      root.querySelector('#keepEntered').addEventListener('click', function () {
+        closeModal();
+        onProceed();
+      });
+    }
+  });
 }
 
 function isImportantField(col) {

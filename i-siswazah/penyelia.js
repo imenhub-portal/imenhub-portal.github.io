@@ -15,6 +15,105 @@ function normalizedMatric(r) {
   const value = studentIdentity(r).id.toUpperCase().replace(/\s/g, '');
   return /^P\d+$/.test(value) ? value : /^\d{5,6}$/.test(value) ? 'P' + value : ''; // Legacy short matric; never a 12-digit IC.
 }
+
+/* ---------- REGISTRI PELAJAR (konsistensi merentas worksheet) ----------
+   Sumber kebenaran: workspace penyeliaPelajar (nama, program, penyelia).
+   Kunci: normalizedMatric. Digunakan untuk autofill + amaran konflik. */
+function buildStudentRegistry() {
+  const reg = {};
+  (state.records.penyeliaPelajar || []).forEach(function (g) {
+    (g.pelajar || []).forEach(function (p) {
+      const key = normalizedMatric(p);
+      if (!key) return;
+      const nama = studentIdentity(p).nama;
+      if (!reg[key]) reg[key] = { nama: nama, program: p.program || '', penyelia: g.namaPenyelia, penyeliaBersama: p.penyeliaBersama || '', namaAliases: {} };
+      if (reg[key].nama && nama && reg[key].nama !== nama) reg[key].namaAliases[nama] = true;
+      if (!reg[key].program && p.program) reg[key].program = p.program;
+    });
+  });
+  return reg;
+}
+
+/* Cari rekod kanonikal untuk satu matrik (dari teks). */
+function lookupStudent(matric) {
+  const key = normalizedMatric({ noMatrik: matric });
+  if (!key) return null;
+  return buildStudentRegistry()[key] || null;
+}
+
+/* Nilai kanonikal untuk cadangan (nama/program) bagi matrik tertentu. */
+function registrySuggestion(matric) {
+  const hit = lookupStudent(matric);
+  return hit ? { nama: hit.nama, program: hit.program, penyeliaBersama: hit.penyeliaBersama } : null;
+}
+
+/* Semak konflik: matrik sama tetapi nama/program berbeza daripada registri. */
+function registryConflict(matric, nama, program) {
+  const hit = lookupStudent(matric);
+  if (!hit) return null;
+  const conflicts = [];
+  const cleanNama = String(nama || '').trim();
+  const cleanProg = String(program || '').trim();
+  if (hit.nama && cleanNama && normalizeName(hit.nama) !== normalizeName(cleanNama)) {
+    conflicts.push({ field: 'NAMA', canonical: hit.nama, entered: cleanNama });
+  }
+  if (hit.program && cleanProg && hit.program !== cleanProg) {
+    conflicts.push({ field: 'PROGRAM', canonical: hit.program, entered: cleanProg });
+  }
+  return conflicts.length ? { ref: hit, conflicts: conflicts } : null;
+}
+
+function normalizeName(s) {
+  return String(s || '').toUpperCase().replace(/\s+/g, ' ').replace(/[^A-Z0-9 ]/g, '').trim();
+}
+
+/* Pancarkan (sync) nilai kanonikal ke SEMUA rekod pelajar sama dalam semua worksheet.
+   Hanya mengemas kini bila matrik padan dan medan berkenaan wujud. Pulangkan bilangan dikemas kini. */
+function propagateCanonical(matric, canonical) {
+  const key = normalizedMatric({ noMatrik: matric });
+  if (!key) return 0;
+  let changed = 0;
+  WORKSPACES.forEach(function (w) {
+    if (w.id === 'penyeliaPelajar') return;
+    const hasNama = w.columns.some(function (c) { return c.key === 'nama'; });
+    const hasProgram = w.columns.some(function (c) { return c.key === 'program'; });
+    (state.records[w.id] || []).forEach(function (r) {
+      if (normalizedMatric(r) !== key) return;
+      if (hasNama && canonical.nama && studentIdentity(r).nama !== canonical.nama) {
+        r._legacyNama = r._legacyNama || r.nama; r.nama = canonical.nama; changed++;
+      }
+      if (hasProgram && canonical.program && r.program !== canonical.program) {
+        r._legacyProgram = r._legacyProgram || r.program; r.program = canonical.program; changed++;
+      }
+    });
+  });
+  return changed;
+}
+
+/* Amaran penuh: kumpul konflik dalam semua worksheet terhadap registri. */
+function registryAudit() {
+  const reg = buildStudentRegistry();
+  const issues = [];
+  WORKSPACES.forEach(function (w) {
+    if (w.id === 'penyeliaPelajar') return;
+    const hasNama = w.columns.some(function (c) { return c.key === 'nama'; });
+    const hasProgram = w.columns.some(function (c) { return c.key === 'program'; });
+    (state.records[w.id] || []).forEach(function (r) {
+      const key = normalizedMatric(r);
+      if (!key || !reg[key]) return;
+      if (hasNama) {
+        const entered = studentIdentity(r).nama;
+        if (reg[key].nama && entered && normalizeName(reg[key].nama) !== normalizeName(entered)) {
+          issues.push({ wsId: w.id, wsName: w.name, recordId: r.id, field: 'NAMA', entered: entered, canonical: reg[key].nama, matric: key });
+        }
+      }
+      if (hasProgram && r.program && reg[key].program && r.program !== reg[key].program) {
+        issues.push({ wsId: w.id, wsName: w.name, recordId: r.id, field: 'PROGRAM', entered: r.program, canonical: reg[key].program, matric: key });
+      }
+    });
+  });
+  return issues;
+}
 function searchableRecords(w) {
   return w.nested ? (state.records[w.id] || []).flatMap(g => [{id:g.id,nama:g.namaPenyelia}, ...(g.pelajar || [])]) : state.records[w.id] || [];
 }
@@ -327,7 +426,10 @@ function saveNestedStudent(root,parent,student) {
   record.needsDateReview = status === 'graduasi' && !date;
   if (!student) parent.pelajar.push(record);
   syncGraduan(record);
+  /* Pancarkan identiti kanonikal ke semua worksheet (elak typo/percanggahan). */
+  const propagat = propagateCanonical(studentIdentity(record).id, { nama: studentIdentity(record).nama, program: record.program });
   save(); closeDrawer(); render();
+  if (propagat) toast('Identiti diselaraskan ke ' + propagat + ' medan di worksheet lain', 'success');
 }
 
 // Ownership is explicit. Legacy _syncPelajarId alone is not proof of creation.

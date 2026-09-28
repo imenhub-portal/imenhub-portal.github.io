@@ -202,8 +202,22 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
     Semasa edit, papar **2 kotak**: nombor semester + dropdown sesi (dihadkan sesi
     aktif). Format simpanan kanonikal `"Sem N · S/YYYY-YYYY"` (`formatSemesterSesi()`),
     dihurai oleh `parseSemesterSesi()`. Nilai lama tak dikenali dikekalkan sebagai
-    `legacy` dan dipaparkan sebagai "Nilai lama:" tanpa hilang. `collectDraftEdits()`
+     `legacy` dan dipaparkan sebagai "Nilai lama:" tanpa hilang. `collectDraftEdits()`
     menggabungkan kedua-dua kotak.
+21. **Analisis lanjutan** — tambahan pada panel dashboard: **Beban Penyeliaan**
+    (purata/maks/min pelajar aktif per penyelia, penyelia beban tinggi ≥6, penyelia
+    kosong) dan **Sebaran Semester Pengajian** (bilangan pelajar setiap semester,
+    tertinggi → terendah, dengan label semester tertinggi/terendah). Ada pemilih
+    **Tempoh** (julat tahun) untuk pecahan graduasi — `ui.analyticsPeriod`.
+22. **Registri Pelajar & Konsistensi merentas worksheet** (dalam `penyelia.js`) —
+    `buildStudentRegistry()` membina peta kanonikal `normalizedMatric → {nama, program,
+    penyelia}` daripada workspace **Senarai Pelajar Mengikut Penyelia** (sumber
+    kebenaran). `registryConflict()` mengesan matrik sama tetapi nama/program berbeza.
+    `requestSave()` memaparkan modal **Semak Konsistensi** (guna nilai registri / kekal
+    taipan) sebelum simpan. `saveNestedStudent()` memanggil `propagateCanonical()` yang
+    menyelaraskan nama+program ke semua rekod bermarrik sama dalam semua worksheet.
+    Admin → **Semakan Konsistensi Identiti** menyenaraikan semua isu (`registryAudit()`).
+    Tujuan: elak typo & nama sama dengan butiran bercanggah.
 
 ## Prinsip reka bentuk (JANGAN langgar)
 
@@ -332,6 +346,9 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
   pelajar:penyelia, bar kesihatan status, kadar kemasukan (tawaran/terima/tolak),
   graduasi tahun semasa. (b) Kolum **Semester-Sesi 2 kotak** pada 10 kolum semester.
   (c) Had sesi: dropdown tidak melebihi sesi aktif Admin.
+- **Sesi 6** — (a) Analisis lanjutan: **Beban Penyeliaan** & **Sebaran Semester
+  Pengajian**, pemilih tempoh tahun. (b) **Registri pelajar** + semakan/pancaran
+  konsistensi nama & program merentas semua worksheet (elak typo/percanggahan).
 
 ### Baki dropdown & format
 Permintaan yang belum dilaksanakan (lihat perbincangan terakhir):
