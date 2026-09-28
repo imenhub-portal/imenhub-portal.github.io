@@ -136,6 +136,17 @@ Boleh diedit pengguna melalui **tab Admin** (tiada perlu ubah kod):
     (PD = Pemeriksa Dalam)**, kedua-duanya `multi: true`. `migrateRecords()` +
     `splitPemeriksa()` memisahkan data lama secara automatik semasa `load()`
     (nama berlabel `(PD)` → Dalam; label universiti UM/USM/UiTM/INOR dll → Luar).
+17. **Senarai Pelajar Mengikut Penyelia** (`penyeliaPelajar`) — workspace **bersarang**
+    (kategori baharu PENYELIA-PELAJAR). Setiap penyelia = panel collapsible berisi
+    pelajar aktif (default terbuka) + sub-collapsible **"Rekod Lepas"**. Toggle
+    **Aktif/Semua**. Setiap pelajar ada butang **Edit** (drawer) dan **Ubah Status**
+    (dropdown: Aktif / Telah Bergraduasi / Menarik Diri / Diberhentikan). Graduasi
+    wajib tarikh; lain optional. `syncGraduan()` **auto-sync** pelajar bergraduasi ke
+    workspace `graduan` (padanan `noPelajar` + `_syncPelajarId`); bila status ditukar
+    balik ke Aktif, rekod graduan yang dijana auto **dibuang**.
+18. **Semester Master** — `settings.semesterAktif = { sesi, semesterPengajian }`,
+    diedit di Admin (dropdown sesi dari `generateSemesterOptions()`). Menjana label
+    sesi secara dinamik supaya sistem kekal relevan bila semester bertukar.
 
 ## Prinsip reka bentuk (JANGAN langgar)
 
@@ -256,6 +267,10 @@ dipindah ke editor Apps Script secara manual — `git push` tidak mendeploy-nya.
   terkunci minta buka kunci dahulu.
 - **Sesi 3** — (a) Pisah pemeriksa `pdpl` kepada **PL (Pemeriksa Luar)** dan
   **PD (Pemeriksa Dalam)**, kedua-duanya multi. Migrasi automatik data lama.
+- **Sesi 4** — Workspace bersarang **"Senarai Pelajar Mengikut Penyelia"** (kategori
+  PENYELIA-PELAJAR): panel penyelia collapsible, toggle Aktif/Semua, drawer edit
+  pelajar, status pelajar (graduasi/menarik diri/diberhentikan), auto-sync graduan,
+  semester master di Admin.
 
 ### Belum siap (dropdown & format — menunggu pengesahan)
 Permintaan yang belum dilaksanakan (lihat perbincangan terakhir):

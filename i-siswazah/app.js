@@ -9,6 +9,19 @@ const PROGRAM_OPTIONS = [
   'Sarjana Sains Kejuruteraan Mikro dan Nanoelektronik'
 ];
 
+/* ---------- STATUS PELAJAR (workspace penyeliaPelajar) ---------- */
+const STATUS_PELAJAR_OPTIONS = [
+  { value: '', label: 'Aktif' },
+  { value: 'graduasi', label: 'Telah Bergraduasi' },
+  { value: 'menarik_diri', label: 'Menarik Diri' },
+  { value: 'diberhentikan', label: 'Diberhentikan' }
+];
+
+function statusPelajarLabel(v) {
+  const o = STATUS_PELAJAR_OPTIONS.find(function (x) { return x.value === v; });
+  return o ? o.label : 'Aktif';
+}
+
 /* Kolum: header = teks ASAL (dikekalkan), key = id dalaman, type, identity = boleh disalin */
 const WORKSPACES = [
   { id: 'kpi', name: 'KPI Hal Ehwal Siswazah', group: 'KEMASUKAN', icon: 'target',
@@ -174,10 +187,22 @@ const WORKSPACES = [
       { key: 'serahKP', header: 'TARIKH SERAH KPD KP UTK SEMAKAN DAN PENGESAHAN', type: 'date' },
       { key: 'serahTP', header: 'TARIKH SERAH KPD TP UTK PENGESAHAN DAN KELULUSAN', type: 'date' },
       { key: 'emelJkuasa', header: 'TARIKH EMEL KE JKUASA', type: 'date' }
+    ] },
+  { id: 'penyeliaPelajar', name: 'Senarai Pelajar Mengikut Penyelia', group: 'PENYELIA-PELAJAR', icon: 'userCheck',
+    desc: 'Paparan pelajar bagi setiap penyelia — status aktif, graduasi dan penarikan diri',
+    nested: true,
+    columns: [
+      { key: 'bil', header: 'BIL', type: 'number', noEdit: true },
+      { key: 'nama', header: 'PELAJAR', type: 'text', required: true },
+      { key: 'program', header: 'PROGRAM', type: 'select', options: PROGRAM_OPTIONS },
+      { key: 'noPelajar', header: 'NO. PELAJAR', type: 'text' },
+      { key: 'penyeliaBersama', header: 'PENYELIA BERSAMA', type: 'text', multi: true },
+      { key: 'semesterPengajian', header: 'SEM. PENGAJIAN', type: 'text' },
+      { key: 'status', header: 'STATUS', type: 'select', options: STATUS_PELAJAR_OPTIONS }
     ] }
 ];
 
-const GROUP_ORDER = ['KEMASUKAN', 'PENGURUSAN PENGAJIAN', 'TESIS & PEPERIKSAAN', 'PENGIJAZAHAN', 'PENTADBIRAN'];
+const GROUP_ORDER = ['KEMASUKAN', 'PENGURUSAN PENGAJIAN', 'TESIS & PEPERIKSAAN', 'PENGIJAZAHAN', 'PENTADBIRAN', 'PENYELIA-PELAJAR'];
 
 /* ---------- STATE ---------- */
 const STORAGE_KEY = 'sps_demo_state_v1';
@@ -214,6 +239,10 @@ function defaultSettings() {
       notis: true,
       jps: true,
       senat: true
+    },
+    semesterAktif: {
+      sesi: '2/2025-2026',
+      semesterPengajian: 1
     }
   };
 }
@@ -227,6 +256,7 @@ function ensureSettings() {
   });
   if (!state.settings.attentionThresholds) state.settings.attentionThresholds = d.attentionThresholds;
   if (!state.settings.attentionRules) state.settings.attentionRules = d.attentionRules;
+  if (!state.settings.semesterAktif) state.settings.semesterAktif = d.semesterAktif;
   return state.settings;
 }
 
@@ -239,6 +269,8 @@ let ui = {
   query: {},
   page: {},
   lockedOpen: {},
+  penyeliaOpen: {},
+  lepasOpen: {},
   pageSize: 25
 };
 
@@ -279,7 +311,8 @@ const ICONS = {
   database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   lockOpen: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
-  chevronDown: '<path d="M6 9l6 6 6-6"/>'
+  chevronDown: '<path d="M6 9l6 6 6-6"/>',
+  userCheck: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M16 11l2 2 4-4"/>'
 };
 
 function icon(name, size) {
@@ -502,6 +535,26 @@ function seedData() {
     honorarium: [
       { id: uid('r'), bil: 1, nama: '', noMatrik: '', tarikhViva: '', pdpl: '', jumlah: '', tarikhSedia: '', tarikhPos: '' },
       { id: uid('r'), bil: 2, nama: '', noMatrik: '', tarikhViva: '', pdpl: '', jumlah: '', tarikhSedia: '', tarikhPos: '' }
+    ],
+    penyeliaPelajar: [
+      { id: uid('r'), bil: 1, namaPenyelia: 'PROF. DR. AZMAN JALAR @JALIL (K007353)', pelajar: [
+        { id: uid('r'), bil: 1, nama: 'LIM EE MAY', program: 'Sarjana Sains', noPelajar: 'P137670', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR', statusKhas: '', tarikhStatus: '', semesterPengajian: 6, sejarahSemester: [
+          { sesi: '2/2022-2023', semesterPengajian: '6', catatan: '' },
+          { sesi: '1/2023-2024', semesterPengajian: '', catatan: 'akan hantar notis dalam masa terdekat' },
+          { sesi: '2/2023-2024', semesterPengajian: '6', catatan: 'Dalam tempoh pembetulan tesis.' }
+        ] },
+        { id: uid('r'), bil: 2, nama: 'BALOGUN BASHIR TEMITOPE', program: 'Doktor Falsafah', noPelajar: 'P117630', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR\nDR. ATIQAH BINTI MOHD AFDZALUDDIN', statusKhas: '', tarikhStatus: '', semesterPengajian: 7, sejarahSemester: [] },
+        { id: uid('r'), bil: 3, nama: 'MOHD ERWAN BIN BASIRON', program: 'Sarjana Sains', noPelajar: 'P130002', penyeliaBersama: 'DR. MARIA BINTI ABU BAKAR', statusKhas: '', tarikhStatus: '', semesterPengajian: 6, sejarahSemester: [] }
+      ] },
+      { id: uid('r'), bil: 2, namaPenyelia: 'PROF. DR. AZRUL AZLAN HAMZAH (K014762)', pelajar: [
+        { id: uid('r'), bil: 1, nama: 'ROHARSYAFINAZ BINTI ROSLAN', program: 'Sarjana Sains', noPelajar: 'P121441', penyeliaBersama: 'DR. AHMAD GHADAFI ISMAIL, PROF. MADYA DR. P. SUSTHITHA MENON', statusKhas: 'graduasi', tarikhStatus: '2024-11-15', semesterPengajian: 8, sejarahSemester: [] },
+        { id: uid('r'), bil: 2, nama: 'MANAL BINTI AMMAR', program: 'Sarjana Sains', noPelajar: 'P152989', penyeliaBersama: 'TIADA', statusKhas: '', tarikhStatus: '', semesterPengajian: 4, sejarahSemester: [] },
+        { id: uid('r'), bil: 3, nama: 'ARIFAH SYAHIRAH BINTI ABDUL RAHMAN', program: 'Doktor Falsafah', noPelajar: 'P153583', penyeliaBersama: 'TIADA', statusKhas: '', tarikhStatus: '', semesterPengajian: 3, sejarahSemester: [] }
+      ] },
+      { id: uid('r'), bil: 3, namaPenyelia: 'PROF. DR. DEE CHANG FU (K013525)', pelajar: [
+        { id: uid('r'), bil: 1, nama: 'MOHAMAD NIZAR HADI BIN MOHAMAD NASSIR', program: 'Doktor Falsafah', noPelajar: 'P109012', penyeliaBersama: 'PROF. DR. AZRUL AZLAN BIN HAMZAH\nDR. AHMAD GHADAFI BIN ISMAIL', statusKhas: '', tarikhStatus: '', semesterPengajian: 12, sejarahSemester: [] },
+        { id: uid('r'), bil: 2, nama: 'MUHAMAD ARIF BIN SHAHARIAH', program: 'Doktor Falsafah', noPelajar: 'P154207', penyeliaBersama: 'DR. NG PEI YUEN', statusKhas: 'diberhentikan', tarikhStatus: '2025-09-01', semesterPengajian: 4, sejarahSemester: [] }
+      ] }
     ]
   };
   state.reminders = [
@@ -532,7 +585,8 @@ const CATEGORY_META = {
   'PENGURUSAN PENGAJIAN': { icon: 'clock', grad: 'g-purple' },
   'TESIS & PEPERIKSAAN': { icon: 'fileText', grad: 'g-teal' },
   'PENGIJAZAHAN': { icon: 'award', grad: 'g-amber' },
-  'PENTADBIRAN': { icon: 'wallet', grad: 'g-slate' }
+  'PENTADBIRAN': { icon: 'wallet', grad: 'g-slate' },
+  'PENYELIA-PELAJAR': { icon: 'userCheck', grad: 'g-indigo' }
 };
 
 function renderSidebar() {
@@ -610,6 +664,7 @@ function render() {
   const c = document.getElementById('content');
   if (ui.view === 'dashboard') c.innerHTML = renderDashboard();
   else if (ui.view === 'admin') c.innerHTML = renderAdmin();
+  else if (ui.view === 'penyeliaPelajar') c.innerHTML = renderPenyeliaWorkspace();
   else c.innerHTML = renderWorkspace(ws(ui.view));
   bindContent();
 }
@@ -750,6 +805,7 @@ function renderAdmin() {
   html += adminField('set-pageSize', 'Bilangan Baris Sehalaman', s.pageSize, 'number');
   html += adminField('set-upcomingDays', 'Horizon Countdown (hari)', s.attentionThresholds.upcomingDays, 'number');
   html += adminField('set-vivaSoonDays', 'Ambang "Viva Terdekat" (hari)', s.attentionThresholds.vivaSoonDays, 'number');
+  html += '<div class="field" style="margin-top:12px"><label>Sesi Aktif (Semester Semasa)</label><select id="set-sesiAktif">' + selectOptions(generateSemesterOptions(), s.semesterAktif.sesi) + '</select><span class="field__hint">Digunakan untuk label "SEM. PENGAJIAN" dalam Senarai Pelajar Mengikut Penyelia.</span></div>';
   html += '</div></section>';
 
   /* Kad 4: Peraturan Perhatian */
@@ -815,6 +871,341 @@ function renderAdmin() {
 function adminField(id, label, value, type, maxlength) {
   return '<div class="field" style="margin-top:12px"><label>' + esc(label) + '</label>' +
     '<input id="' + id + '" type="' + type + '" value="' + esc(value) + '"' + (maxlength ? ' maxlength="' + maxlength + '"' : '') + '></div>';
+}
+
+/* ---------- WORKSPACE PENYELIA-PELAJAR (bersarang) ---------- */
+/* Penjana senarai sesi semester (dropdown) — 3 ke belakang, 1 ke hadapan */
+function generateSemesterOptions() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const out = [];
+  for (let sy = y - 3; sy <= y + 1; sy++) {
+    out.push('1/' + sy + '-' + (sy + 1));
+    out.push('2/' + sy + '-' + (sy + 1));
+  }
+  return out;
+}
+
+function renderPenyeliaWorkspace() {
+  const w = ws('penyeliaPelajar');
+  const st = ensureSettings();
+  const showAll = ui.filter['penyeliaPelajar'] === 'semua';
+  const recs = state.records.penyeliaPelajar || [];
+  const q = (ui.query['penyeliaPelajar'] || '').toLowerCase().trim();
+
+  function filterPelajar(plist) {
+    let list = plist || [];
+    if (q) list = list.filter(function (p) {
+      return String(p.nama || '').toLowerCase().indexOf(q) !== -1 || String(p.noPelajar || '').toLowerCase().indexOf(q) !== -1;
+    });
+    return list;
+  }
+
+  let html = '<div class="page-head">';
+  html += '<div><h1 class="page-head__title">' + esc(w.name) + '</h1><p class="page-head__desc">' + esc(w.desc || '') + '</p></div>';
+  html += '<button class="btn btn--primary" data-add-penyelia>' + icon('plus', 16) + '<span class="btn-label">Tambah Penyelia</span></button>';
+  html += '</div>';
+
+  /* Toolbar: carian + toggle Aktif/Semua */
+  html += '<div class="ws-toolbar">';
+  html += '<div class="ws-search' + (q ? ' has-value' : '') + '"><svg class="ws-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>';
+  html += '<input type="search" data-ws-search="penyeliaPelajar" value="' + esc(ui.query['penyeliaPelajar'] || '') + '" placeholder="Cari pelajar (nama / no. pelajar)…" aria-label="Cari pelajar">';
+  html += '<button class="ws-search__clear" data-ws-clear="penyeliaPelajar" aria-label="Kosongkan carian">' + icon('x', 15) + '</button></div>';
+  html += '<div class="seg-toggle">';
+  html += '<button class="seg' + (!showAll ? ' is-active' : '') + '" data-seg="aktif">Aktif</button>';
+  html += '<button class="seg' + (showAll ? ' is-active' : '') + '" data-seg="semua">Semua</button>';
+  html += '</div>';
+  html += '</div>';
+
+  const sesiAktif = st.semesterAktif.sesi;
+
+  if (!recs.length) {
+    html += '<div class="panel"><div class="panel__body">' + emptyState('Tiada penyelia', 'Klik "Tambah Penyelia" untuk mula.') + '</div></div>';
+    return html;
+  }
+
+  /* Bina panel penyelia */
+  recs.forEach(function (p) {
+    const allPelajar = filterPelajar(p.pelajar);
+    const aktif = allPelajar.filter(function (x) { return !x.statusKhas; });
+    const lepas = allPelajar.filter(function (x) { return x.statusKhas; });
+    const open = (ui.penyeliaOpen && ui.penyeliaOpen[p.id]) !== false; // default terbuka
+
+    html += '<section class="penyelia-panel' + (open ? ' is-open' : '') + '" data-penyelia="' + p.id + '">';
+    html += '<button class="penyelia-panel__head" data-toggle-penyelia="' + p.id + '">';
+    html += '<span class="penyelia-panel__chev">' + icon('chevronRight', 16) + '</span>';
+    html += '<span class="penyelia-panel__icon">' + icon('userCheck', 15) + '</span>';
+    html += '<span class="penyelia-panel__title">' + esc(p.namaPenyelia) + '</span>';
+    html += '<span class="badge badge--info">' + aktif.length + ' aktif</span>';
+    if (lepas.length) html += '<span class="badge badge--warn">' + lepas.length + ' lepas</span>';
+    html += '</button>';
+
+    if (open) {
+      html += '<div class="penyelia-panel__body">';
+      html += renderPenyeliaTable(aktif, sesiAktif, p.id);
+      if (lepas.length && (showAll || true)) {
+        html += renderLepasPanel(p.id, lepas, sesiAktif, showAll);
+      }
+      html += '</div>';
+    }
+    html += '</section>';
+  });
+
+  return html;
+}
+
+function renderPenyeliaTable(pelajar, sesiAktif, penyeliaId) {
+  const cols = ws('penyeliaPelajar').columns;
+  if (!pelajar.length) {
+    return '<div class="empty-state" style="padding:16px">' + icon('userCheck', 24) + '<div>Tiada pelajar aktif.</div></div>';
+  }
+  let html = '<div class="table-scroll"><table class="grid penyelia-table"><thead><tr>';
+  cols.forEach(function (c, i) {
+    html += '<th class="' + colClass(c, i) + '" title="' + esc(c.header) + '">' + esc(c.header) + '</th>';
+  });
+  html += '<th class="col-actions">TINDAKAN</th></tr></thead><tbody>';
+  pelajar.forEach(function (p) {
+    html += renderPenyeliaRow(p, penyeliaId);
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function renderPenyeliaRow(p, penyeliaId) {
+  const cols = ws('penyeliaPelajar').columns;
+  const cells = cols.map(function (c, i) {
+    const cls = colClass(c, i);
+    let val = p[c.key] || '';
+    if (c.key === 'status') val = statusPelajarLabel(p.statusKhas);
+    if (c.key === 'semesterPengajian') val = p.semesterPengajian || '';
+    if (c.key === 'penyeliaBersama') val = (p.penyeliaBersama || '').replace(/\n/g, ', ');
+    return '<td class="' + cls + '">' + esc(val) + '</td>';
+  }).join('');
+
+  const statusBadge = p.statusKhas
+    ? '<span class="badge badge--warn">' + esc(statusPelajarLabel(p.statusKhas)) + '</span>'
+    : '';
+
+  return '<tr data-pelajar="' + p.id + '">' + cells +
+    '<td class="col-actions"><div class="cell-actions">' +
+    '<button class="row-action" data-edit-pelajar="' + penyeliaId + '|' + p.id + '" title="Edit / Status">' + icon('edit', 15) + '</button>' +
+    '<button class="row-action" data-status-pelajar="' + penyeliaId + '|' + p.id + '" title="Ubah Status">' + icon('checkCircle', 15) + '</button>' +
+    '</div>' + statusBadge + '</td></tr>';
+}
+
+function renderLepasPanel(penyeliaId, lepas, sesiAktif, showAll) {
+  const open = ui.lepasOpen && ui.lepasOpen[penyeliaId];
+  let html = '<section class="lepas-panel' + (open ? ' is-open' : '') + '">';
+  html += '<button class="lepas-panel__head" data-toggle-lepas="' + penyeliaId + '">';
+  html += '<span class="locked-panel__chev">' + icon('chevronRight', 15) + '</span>';
+  html += '<span class="locked-panel__title">Rekod Lepas</span>';
+  html += '<span class="badge badge--warn">' + lepas.length + '</span>';
+  html += '<span class="locked-panel__hint">Graduasi / Menarik Diri / Diberhentikan</span>';
+  html += '</button>';
+  if (open) {
+    html += '<div class="lepas-panel__body">';
+    html += renderPenyeliaTable(lepas, sesiAktif, penyeliaId);
+    html += '</div>';
+  }
+  html += '</section>';
+  return html;
+}
+
+/* ---------- PENYELIA: drawer edit pelajar ---------- */
+function openPelajarDrawer(penyeliaId, pelajarId) {
+  const p = (state.records.penyeliaPelajar || []).find(function (x) { return x.id === penyeliaId; });
+  if (!p) return;
+  const pelajar = pelajarId ? p.pelajar.find(function (x) { return x.id === pelajarId; }) : null;
+  const isNew = !pelajar;
+  const rec = pelajar || { id: '', bil: (p.pelajar.length + 1), nama: '', program: '', noPelajar: '', penyeliaBersama: '', statusKhas: '', tarikhStatus: '', semesterPengajian: '', sejarahSemester: [] };
+
+  let body = '<input type="hidden" id="dPenyeliaId" value="' + penyeliaId + '">';
+  body += '<input type="hidden" id="dPelajarId" value="' + (isNew ? '' : pelajarId) + '">';
+  body += '<div class="field"><label>Nama Pelajar <span class="req">*</span></label><input id="dNama" value="' + esc(rec.nama) + '"></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Program</label><select id="dProgram">' + selectOptions(PROGRAM_OPTIONS, rec.program) + '</select></div>';
+  body += '<div class="field" style="margin-top:12px"><label>No. Pelajar</label><input id="dNoPelajar" value="' + esc(rec.noPelajar) + '"></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Penyelia Bersama</label><textarea id="dPenyeliaBersama">' + esc(rec.penyeliaBersama) + '</textarea></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Semester Pengajian (semasa)</label><input id="dSemesterPengajian" value="' + esc(rec.semesterPengajian) + '"></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Status Pelajar</label><select id="dStatus">' + selectOptions(STATUS_PELAJAR_OPTIONS, rec.statusKhas) + '</select></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Tarikh Status</label><input type="date" id="dTarikhStatus" value="' + esc(rec.tarikhStatus) + '"><span class="field__hint">Wajib untuk graduasi; optional untuk menarik diri / diberhentikan.</span></div>';
+
+  /* Sejarah semester */
+  body += '<div class="field" style="margin-top:16px"><label>Sejarah Semester</label><div id="dSejarah" class="sejarah-list">';
+  (rec.sejarahSemester || []).forEach(function (s, idx) {
+    body += sejarahRow(s.sesi, s.semesterPengajian, s.catatan, idx);
+  });
+  body += '</div><button class="penyelia-add" data-add-sejarah>' + icon('plus', 13) + ' Tambah Semester</button></div>';
+
+  openDrawer({
+    title: (isNew ? 'Tambah Pelajar' : 'Edit Pelajar'),
+    sub: esc(p.namaPenyelia),
+    body: body,
+    foot: '<button class="btn btn--ghost" data-close-drawer>Batal</button><button class="btn btn--primary" id="savePelajar">' + icon('save', 16) + ' Simpan</button>',
+    onMount: function (root) {
+      root.querySelectorAll('[data-add-sejarah]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          const list = root.querySelector('#dSejarah');
+          const div = document.createElement('div');
+          div.innerHTML = sejarahRow('', '', '', Date.now());
+          list.appendChild(div);
+        });
+      });
+      root.querySelectorAll('[data-remove-sejarah]').forEach(function (b) {
+        b.addEventListener('click', function () { b.closest('.sejarah-row').remove(); });
+      });
+      root.querySelector('#dStatus').addEventListener('change', function () {
+        const tgl = root.querySelector('#dTarikhStatus');
+        tgl.required = this.value === 'graduasi';
+      });
+      root.querySelector('#savePelajar').addEventListener('click', function () {
+        savePelajarFromDrawer(root);
+      });
+    }
+  });
+}
+
+function sejarahRow(sesi, sp, catatan, idx) {
+  return '<div class="sejarah-row">' +
+    '<select class="sejarah-sesi">' + selectOptions(generateSemesterOptions(), sesi) + '</select>' +
+    '<input class="sejarah-sp" placeholder="Sem. pengajian" value="' + esc(sp || '') + '">' +
+    '<input class="sejarah-catatan" placeholder="Catatan" value="' + esc(catatan || '') + '">' +
+    '<button type="button" class="penyelia-remove" data-remove-sejarah title="Buang">' + icon('x', 13) + '</button>' +
+    '</div>';
+}
+
+function selectOptions(opts, selected) {
+  return opts.map(function (o) {
+    const v = typeof o === 'object' ? o.value : o;
+    const l = typeof o === 'object' ? o.label : o;
+    return '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + esc(l) + '</option>';
+  }).join('');
+}
+
+function savePelajarFromDrawer(root) {
+  const penyeliaId = root.querySelector('#dPenyeliaId').value;
+  const pelajarId = root.querySelector('#dPelajarId').value;
+  const p = (state.records.penyeliaPelajar || []).find(function (x) { return x.id === penyeliaId; });
+  if (!p) return;
+
+  const nama = root.querySelector('#dNama').value.trim();
+  if (!nama) { toast('Nama pelajar wajib diisi', 'error'); return; }
+
+  const statusKhas = root.querySelector('#dStatus').value;
+  const tarikhStatus = root.querySelector('#dTarikhStatus').value;
+  if (statusKhas === 'graduasi' && !tarikhStatus) { toast('Tarikh wajib untuk status graduasi', 'error'); return; }
+
+  const sejarahSemester = [];
+  root.querySelectorAll('#dSejarah .sejarah-row').forEach(function (row) {
+    const sesi = row.querySelector('.sejarah-sesi').value;
+    const sp = row.querySelector('.sejarah-sp').value;
+    const catatan = row.querySelector('.sejarah-catatan').value;
+    if (sesi || sp || catatan) sejarahSemester.push({ sesi: sesi, semesterPengajian: sp, catatan: catatan });
+  });
+
+  const data = {
+    nama: nama,
+    program: root.querySelector('#dProgram').value,
+    noPelajar: root.querySelector('#dNoPelajar').value,
+    penyeliaBersama: root.querySelector('#dPenyeliaBersama').value,
+    semesterPengajian: root.querySelector('#dSemesterPengajian').value,
+    statusKhas: statusKhas,
+    tarikhStatus: tarikhStatus,
+    sejarahSemester: sejarahSemester
+  };
+
+  if (pelajarId) {
+    const existing = p.pelajar.find(function (x) { return x.id === pelajarId; });
+    const oldStatus = existing ? existing.statusKhas : '';
+    Object.assign(existing, data);
+    syncGraduan(existing, oldStatus);
+    toast('Pelajar dikemas kini', 'success');
+  } else {
+    const newPelajar = Object.assign({ id: uid('r'), bil: p.pelajar.length + 1 }, data);
+    p.pelajar.push(newPelajar);
+    syncGraduan(newPelajar, '');
+    toast('Pelajar ditambah', 'success');
+  }
+  save();
+  closeDrawer();
+  render();
+}
+
+/* ---------- Status cepat (dropdown di baris) ---------- */
+function openStatusQuick(penyeliaId, pelajarId) {
+  const p = (state.records.penyeliaPelajar || []).find(function (x) { return x.id === penyeliaId; });
+  if (!p) return;
+  const pelajar = p.pelajar.find(function (x) { return x.id === pelajarId; });
+  if (!pelajar) return;
+
+  let body = '<div class="field"><label>Status Pelajar</label><select id="qStatus">' + selectOptions(STATUS_PELAJAR_OPTIONS, pelajar.statusKhas) + '</select></div>';
+  body += '<div class="field" style="margin-top:12px"><label>Tarikh Status</label><input type="date" id="qTarikh" value="' + esc(pelajar.tarikhStatus || '') + '"><span class="field__hint">Wajib untuk graduasi; optional untuk lain.</span></div>';
+
+  openModal({
+    title: 'Ubah Status',
+    sub: esc(pelajar.nama),
+    body: body,
+    foot: '<button class="btn btn--ghost" data-close-modal>Batal</button><button class="btn btn--primary" id="saveStatus">Simpan</button>',
+    onMount: function (root) {
+      root.querySelector('#saveStatus').addEventListener('click', function () {
+        const status = root.querySelector('#qStatus').value;
+        const tarikh = root.querySelector('#qTarikh').value;
+        if (status === 'graduasi' && !tarikh) { toast('Tarikh wajib untuk graduasi', 'error'); return; }
+        const old = pelajar.statusKhas;
+        pelajar.statusKhas = status;
+        pelajar.tarikhStatus = tarikh;
+        syncGraduan(pelajar, old);
+        save();
+        closeModal();
+        render();
+        toast('Status dikemas kini', 'success');
+      });
+    }
+  });
+}
+
+/* ---------- AUTO-SYNC GRADUAN ---------- */
+function syncGraduan(pelajar, oldStatus) {
+  const baru = pelajar.statusKhas;
+  if (baru === 'graduasi') {
+    /* tambah / kemas kini rekod graduan */
+    const existing = (state.records.graduan || []).find(function (g) {
+      return g.noPelajar && pelajar.noPelajar && g.noPelajar === pelajar.noPelajar;
+    }) || (state.records.graduan || []).find(function (g) { return g._syncPelajarId === pelajar.id; });
+
+    const entry = {
+      id: existing ? existing.id : uid('r'),
+      bil: existing ? existing.bil : nextId('graduan'),
+      nama: pelajar.nama + (pelajar.noPelajar ? ' (' + pelajar.noPelajar + ')' : ''),
+      program: pelajar.program || '',
+      penyelia: 'Penyelia Utama\n' + (pelajar.penyeliaBersama || ''),
+      semester: pelajar.semesterPengajian || '',
+      catatan: 'Graduasi ' + (pelajar.tarikhStatus ? fmtDate(pelajar.tarikhStatus) : ''),
+      noPelajar: pelajar.noPelajar,
+      _syncPelajarId: pelajar.id
+    };
+    if (existing) {
+      Object.assign(existing, entry);
+    } else {
+      state.records.graduan = state.records.graduan || [];
+      state.records.graduan.push(entry);
+    }
+  } else if (oldStatus === 'graduasi') {
+    /* buang rekod graduan yang dijana auto */
+    state.records.graduan = (state.records.graduan || []).filter(function (g) {
+      return g._syncPelajarId !== pelajar.id && g.noPelajar !== pelajar.noPelajar;
+    });
+  }
+}
+
+/* ---------- Tambah penyelia ---------- */
+function addPenyelia() {
+  const nama = prompt('Nama penyelia:');
+  if (!nama || !nama.trim()) return;
+  state.records.penyeliaPelajar = state.records.penyeliaPelajar || [];
+  state.records.penyeliaPelajar.push({ id: uid('r'), bil: state.records.penyeliaPelajar.length + 1, namaPenyelia: nama.trim(), pelajar: [] });
+  save();
+  render();
+  toast('Penyelia ditambah', 'success');
 }
 
 /* ---------- ATTENTION ---------- */
@@ -1223,7 +1614,8 @@ function bindContent() {
     'set-upcomingDays': function (v) { ensureSettings().attentionThresholds.upcomingDays = Math.max(1, parseInt(v, 10) || 60); },
     'set-vivaSoonDays': function (v) { ensureSettings().attentionThresholds.vivaSoonDays = Math.max(1, parseInt(v, 10) || 14); },
     'set-trashRetentionDays': function (v) { ensureSettings().trashRetentionDays = Math.max(1, parseInt(v, 10) || 30); },
-    'set-confirmDelete': function (v) { ensureSettings().confirmDelete = v === '1'; }
+    'set-confirmDelete': function (v) { ensureSettings().confirmDelete = v === '1'; },
+    'set-sesiAktif': function (v) { ensureSettings().semesterAktif.sesi = v; }
   };
   Object.keys(adminBind).forEach(function (id) {
     const el = document.getElementById(id);
@@ -1251,6 +1643,41 @@ function bindContent() {
   c.querySelectorAll('[data-empty-trash]').forEach(function (b) { b.addEventListener('click', function () { emptyTrash(); }); });
   c.querySelectorAll('[data-reset-demo]').forEach(function (b) { b.addEventListener('click', function () { resetDemo(); }); });
   c.querySelectorAll('[data-export-all]').forEach(function (b) { b.addEventListener('click', function () { exportAllJson(); }); });
+
+  /* ---------- PENYELIA-PELAJAR binding ---------- */
+  c.querySelectorAll('[data-toggle-penyelia]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const id = b.dataset.togglePenyelia;
+      ui.penyeliaOpen[id] = (ui.penyeliaOpen[id] === undefined) ? false : !ui.penyeliaOpen[id];
+      render();
+    });
+  });
+  c.querySelectorAll('[data-toggle-lepas]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const id = b.dataset.toggleLepas;
+      ui.lepasOpen[id] = !ui.lepasOpen[id];
+      render();
+    });
+  });
+  c.querySelectorAll('[data-seg]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      ui.filter['penyeliaPelajar'] = b.dataset.seg === 'semua' ? 'semua' : 'aktif';
+      render();
+    });
+  });
+  c.querySelectorAll('[data-add-penyelia]').forEach(function (b) { b.addEventListener('click', function () { addPenyelia(); }); });
+  c.querySelectorAll('[data-edit-pelajar]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const parts = b.dataset.editPelajar.split('|');
+      openPelajarDrawer(parts[0], parts[1]);
+    });
+  });
+  c.querySelectorAll('[data-status-pelajar]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const parts = b.dataset.statusPelajar.split('|');
+      openStatusQuick(parts[0], parts[1]);
+    });
+  });
 }
 
 /* ---------- EDIT FLOW ---------- */
@@ -1711,6 +2138,36 @@ function closeModal() {
   const o = document.getElementById('overlay');
   if (o) o.remove();
   document.removeEventListener('keydown', escClose);
+}
+
+/* ---------- DRAWER ---------- */
+function openDrawer(opts) {
+  closeDrawer();
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.id = 'drawerOverlay';
+  overlay.innerHTML =
+    '<div class="drawer" role="dialog" aria-modal="true">' +
+    '<div class="drawer__head"><div><h3 class="modal__title">' + esc(opts.title || '') + '</h3>' +
+    (opts.sub ? '<p class="modal__sub">' + esc(opts.sub) + '</p>' : '') + '</div>' +
+    '<button class="modal__close" data-close-drawer aria-label="Tutup">' + icon('x', 18) + '</button></div>' +
+    '<div class="drawer__body">' + opts.body + '</div>' +
+    (opts.foot ? '<div class="drawer__foot">' + opts.foot + '</div>' : '') +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelectorAll('[data-close-drawer]').forEach(function (b) { b.addEventListener('click', closeDrawer); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeDrawer(); });
+  document.addEventListener('keydown', escCloseDrawer);
+  if (opts.onMount) opts.onMount(overlay);
+}
+
+function escCloseDrawer(e) { if (e.key === 'Escape') closeDrawer(); }
+
+function closeDrawer() {
+  const o = document.getElementById('drawerOverlay');
+  if (o) o.remove();
+  document.removeEventListener('keydown', escCloseDrawer);
 }
 
 /* ---------- EXPORT ---------- */
