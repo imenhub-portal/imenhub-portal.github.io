@@ -896,7 +896,16 @@
                         <h2 class="text-3xl sm:text-5xl font-bold tracking-tight text-white mt-3">i-Nstrumen</h2>
                         <p class="text-sm text-slate-400 mt-2">Less time coordinating. More time creating.</p>
                     </div>
-                    <div class="text-sm text-slate-300 sm:text-right">${dateStr}</div>
+                    <div class="sm:text-right sm:max-w-sm">
+                        <div class="text-sm text-slate-300">${dateStr}</div>
+                        ${now.getDay() === 3 ? `
+                        <style>@keyframes wfhPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,.35) } 50% { box-shadow: 0 0 0 7px rgba(251,191,36,0) } }
+                               @media (prefers-reduced-motion: reduce) { .wfh-note { animation: none !important } }</style>
+                        <div class="wfh-note mt-3 text-left rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 flex gap-3 items-start" style="animation: wfhPulse 2.4s ease-in-out infinite" role="status">
+                            <span class="relative flex h-2.5 w-2.5 mt-1 shrink-0"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span></span>
+                            <p class="text-xs leading-relaxed text-amber-100">In accordance with Registrar's Office Circular No. 20/2026, Wednesday is designated as a mandatory Work From Home (WFH) day for eligible staff under the Hybrid Working Day (HBH) scheme at Universiti Kebangsaan Malaysia (UKM), effective September 23, 2026, as an energy-saving measure.</p>
+                        </div>` : ''}
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
