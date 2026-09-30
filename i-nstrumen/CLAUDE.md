@@ -181,6 +181,23 @@ top 12 results) — never a bulk directory dump to the client.
 
 ## Recent major changes (most recent session first)
 
+- **One-time member verification (visitor = view-only)** — booking, usage, report,
+  cancel, find-my-bookings and i-Menian member search now need a *member token*
+  (`MEMBER_ACTIONS` in `Code.gs`, gated in `handleFrontendAction`). A student/staff
+  enters their No. Matrik / UKMPer once per device (`MemberVerify` → looked up in the
+  i-Menian directory via `_getIMenianDirectory()`), ticks a one-time PDPA consent,
+  and gets a 60-day sliding token (PropertiesService, prefix `membtok_`; admin tokens
+  also count). Frontend keeps it in localStorage `instrumen_member_v1`
+  (`openMemberVerify`, `withMember`, `isMemberOk`; `openModal` is now a wrapper that
+  prompts visitors, real body is `_openModalCore`). Consent rows are appended to an
+  auto-created `Consents` sheet tab (hashed ID + notice version); bookings capped at 6
+  per verified ID per day. Verified name is pre-filled in the name search.
+  **Known limits:** matric-only proof can be impersonated by someone who knows another
+  member's number; `getInitialData` still returns bookings/logs incl. contact fields to
+  everyone (needs a follow-up before going fully public); `MAINTENANCE_PIN` is still
+  in `index.html`. **Deploy order: Code.gs FIRST, then push index.html** (an old backend
+  rejects `MemberVerify`, which would lock members out).
+
 - **"Block All Wednesdays" admin toggle** (feature-freeze window) — Maintenance
   admin page card; Config key `blockWednesdays` (E2:F), written by the
   `SetBlockWednesdays` action (in `ADMIN_ONLY_ACTIONS`, `SYSDATA_MUTATING_ACTIONS`

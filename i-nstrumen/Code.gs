@@ -299,6 +299,121 @@ function invalidateSystemDataCache() {
   } catch (e) { /* best-effort */ }
 }
 
+
+// ── i-Menian member directory (server-side only, cached 30 min) ─────────────
+// Shared by SearchAllLabsIMenian and MemberVerify. Never sent to clients in full.
+function _getIMenianDirectory() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('imenian_all_users');
+  if (cached) return JSON.parse(cached);
+
+  const sheet = SpreadsheetApp.openById('16mqyApWABuMmYUumLXOLsAzVLwwu9V4MlQs73RYZgNY').getSheets()[0];
+  const hdr = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const iN = hdr.indexOf('Name'), iE = hdr.indexOf('Email'), iP = hdr.indexOf('Phone'),
+        iM = hdr.indexOf('StudentID'), iC = hdr.indexOf('Category'),
+        iS = hdr.indexOf('SupervisorName'), iL = hdr.indexOf('LabName');
+  const all = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+
+  const seen = {}, out = [];
+  for (let i = 0; i < all.length; i++) {
+    const r = all[i];
+    const name = (r[iN] || '').toString().trim();
+    const email = (r[iE] || '').toString().trim().toLowerCase();
+    if (!name || !email) continue;
+    if (seen[email]) continue;           // deduplicate by email
+    seen[email] = true;
+    out.push({
+      name: name, email: email,
+      phone: (r[iP] || '').toString(), matric: (r[iM] || '').toString(),
+      category: (r[iC] || '').toString(), supervisor: (r[iS] || '').toString(),
+      lab: (r[iL] || '').toString().trim()
+    });
+  }
+  try { cache.put('imenian_all_users', JSON.stringify(out), 1800); } catch (e) {}
+  return out;
+}
+
+// ── MEMBER VERIFICATION (one-time per device) ───────────────────────────────
+// Visitors can browse; booking / usage / member search require a member token
+// obtained by entering a No. Matrik / UKMPer registered in the i-Menian
+// directory. Weak proof by design (chosen for zero-friction) — it stops random
+// outsiders, not someone who already knows another member's number.
+const MEMBER_TOKEN_PREFIX = 'membtok_';
+const MEMBER_TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000;   // 60 days, sliding
+const MEMBER_ACTIONS = [
+  'Book', 'Usage', 'Report', 'CancelBooking', 'MarkNoShow', 'FindMyBookings',
+  'SearchIMenian', 'SearchAllLabsIMenian', 'GetIMenianPhoto', 'GetIMenianPhotoBatch',
+  'GetLabData'
+];
+const MEMBER_BOOKINGS_PER_DAY = 6;
+const CONSENT_NOTICE_VERSION = 'v1-2026-10';
+
+function _normId(v) { return String(v || '').trim().toUpperCase().replace(/\s+/g, ''); }
+
+function memberVerify(payload) {
+  const id = _normId(payload && payload.id);
+  if (!id || id.length < 4) return { success: false, error: 'ID not recognised.' };
+  if (!payload || payload.consent !== true) return { success: false, error: 'Please accept the privacy notice.' };
+
+  // Throttle guessing on this public endpoint (no client identity available):
+  // at most 60 attempts per 10 minutes across all callers.
+  const cache = CacheService.getScriptCache();
+  const tries = Number(cache.get('mv_tries') || 0);
+  if (tries >= 60) return { success: false, error: 'Too many attempts. Try again later.' };
+  cache.put('mv_tries', String(tries + 1), 600);
+
+  const person = _getIMenianDirectory().filter(function (u) { return _normId(u.matric) === id; })[0];
+  if (!person) return { success: false, error: 'ID not recognised.' };
+
+  const token = Utilities.getUuid();
+  const rec = { id: id, name: person.name, expiresAt: Date.now() + MEMBER_TOKEN_TTL_MS };
+  PropertiesService.getScriptProperties().setProperty(MEMBER_TOKEN_PREFIX + token, JSON.stringify(rec));
+  _logConsent(id);
+  return { success: true, token: token, name: person.name };
+}
+
+// Returns {id,name} for a valid member OR admin token, else null. Slides expiry.
+function validateMemberToken(token) {
+  if (!token) return null;
+  if (validateAdminToken(token)) return { id: 'ADMIN', name: 'PIC' };   // admin tokens count too
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(MEMBER_TOKEN_PREFIX + token);
+  if (!raw) return null;
+  let rec; try { rec = JSON.parse(raw); } catch (e) { return null; }
+  if (!rec.expiresAt || Date.now() > rec.expiresAt) {
+    try { props.deleteProperty(MEMBER_TOKEN_PREFIX + token); } catch (e) {}
+    return null;
+  }
+  // slide the expiry at most once a day (avoid a property write on every call)
+  if (rec.expiresAt - Date.now() < MEMBER_TOKEN_TTL_MS - 24 * 3600 * 1000) {
+    rec.expiresAt = Date.now() + MEMBER_TOKEN_TTL_MS;
+    try { props.setProperty(MEMBER_TOKEN_PREFIX + token, JSON.stringify(rec)); } catch (e) {}
+  }
+  return rec;
+}
+
+// Consent audit trail: timestamp + hashed ID + notice version (no raw ID stored).
+function _logConsent(id) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sh = ss.getSheetByName('Consents');
+    if (!sh) { sh = ss.insertSheet('Consents'); sh.appendRow(['timestamp', 'idHash', 'noticeVersion']); }
+    const hash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, id)).slice(0, 16);
+    sh.appendRow([new Date().toISOString(), hash, CONSENT_NOTICE_VERSION]);
+  } catch (e) { /* audit is best-effort, must not block verification */ }
+}
+
+// Per-ID daily booking cap (identity comes from the member token, not the payload).
+function _memberBookingCapHit(member) {
+  if (!member || member.id === 'ADMIN') return false;
+  const cache = CacheService.getScriptCache();
+  const key = 'mb_' + member.id + '_' + Utilities.formatDate(new Date(), 'Asia/Kuala_Lumpur', 'yyyyMMdd');
+  const n = Number(cache.get(key) || 0);
+  if (n >= MEMBER_BOOKINGS_PER_DAY) return true;
+  cache.put(key, String(n + 1), 86400);
+  return false;
+}
+
 function handleFrontendAction(actionType, payload) {
   const lock = LockService.getScriptLock();
   const acquired = lock.tryLock(5000);
@@ -325,9 +440,25 @@ function handleFrontendAction(actionType, payload) {
     }
   }
 
+  // ── MEMBER GATE ────────────────────────────────────────────────────────
+  // Visitors may browse (getInitialData) but not book, log usage or search members.
+  if (MEMBER_ACTIONS.indexOf(actionType) !== -1) {
+    const member = validateMemberToken(payload && payload.__memberToken) ||
+                   validateMemberToken(payload && payload.__adminToken);
+    if (!member) {
+      lock.releaseLock();
+      return { success: false, error: 'Verification required. Please verify your No. Matrik / UKMPer.' };
+    }
+    if (actionType === 'Book' && _memberBookingCapHit(member)) {
+      lock.releaseLock();
+      return { success: false, error: 'Daily booking limit reached. Please try again tomorrow.' };
+    }
+  }
+
   try {
     switch (actionType) {
       case 'AdminLogin': return adminLogin(payload && payload.credential);
+      case 'MemberVerify': return memberVerify(payload);
       case 'Usage': return saveLog(payload);
       case 'Book': return saveBooking(payload);
       case 'UpdateBooking': return updateBooking(payload);
@@ -537,53 +668,7 @@ function handleFrontendAction(actionType, payload) {
         var sqQuery = ((payload && payload.query) || '').trim();
         if (sqQuery.length < 4) return [];
 
-        var allCacheKey = 'imenian_all_users';
-        var allCache    = CacheService.getScriptCache();
-        var allCached   = allCache.get(allCacheKey);
-        var aResults;
-
-        if (allCached) {
-          aResults = JSON.parse(allCached);
-        } else {
-          var aSS    = SpreadsheetApp.openById('16mqyApWABuMmYUumLXOLsAzVLwwu9V4MlQs73RYZgNY');
-          var aSheet = aSS.getSheets()[0];
-          var aHdr   = aSheet.getRange(1, 1, 1, aSheet.getLastColumn()).getValues()[0];
-
-          var aN = aHdr.indexOf('Name');
-          var aE = aHdr.indexOf('Email');
-          var aP = aHdr.indexOf('Phone');
-          var aM = aHdr.indexOf('StudentID');
-          var aC = aHdr.indexOf('Category');
-          var aS = aHdr.indexOf('SupervisorName');
-          var aL = aHdr.indexOf('LabName');
-
-          var aLastRow = aSheet.getLastRow();
-          var aLastCol = aSheet.getLastColumn();
-          var aAll     = aSheet.getRange(2, 1, aLastRow - 1, aLastCol).getValues();
-
-          var aSeen = {};
-          aResults  = [];
-
-          for (var ai = 0; ai < aAll.length; ai++) {
-            var aRow = aAll[ai];
-            var aNm  = (aRow[aN] || '').toString().trim();
-            var aEm  = (aRow[aE] || '').toString().trim().toLowerCase();
-            if (!aNm || !aEm) continue;
-            if (aSeen[aEm])   continue; // deduplicate by email
-            aSeen[aEm] = true;
-            aResults.push({
-              name:       aNm,
-              email:      aEm,
-              phone:      (aRow[aP] || '').toString(),
-              matric:     (aRow[aM] || '').toString(),
-              category:   (aRow[aC] || '').toString(),
-              supervisor: (aRow[aS] || '').toString(),
-              lab:        (aRow[aL] || '').toString().trim()
-            });
-          }
-
-          try { allCache.put(allCacheKey, JSON.stringify(aResults), 1800); } catch(e) {}
-        }
+        var aResults = _getIMenianDirectory();
 
         return aResults.filter(function(u) { return _fuzzyMatchName(sqQuery, u.name); }).slice(0, 12);
       }

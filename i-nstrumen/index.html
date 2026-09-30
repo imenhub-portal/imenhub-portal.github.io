@@ -483,6 +483,89 @@
             renderApp();
         }
 
+        // ── MEMBER VERIFICATION (one-time per device) ─────────────────────────
+        // Visitors can browse; booking / usage / member search need a member token
+        // from MemberVerify (No. Matrik / UKMPer registered in i-Menian). Stored on
+        // this device for ~60 days — students verify once, no login/logout.
+        const MEMBER_KEY = 'instrumen_member_v1';
+        const MEMBER_ACTIONS = ['Book', 'Usage', 'Report', 'CancelBooking', 'MarkNoShow', 'FindMyBookings',
+            'SearchIMenian', 'SearchAllLabsIMenian', 'GetIMenianPhoto', 'GetIMenianPhotoBatch', 'GetLabData'];
+        const MEMBER_MODES = ['Usage', 'Usage_Authenticated', 'Usage_WalkIn', 'Book', 'Report'];
+        function loadMember() {
+            try { const m = JSON.parse(localStorage.getItem(MEMBER_KEY)); if (m && m.token) return m; } catch (e) {}
+            return null;
+        }
+        state.member = loadMember();
+        function isMemberOk() { return !!(state.member || (state.adminAuthenticated && state.adminToken)); }
+        function clearMember() { state.member = null; try { localStorage.removeItem(MEMBER_KEY); } catch (e) {} }
+        function withMember(p) { return state.member ? Object.assign({}, p, { __memberToken: state.member.token }) : p; }
+
+        function openMemberVerify(callback) {
+            const overlay = getById('modal-overlay');
+            const content = getById('modal-content');
+            content.innerHTML = `
+                <div class="p-7">
+                    <div class="w-14 h-14 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-brand-600"><i class="ph-fill ph-identification-card text-3xl"></i></div>
+                    <h3 class="text-xl font-bold text-slate-800 text-center">Verify once to continue</h3>
+                    <p class="text-slate-500 text-sm mt-1 mb-4 text-center">Booking and equipment usage are for registered IMEN members. Enter your No. Matrik / UKMPer — you only need to do this once on this device.</p>
+                    <form onsubmit="submitMemberVerify(event)" class="space-y-3">
+                        <input id="member-id-input" required autocomplete="off" autocapitalize="characters" placeholder="e.g. P146080 or UKMPer"
+                            class="w-full p-3 border border-slate-200 rounded-xl text-center text-lg tracking-wider uppercase outline-none focus:ring-2 focus:ring-brand-500 text-slate-800">
+                        <div class="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3 leading-relaxed max-h-28 overflow-y-auto">
+                            <strong>Privacy notice (PDPA 2010).</strong> IMEN, UKM collects your name, email, phone number and No. Matrik/UKMPer to manage equipment bookings and usage records. Data is stored in IMEN's Google Sheet and is visible only to lab PICs and administrators, for lab operations. Smart Match AI questions are sent to external AI services — do not include personal data in them.
+                        </div>
+                        <label class="flex items-start gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="member-consent" class="mt-0.5"> <span>I have read the notice and agree to the collection and use of my data for lab operations.</span></label>
+                        <p id="member-err" class="hidden text-xs text-red-600 font-medium text-center"></p>
+                        <div class="flex gap-2 pt-1">
+                            <button type="button" onclick="closeModal()" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-medium text-sm">Cancel</button>
+                            <button type="submit" class="flex-1 py-2.5 bg-brand-900 text-white rounded-xl font-bold hover:bg-brand-800 text-sm">Verify</button>
+                        </div>
+                    </form>
+                </div>`;
+            window._memberCallback = callback;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                content.classList.remove('scale-95', 'opacity-0');
+                const i = getById('member-id-input'); if (i) i.focus();
+            }, 10);
+        }
+
+        function submitMemberVerify(e) {
+            e.preventDefault();
+            const id = getById('member-id-input').value.trim();
+            const consent = getById('member-consent').checked;
+            const err = getById('member-err');
+            const btn = e.target.querySelector('button[type="submit"]');
+            if (!consent) { err.textContent = 'Please tick the box to agree to the privacy notice.'; err.classList.remove('hidden'); return; }
+            setLoading(btn, true);
+            google.script.run
+                .withSuccessHandler(r => {
+                    setLoading(btn, false);
+                    if (r && r.success) {
+                        state.member = { token: r.token, name: r.name, savedAt: Date.now() };
+                        try { localStorage.setItem(MEMBER_KEY, JSON.stringify(state.member)); } catch (e2) {}
+                        closeModal();
+                        showToast('Verified — welcome, ' + r.name + '.', 'success');
+                        renderApp();
+                        const cb = window._memberCallback; window._memberCallback = null;
+                        if (cb) setTimeout(cb, 250);
+                    } else {
+                        err.textContent = (r && r.error) || 'Verification failed.';
+                        err.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(ex => { setLoading(btn, false); err.textContent = 'Network error: ' + ex.message; err.classList.remove('hidden'); })
+                .handleFrontendAction('MemberVerify', { id: id, consent: true });
+        }
+
+        // Name of the verified member pre-filled into the name search of booking/usage forms.
+        function _prefillMemberName() {
+            const i = document.getElementById('imenian-search-input');
+            if (i && !i.value && state.member) { i.value = state.member.name; imenianSearch(state.member.name, state.selectedLab || ''); }
+        }
+
         // DISPLAY-ONLY: pretty booking date, e.g. "Wed, 1 Jul 2026".
         // Parses the Y-M-D digits directly (no Date-string parsing → no timezone
         // shift) and never mutates the underlying b.date value that the
@@ -1723,6 +1806,7 @@
                                 <i class="ph-bold ph-user-circle"></i>
                                 ${labPic ? `PIC: <span class="font-semibold text-slate-500">${labPic.name}</span>` : `<span class="italic">No PIC assigned</span>`}
                             </p>
+                            ${!isMemberOk() ? `<button onclick="event.stopPropagation(); openMemberVerify()" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"><i class="ph-bold ph-eye"></i> View only — verify to book or log usage</button>` : ''}
                         </div>
                         <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                             ${searchBarHtml}
@@ -4717,6 +4801,16 @@
        
         // 2. STANDARD MODALS
         function openModal(identifier, mode) {
+            // Registered members only (visitors get the one-time verify prompt first).
+            if (MEMBER_MODES.includes(mode) && !isMemberOk()) {
+                openMemberVerify(() => openModal(identifier, mode));
+                return;
+            }
+            _openModalCore(identifier, mode);
+            if (MEMBER_MODES.includes(mode) && state.member) setTimeout(_prefillMemberName, 80);
+        }
+
+        function _openModalCore(identifier, mode) {
             const overlay = getById('modal-overlay');
             const content = getById('modal-content');
 
@@ -5451,9 +5545,14 @@
             // Attach the session token for actions the server requires it for —
             // the server independently validates this; it doesn't trust anything
             // else the client claims about who's logged in.
-            const finalPayload = ADMIN_GATED_ACTIONS.includes(actionType)
+            let finalPayload = ADMIN_GATED_ACTIONS.includes(actionType)
                 ? { ...payload, __adminToken: state.adminToken }
                 : payload;
+            if (MEMBER_ACTIONS.includes(actionType)) {
+                finalPayload = { ...finalPayload };
+                if (state.member) finalPayload.__memberToken = state.member.token;
+                if (state.adminToken) finalPayload.__adminToken = state.adminToken;
+            }
 
             console.log("Syncing to sheet:", actionType, finalPayload);
 
@@ -5462,6 +5561,14 @@
                     // Check if the backend actually succeeded
                     if (response && response.success === false) {
                         const msg = (response.error || '').toLowerCase();
+                        if (msg.includes('verification required')) {
+                            // Member token missing/expired — re-verify, then resync the screen.
+                            clearMember();
+                            showToast('Please verify your No. Matrik / UKMPer again.', 'error');
+                            initSystem();
+                            openMemberVerify();
+                            return;
+                        }
                         if (msg.includes('session') || msg.includes('log in') || msg.includes('not authorized')) {
                             // Session expired/invalid — soft logout instead of the
                             // generic reload, since nothing was actually corrupted.
@@ -6622,6 +6729,7 @@
         // --- NEW: VERIFICATION LOGIC (Robust) ---
         // --- CANCEL BOOKING ---
         function openCancelBooking(eqId) {
+            if (!isMemberOk()) { openMemberVerify(() => openCancelBooking(eqId)); return; }
             const overlay = getById('modal-overlay');
             const content = getById('modal-content');
 
@@ -6734,7 +6842,7 @@
                     searchBtn.disabled = false;
                     showToast('Search failed: ' + (err.message || 'Unknown error'), 'error');
                 })
-                .handleFrontendAction('FindMyBookings', { phone: phone });
+                .handleFrontendAction('FindMyBookings', withMember({ phone: phone }));
         }
 
         let _cancelTargetBookingId = null;
@@ -7375,7 +7483,7 @@
                     .withFailureHandler(() => {
                         if (dropdown) dropdown.innerHTML = `<div class="p-3 text-xs text-red-400">Search failed — try again.</div>`;
                     })
-                    .handleFrontendAction('SearchAllLabsIMenian', { query: q });
+                    .handleFrontendAction('SearchAllLabsIMenian', withMember({ query: q }));
             }, 300);
         }
 
@@ -7599,7 +7707,7 @@
                         }
                     })
                     .withFailureHandler(() => {}) // initials stay visible
-                    .handleFrontendAction('GetIMenianPhoto', { matric: user.matric, lab: lab });
+                    .handleFrontendAction('GetIMenianPhoto', withMember({ matric: user.matric, lab: lab }));
             }
         }
 
