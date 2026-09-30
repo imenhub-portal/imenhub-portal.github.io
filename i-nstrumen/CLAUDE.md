@@ -187,7 +187,7 @@ top 12 results) — never a bulk directory dump to the client.
   and the frontend `ADMIN_GATED_ACTIONS`). When ON: `saveBooking` rejects any
   Wednesday date (incl. day 2 of "2 Days"), `updateBooking` won't approve one,
   `saveLog` rejects new Usage on a Wednesday; frontend hides Start/Check-in +
-  shows "Closed on Wednesdays", `openModal`/`handleSubmit`/`checkDateConflict`
+  shows "Equipment use not permitted on Wednesdays" (the lab itself stays open — only equipment operation/bookings are blocked), `openModal`/`handleSubmit`/`checkDateConflict`
   guard too (Book button stays; Wednesday dates are rejected in the picker).
   Existing approved Wednesday bookings are left alone: `markNoShow`, the weekly
   no-show job and check-in reminder job skip blocked Wednesdays. Needs the usual

@@ -754,7 +754,7 @@ function getSystemData() {
 function saveLog(logObj) {
   if (logObj && logObj.action === 'Usage' && !logObj.sessionEnded &&
       _todayIsWednesday() && _isWednesdayBlockOn()) {
-    return { success: false, error: 'Equipment usage is not available on Wednesdays.' };
+    return { success: false, error: 'Equipment usage is not permitted on Wednesdays.' };
   }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.LOGS);
   // Auto-heal: ensure the userEmail header exists (col 16 / P). Added Jul 2026 —
@@ -890,7 +890,7 @@ function saveLog(logObj) {
 
 function saveBooking(bookingObj) {
   if (_isWednesdayBlockOn() && _bookingTouchesWednesday(bookingObj.date, bookingObj.duration)) {
-    return { success: false, error: 'Bookings are not available on Wednesdays.' };
+    return { success: false, error: 'Bookings are not permitted on Wednesdays.' };
   }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
   const existingBookings = getDataAsObjects(sheet);

@@ -472,13 +472,13 @@
             }
             return false;
         }
-        const WED_BLOCK_MSG = 'Closed on Wednesdays — bookings and equipment usage are unavailable.';
+        const WED_BLOCK_MSG = 'Equipment use is not permitted on Wednesdays (Hybrid Working Day). Bookings for Wednesdays are not accepted.';
 
         function toggleBlockWednesdays() {
             if (demoBlockWrite()) return;
             const next = !state.systemConfig.blockWednesdays;
             state.systemConfig.blockWednesdays = next;   // optimistic
-            showToast(next ? 'Wednesdays blocked.' : 'Wednesdays re-opened.', next ? 'info' : 'success');
+            showToast(next ? 'Equipment use blocked on Wednesdays.' : 'Equipment use re-opened on Wednesdays.', next ? 'info' : 'success');
             backgroundSync('SetBlockWednesdays', { value: next });
             renderApp();
         }
@@ -903,7 +903,7 @@
                                @media (prefers-reduced-motion: reduce) { .wfh-note { animation: none !important } }</style>
                         <div class="wfh-note mt-3 text-left rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 flex gap-3 items-start" style="animation: wfhPulse 2.4s ease-in-out infinite" role="status">
                             <span class="relative flex h-2.5 w-2.5 mt-1 shrink-0"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span></span>
-                            <p class="text-xs leading-relaxed text-amber-100"><strong class="font-semibold text-amber-50">All lab operations are closed every Wednesday.</strong><br><span class="text-amber-200/80">UKM Hybrid Working Day (Circular No. 20/2026).</span></p>
+                            <p class="text-xs leading-relaxed text-amber-100"><strong class="font-semibold text-amber-50">Equipment operation is not permitted every Wednesday.</strong><br><span class="text-amber-200/80">You may still visit the lab. UKM Hybrid Working Day (Circular No. 20/2026).</span></p>
                         </div>` : ''}
                     </div>
                 </div>
@@ -1391,7 +1391,7 @@
                         ` : ''}
 
                         ${wedClosedToday && !effectivelyDown ? `
-                        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 mb-3 text-amber-800 text-xs font-bold flex items-center gap-2"><i class="ph-fill ph-calendar-x"></i> Closed on Wednesdays</div>
+                        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 mb-3 text-amber-800 text-xs font-bold flex items-center gap-2"><i class="ph-fill ph-calendar-x"></i> Equipment use not permitted on Wednesdays</div>
                         ` : ''}
                         <div class="flex flex-wrap items-stretch gap-2 sm:gap-3 mt-auto">
                             ${showStart ? `
@@ -3490,11 +3490,11 @@
 
                         <!-- BLOCK WEDNESDAYS (feature-freeze window) -->
                         <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                            <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><i class="ph-bold ph-calendar-x text-amber-500"></i> Block All Wednesdays</h3>
-                            <p class="text-sm text-slate-600 mb-4">A safe window for shipping new features. When ON, every Wednesday all bookings and walk-in usage are disabled for every lab.</p>
+                            <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><i class="ph-bold ph-calendar-x text-amber-500"></i> Block Equipment Use on Wednesdays</h3>
+                            <p class="text-sm text-slate-600 mb-4">When ON, on every Wednesday bookings and equipment operation (including walk-in usage) are disabled in every lab. The lab itself stays open to visit.</p>
                             <div class="flex items-center justify-between p-4 rounded-xl border ${state.systemConfig.blockWednesdays ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}">
                                 <div>
-                                    <div class="text-sm font-bold ${state.systemConfig.blockWednesdays ? 'text-amber-800' : 'text-slate-700'}">${state.systemConfig.blockWednesdays ? 'Wednesdays are BLOCKED' : 'Wednesdays are open'}</div>
+                                    <div class="text-sm font-bold ${state.systemConfig.blockWednesdays ? 'text-amber-800' : 'text-slate-700'}">${state.systemConfig.blockWednesdays ? 'Equipment use is BLOCKED on Wednesdays' : 'Equipment use is open on Wednesdays'}</div>
                                     <div class="text-[11px] text-slate-500 mt-0.5">Existing approved Wednesday bookings are left untouched (no no-show marks or reminder emails).</div>
                                 </div>
                                 <button onclick="toggleBlockWednesdays()" role="switch" aria-checked="${state.systemConfig.blockWednesdays ? 'true' : 'false'}" aria-label="Block all Wednesdays"
@@ -4607,7 +4607,7 @@
                     title = 'Booked';
                 } else if (isBlockedWed(currentStr)) {
                     classes = 'disabled';
-                    title = 'Closed on Wednesdays';
+                    title = 'Equipment use not permitted on Wednesdays';
                 } else if (isRestricted) {
                     classes = 'disabled';
                     title = 'Unavailable (Advance notice required)';
