@@ -226,7 +226,6 @@
     <!-- JAVASCRIPT LOGIC -->
     <script>
         // --- CONSTANTS & CONFIG ---
-        const MAINTENANCE_PIN = "023775";
         
         // Initial Default Labs (Can be edited in state)
         const INITIAL_LAB_LIST = [
@@ -4772,31 +4771,30 @@
             }, 10);
         }
 
-        const ANALYTICS_CREDS = ['rhonira@ukm.edu.my', 'imenmakmal@gmail.com'];
-
+        // Maintenance / Analytics gate. The PIN and master emails are NOT in this file any
+        // more — they live only in the Apps Script Script Property MASTER_CREDS_JSON and are
+        // checked server-side (AdminLogin). Only a *master* credential passes here.
         function verifyPin(e) {
             e.preventDefault();
             const val = getById('pin-input').value.trim();
-            const valLower = val.toLowerCase();
-            const isValid = val === MAINTENANCE_PIN ||
-                (window._analyticsMode && ANALYTICS_CREDS.includes(valLower));
-
-            if (isValid) {
-                window._analyticsMode = false;
-                closeModal();
-                const done = () => { if (window.verifyCallback) window.verifyCallback(true); };
-                // The maintenance PIN / master emails are also master credentials: quietly
-                // obtain a real server session so admin writes from the Maintenance page
-                // (Archive, Block Wednesdays…) aren't rejected as "Session expired".
-                if (state.adminToken) { done(); return; }
-                google.script.run
-                    .withSuccessHandler(r => { if (r && r.success) state.adminToken = r.token; done(); })
-                    .withFailureHandler(() => done())
-                    .handleFrontendAction('AdminLogin', { credential: val });
-            } else {
-                showToast("Incorrect credential", "error");
-                getById('pin-input').value = "";
-            }
+            const btn = e.target.querySelector('button[type="submit"]');
+            if (!val) return;
+            if (btn) setLoading(btn, true);
+            google.script.run
+                .withSuccessHandler(r => {
+                    if (btn) setLoading(btn, false);
+                    if (r && r.success && r.role === 'master') {
+                        window._analyticsMode = false;
+                        state.adminToken = r.token;   // real server session for admin writes
+                        closeModal();
+                        if (window.verifyCallback) window.verifyCallback(true);
+                    } else {
+                        showToast("Incorrect credential", "error");
+                        getById('pin-input').value = "";
+                    }
+                })
+                .withFailureHandler(err => { if (btn) setLoading(btn, false); showToast('Network error: ' + err.message, 'error'); })
+                .handleFrontendAction('AdminLogin', { credential: val });
         }
        
         // 2. STANDARD MODALS
