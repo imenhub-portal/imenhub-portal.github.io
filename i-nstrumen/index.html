@@ -828,7 +828,194 @@
 
         // --- VIEWS ---
 
+        // Smart Match input on the home page → open the AI chat and send the text.
+        function homeSmartMatch(text) {
+            text = (text || '').trim();
+            setView('EquipmentFinder');
+            if (!text) return;
+            setTimeout(() => {
+                const input = document.getElementById('chat-input');
+                if (input) { input.value = text; sendChatMessage(); }
+            }, 60);
+        }
+
+        // NEW dark "Your lab, at a glance" landing page (live data). The previous
+        // layout is kept below as renderHomeClassic() for easy rollback.
         function renderHome() {
+            const now = new Date();
+            // Live equipment status (same in-use rule as the lab page)
+            const inUseIds = new Set();
+            (state.logs || []).forEach(l => {
+                if (l.action !== 'Usage' || l.sessionEnded) return;
+                if (now < getSessionEndTime(l.timestamp, l.duration)) inUseIds.add(l.equipmentId);
+            });
+            const rows = (state.equipment || []).map(eq => {
+                const st = isFullyDown(eq) ? 'maint' : inUseIds.has(eq.id) ? 'use' : 'avail';
+                return { eq, st };
+            });
+            const nAvail = rows.filter(r => r.st === 'avail').length;
+            const nUse   = rows.filter(r => r.st === 'use').length;
+            const nMaint = rows.filter(r => r.st === 'maint').length;
+            const total  = Math.max(rows.length, 1);
+            const pct = n => (n / total * 100).toFixed(1) + '%';
+            const order = { use: 0, maint: 1, avail: 2 };
+            const pulse = rows.slice().sort((a, b) => order[a.st] - order[b.st]).slice(0, 3);
+            const stLabel = { avail: ['Available', 'text-emerald-400'], use: ['In use', 'text-slate-300'], maint: ['Maintenance', 'text-amber-400'] };
+
+            // Lab insights: usage hours per day, last 5 days
+            const dayKey = d => localDayStr(d);
+            const days = [];
+            for (let i = 4; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate() - i); days.push(dayKey(d)); }
+            const perDay = Object.fromEntries(days.map(k => [k, 0]));
+            (state.logs || []).forEach(l => {
+                if (l.action !== 'Usage') return;
+                const k = dayKey(l.timestamp);
+                if (k in perDay) perDay[k] += _durationToHours(l.duration);
+            });
+            const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 6); weekStart.setHours(0, 0, 0, 0);
+            let weekHours = 0;
+            (state.logs || []).forEach(l => {
+                if (l.action !== 'Usage') return;
+                const t = new Date(l.timestamp);
+                if (!isNaN(t) && t >= weekStart && t <= now) weekHours += _durationToHours(l.duration);
+            });
+            const maxH = Math.max(...Object.values(perDay), 1);
+            const bars = days.map((k, i) => {
+                const h = Math.max(perDay[k] / maxH * 100, 8);
+                return `<div class="flex-1 rounded-md ${i === 4 ? 'bg-blue-500' : 'bg-slate-600/60'}" style="height:${h}%" title="${k}: ${perDay[k]}h"></div>`;
+            }).join('');
+
+            const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+            return `
+            <div class="fade-in relative z-10 rounded-[2rem] bg-[#0b1220] text-slate-100 p-5 sm:p-8 shadow-2xl ring-1 ring-white/5 min-h-[80vh] flex flex-col">
+
+                <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">A space for your next discovery</p>
+                        <h2 class="text-3xl sm:text-5xl font-bold tracking-tight text-white mt-3">i-Nstrumen</h2>
+                        <p class="text-sm text-slate-400 mt-2">Less time coordinating. More time creating.</p>
+                    </div>
+                    <div class="text-sm text-slate-300 sm:text-right">${dateStr}</div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+                    <!-- 01 / THE LAB -->
+                    <div onclick="setView('LabView')" class="lg:col-span-3 relative overflow-hidden rounded-3xl cursor-pointer group p-7 sm:p-9 bg-gradient-to-br from-blue-700 via-indigo-600 to-violet-500 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-900/40 min-h-[300px] flex flex-col justify-between">
+                        <style>
+                            @keyframes imenDraw  { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+                            @keyframes imenFade  { from { opacity: 0 } to { opacity: 1 } }
+                            @keyframes imenFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+                            @keyframes imenGlow  { 0%,100% { filter: drop-shadow(0 0 3px rgba(255,255,255,.35)) } 50% { filter: drop-shadow(0 0 10px rgba(255,255,255,.75)) } }
+                            @keyframes imenGrid  { 0%,100% { opacity:.22 } 50% { opacity:.5 } }
+                            .imen-logo { animation: imenFloat 7s ease-in-out infinite, imenGlow 4s ease-in-out infinite }
+                            .imen-logo .ln { fill: none; stroke: #fff; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: imenDraw 2.2s cubic-bezier(.65,0,.35,1) forwards }
+                            .imen-logo .gr { stroke: #fff; stroke-width: .6; opacity:.3; animation: imenFade 2s 1.6s backwards, imenGrid 5s 3.6s ease-in-out infinite }
+                            .imen-logo .tx { fill: none; stroke: #fff; stroke-width: .9; animation: imenFade 1.6s 1.4s backwards }
+                            @media (prefers-reduced-motion: reduce) { .imen-logo, .imen-logo * { animation: none !important } .imen-logo .ln { stroke-dashoffset: 0 } }
+                        </style>
+                        <div class="absolute right-3 sm:right-8 top-6 sm:top-1/2 sm:-translate-y-1/2 w-28 sm:w-44 pointer-events-none"><svg class="imen-logo w-full h-auto" viewBox="-14 -6 240 312" role="img" aria-label="IMEN — Institute of Microengineering and Nanoelectronics">
+                            <defs><clipPath id="imenWafer"><circle cx="100" cy="112" r="78"/></clipPath>
+                                <path id="imenArcTxt" d="M 7.9 145.5 A 98 98 0 0 1 149 27"/></defs>
+                            <!-- wafer grid -->
+                            <g clip-path="url(#imenWafer)">
+                                ${[42,62,82,102,122,142,162].map(x => `<line class="gr" x1="${x}" y1="30" x2="${x}" y2="196"/>`).join('')}
+                                ${[50,70,90,110,130,150,170].map(y => `<line class="gr" x1="16" y1="${y}" x2="184" y2="${y}"/>`).join('')}
+                            </g>
+                            <circle class="ln" pathLength="1" cx="100" cy="112" r="78" stroke-width="1.6"/>
+                            <!-- globe swoosh -->
+                            <path class="ln" pathLength="1" d="M 181 66 A 92 92 0 0 1 40 182" stroke-width="3" style="animation-delay:.5s"/>
+                            <!-- arc caption -->
+                            <text class="tx" font-size="7.4" font-weight="600" letter-spacing="1.1" font-family="Inter,system-ui,sans-serif"><textPath href="#imenArcTxt" startOffset="1%">INST. OF MICROENGINEERING &amp; NANOELECTRONICS</textPath></text>
+                            <!-- shield -->
+                            <path class="ln" pathLength="1" d="M 150 14 H 198 V 52 Q 198 68 174 80 Q 150 68 150 52 Z" stroke-width="1.5" style="animation-delay:.9s"/>
+                            <path class="ln" pathLength="1" d="M 150 34 H 198 M 174 34 V 56 M 150 52 L 174 80 M 198 52 L 174 80 M 148 9 Q 174 2 200 9" stroke-width="1" style="animation-delay:1.3s"/>
+                            <circle class="ln" pathLength="1" cx="162" cy="43" r="4.5" stroke-width="1" style="animation-delay:1.6s"/>
+                            <circle class="ln" pathLength="1" cx="186" cy="43" r="4.5" stroke-width="1" style="animation-delay:1.7s"/>
+                            <!-- mu-n -->
+                            <text x="66" y="150" font-size="76" font-style="italic" font-weight="700" font-family="Inter,system-ui,sans-serif" class="tx" style="stroke:#fde047;stroke-width:1.4">μ</text>
+                            <text x="118" y="112" font-size="34" font-style="italic" font-weight="700" font-family="Inter,system-ui,sans-serif" class="tx" style="stroke:#fde047;stroke-width:1.2">n</text>
+                            <!-- rails -->
+                            <path class="ln" pathLength="1" d="M 6 214 H 194" stroke-width="3.4" style="animation-delay:1s"/>
+                            <path class="ln" pathLength="1" d="M 26 226 H 174" stroke-width="3.4" style="animation-delay:1.2s"/>
+                            <path class="ln" pathLength="1" d="M 50 238 H 150" stroke-width="3.4" style="animation-delay:1.4s"/>
+                            <!-- wordmark -->
+                            <text class="tx" x="100" y="290" text-anchor="middle" font-size="52" font-weight="800" letter-spacing="1" font-family="Inter,system-ui,sans-serif" style="stroke-width:1.5">imen</text>
+                        </svg></div>
+                        <div class="relative">
+                            <p class="text-[10px] font-bold uppercase tracking-[0.25em] text-white/70">01 / The Lab</p>
+                            <h3 class="text-3xl sm:text-4xl font-bold tracking-tight text-white mt-4 leading-tight">Big ideas.<br>Extraordinary<br>instruments.</h3>
+                        </div>
+                        <div class="relative mt-6">
+                            <p class="text-sm text-white/80 max-w-xs mb-5">Your next breakthrough starts with the right tools. Find yours here.</p>
+                            <div class="flex flex-wrap gap-3">
+                                <span class="px-5 py-2.5 rounded-xl bg-white text-blue-700 text-sm font-semibold flex items-center gap-2">Explore instruments <i class="ph-bold ph-arrow-up-right"></i></span>
+                                <button onclick="event.stopPropagation(); openCancelBooking(null)" class="px-5 py-2.5 rounded-xl bg-white/15 border border-white/25 text-white text-sm font-semibold hover:bg-white/25 transition">My bookings</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lab pulse → Live Status -->
+                    <div onclick="setView('Monitoring')" class="lg:col-span-2 rounded-3xl cursor-pointer p-6 bg-[#131c2e] border border-white/10 transition hover:-translate-y-0.5 hover:border-white/20 flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-white">Lab pulse</h3>
+                            <span class="flex items-center gap-1.5 text-xs text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Live status</span>
+                        </div>
+                        <div class="flex gap-6 mt-5">
+                            <div><div class="text-3xl font-semibold text-white tabular-nums">${nAvail}</div><div class="text-xs text-slate-400">Available</div></div>
+                            <div><div class="text-3xl font-semibold text-white tabular-nums">${String(nUse).padStart(2, '0')}</div><div class="text-xs text-slate-400">In use</div></div>
+                            <div><div class="text-3xl font-semibold text-white tabular-nums">${String(nMaint).padStart(2, '0')}</div><div class="text-xs text-slate-400">Maintenance</div></div>
+                        </div>
+                        <div class="flex gap-1 mt-4 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-emerald-500" style="width:${pct(nAvail)}"></div>
+                            <div class="bg-indigo-400" style="width:${pct(nUse)}"></div>
+                            <div class="bg-amber-400" style="width:${pct(nMaint)}"></div>
+                        </div>
+                        <div class="mt-4 divide-y divide-white/10 border-t border-white/10 text-sm flex-1">
+                            ${pulse.map(p => `<div class="flex items-center justify-between py-2.5 gap-3"><span class="text-slate-200 truncate">${p.eq.name}</span><span class="text-xs shrink-0 ${stLabel[p.st][1]}">${stLabel[p.st][0]}</span></div>`).join('')}
+                        </div>
+                        <div class="mt-3 text-sm text-blue-400 flex items-center gap-1.5">View all instruments <i class="ph-bold ph-arrow-right"></i></div>
+                    </div>
+
+                    <!-- Smart Match -->
+                    <div class="lg:col-span-2 rounded-3xl p-6 bg-gradient-to-br from-[#2a2247] to-[#221b3c] border border-violet-400/20">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-violet-300 flex items-center gap-2"><i class="ph-duotone ph-sparkle"></i> Smart Match</h3>
+                            <span class="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">AI assistant</span>
+                        </div>
+                        <p class="text-sm text-slate-300 mt-4 leading-relaxed">A research goal in mind?<br>Let's find the right instrument.</p>
+                        <form onsubmit="event.preventDefault(); homeSmartMatch(this.q.value)" class="mt-4 flex items-center gap-2 bg-[#141a2b] border border-white/10 rounded-xl p-1.5 pl-3">
+                            <input name="q" autocomplete="off" placeholder="What would you like to explore?" class="flex-1 min-w-0 bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none">
+                            <button type="submit" aria-label="Ask Smart Match" class="w-9 h-9 rounded-lg bg-violet-500 hover:bg-violet-400 text-white flex items-center justify-center transition"><i class="ph-bold ph-arrow-up"></i></button>
+                        </form>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            ${['Surface imaging', 'Thin films', 'Material analysis'].map(c => `<button onclick="homeSmartMatch('${c}')" class="px-3 py-1 rounded-lg border border-white/15 text-xs text-slate-300 hover:bg-white/10 transition">${c}</button>`).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Lab insights → Analytics (credential gated as before) -->
+                    <div onclick="checkAnalyticsAccess()" class="lg:col-span-2 rounded-3xl cursor-pointer p-6 bg-[#131c2e] border border-white/10 transition hover:-translate-y-0.5 hover:border-white/20 flex flex-col">
+                        <div class="flex items-center justify-between"><h3 class="text-base font-semibold text-white">Lab insights</h3><i class="ph-bold ph-lock-key text-slate-500 text-sm"></i></div>
+                        <div class="mt-4 flex items-baseline gap-2"><span class="text-4xl font-semibold text-white tabular-nums">${weekHours}</span><span class="text-xs text-slate-400">hours this week</span></div>
+                        <div class="flex items-end gap-2 h-16 mt-4">${bars}</div>
+                        <div class="mt-auto pt-4 text-sm text-blue-400 flex items-center gap-1.5">Explore analytics <i class="ph-bold ph-arrow-up-right"></i></div>
+                    </div>
+
+                    <!-- Control centre → Admin (credential gated as before) -->
+                    <div onclick="setView('Admin')" class="lg:col-span-1 rounded-3xl cursor-pointer p-6 bg-[#131c2e] border border-white/10 transition hover:-translate-y-0.5 hover:border-white/20 flex flex-col">
+                        <div class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-300"><i class="ph-bold ph-sliders-horizontal"></i></div>
+                        <h3 class="text-base font-semibold text-white mt-4">Control centre</h3>
+                        <p class="text-xs text-slate-400 mt-2 leading-relaxed">Keep your lab running smoothly. Manage access and operations.</p>
+                        <div class="mt-auto pt-4 text-sm text-blue-400 flex items-center gap-1.5">Open controls <i class="ph-bold ph-arrow-up-right"></i></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-8 text-xs text-slate-500">IMEN Lab Manager &bull; v2.0</div>
+            </div>`;
+        }
+
+        function renderHomeClassic() {
             return `
             <div class="fade-in relative z-10 p-4 sm:p-6 min-h-[80vh] flex flex-col">
                 <div class="absolute inset-0 bg-grid-pattern opacity-[0.3] pointer-events-none -z-10"></div>
