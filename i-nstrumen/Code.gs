@@ -2078,7 +2078,14 @@ function saveEquipment(eqObj) {
   for(let i=1; i<data.length; i++) { if(data[i][0] == eqObj.id) { rowIdx = i + 1; break; } }
   const procStr = typeof eqObj.processCapabilities === 'object' ? JSON.stringify(eqObj.processCapabilities) : eqObj.processCapabilities;
   const matStr = typeof eqObj.materialsOptions === 'object' ? JSON.stringify(eqObj.materialsOptions) : eqObj.materialsOptions;
-  const rowData = [ eqObj.id, eqObj.assetId, eqObj.name, eqObj.lab, eqObj.description, eqObj.imageUrl, eqObj.status, eqObj.maintenanceReason, eqObj.accessMode, eqObj.trackingUnit, eqObj.calibrationDate, eqObj.picEmail, procStr, matStr ];
+  // Auto-heal: rate columns (15-17 / O,P,Q). Added Oct 2026 — per-instrument usage rates
+  // (RM per tracking unit) for UKM users and others; blank = not set.
+  if (sheet.getRange(1, 15).getValue() === '') sheet.getRange(1, 15).setValue('rateUKM');
+  if (sheet.getRange(1, 16).getValue() === '') sheet.getRange(1, 16).setValue('rateOthers');
+  if (sheet.getRange(1, 17).getValue() === '') sheet.getRange(1, 17).setValue('rateNote');
+  const _rate = v => { const n = parseFloat(v); return (isNaN(n) || n < 0) ? '' : n; };
+  const rowData = [ eqObj.id, eqObj.assetId, eqObj.name, eqObj.lab, eqObj.description, eqObj.imageUrl, eqObj.status, eqObj.maintenanceReason, eqObj.accessMode, eqObj.trackingUnit, eqObj.calibrationDate, eqObj.picEmail, procStr, matStr,
+                    _rate(eqObj.rateUKM), _rate(eqObj.rateOthers), String(eqObj.rateNote || '').slice(0, 200) ];
   if (rowIdx > -1) { sheet.getRange(rowIdx, 1, 1, rowData.length).setValues([rowData]); } else { sheet.appendRow(rowData); }
   return { success: true };
 }

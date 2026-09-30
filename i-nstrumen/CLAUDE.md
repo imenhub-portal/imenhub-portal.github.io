@@ -181,6 +181,13 @@ top 12 results) — never a bulk directory dump to the client.
 
 ## Recent major changes (most recent session first)
 
+- **Equipment rates (UKM vs Others)** — three new Equipment-sheet columns `rateUKM`,
+  `rateOthers` (RM per the equipment's tracking unit) and `rateNote` (cols 15-17 / O-Q,
+  headers auto-created by `saveEquipment()`; blank = not set). Public: lab-page cards show
+  a "Rates" button (only when a rate exists) opening `openRates()`; editable in the Add
+  and Edit Equipment forms; included in the equipment CSV export. Unit label is derived
+  from `trackingUnit` (`_rateUnit`).
+
 - **One-time member verification (visitor = view-only)** — booking, usage, report,
   cancel, find-my-bookings and i-Menian member search now need a *member token*
   (`MEMBER_ACTIONS` in `Code.gs`, gated in `handleFrontendAction`). A student/staff
