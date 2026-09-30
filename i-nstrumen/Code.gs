@@ -405,6 +405,15 @@ function _findGuest(id) {
   return null;
 }
 
+// Optional: run once from the Apps Script editor (select setupGuestSheets → Run) to create the
+// "Guests" and "Consents" tabs immediately instead of on first use.
+function setupGuestSheets() {
+  _guestSheet();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss.getSheetByName('Consents')) ss.insertSheet('Consents').appendRow(['timestamp', 'idHash', 'noticeVersion']);
+  Logger.log('Guests and Consents tabs are ready.');
+}
+
 // Public. Creates a Pending guest (or reports the existing status).
 function guestRegister(payload) {
   const id = _normId(payload && payload.id);
