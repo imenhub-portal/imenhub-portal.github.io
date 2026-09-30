@@ -25,7 +25,7 @@ const SHEET_IDS = {
 //
 // ⚠️ ONE-TIME SETUP required after deploying this file: in the Apps Script
 // editor, add a Script Property named MASTER_CREDS_JSON with a value like:
-//   {"023775":"Dr Ahmad Razif","imenmakmal@gmail.com":"Master Admin","rhonira@ukm.edu.my":"Dr Rhonira"}
+//   {"<pin>":"<display name>","<master-email>":"<display name>"}
 // Until that property is set, master login will not match anything (fails
 // closed, not open — PIC/coordinator-email login is unaffected either way).
 function getMasterCreds() {
