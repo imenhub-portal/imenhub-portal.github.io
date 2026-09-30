@@ -2329,15 +2329,10 @@ function viewLoans(embed) {
 // ══════════════════════════════════════════════════════════════════════
 //  VIEW — STOK
 // ══════════════════════════════════════════════════════════════════════
+var STOCK_FILTER = { q: '' };
+
 function viewStock(embed) {
-  var cons = (D.items || []).filter(function (i) {
-    return i.item_type === 'consumable' && i.status !== 'decommissioned' && i.status !== 'disposed';
-  }).sort(function (a, b) {
-    // Most urgent first: lowest ratio of stock to its reorder point.
-    var ra = (a.min_stock_alert || 1) ? a.quantity_available / (a.min_stock_alert || 1) : 99;
-    var rb = (b.min_stock_alert || 1) ? b.quantity_available / (b.min_stock_alert || 1) : 99;
-    return ra - rb;
-  });
+  var cons = stockItems();
 
   var low = cons.filter(function (i) { return Number(i.quantity_available) <= Number(i.min_stock_alert || 0); });
   var units = cons.reduce(function (s, i) { return s + Number(i.quantity_available || 0); }, 0);
@@ -2356,7 +2351,47 @@ function viewStock(embed) {
     return h + '<div class="card"><div class="empty">' + icon('i-layers', 30) + '<p>Tiada bahan guna habis didaftarkan.</p></div></div>';
   }
 
-  h += '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+  // KPIs above count everything; only the table below is narrowed by the
+  // search, so topping up one item does not mean scrolling the whole list.
+  h += '<div class="card"><div class="filters">' +
+    '<input id="sq" placeholder="Cari nama, tag, lokasi…" value="' + esc(STOCK_FILTER.q) + '" oninput="STOCK_FILTER.q=this.value;renderStockOnly()">' +
+    (STOCK_FILTER.q ? '<button class="btn btn-sm btn-ghost" onclick="STOCK_FILTER.q=\'\';render()">' + icon('i-x', 13) + ' Reset</button>' : '') +
+    '</div><div id="stockHost">' + stockTable(filteredStock(cons)) + '</div></div>';
+  return h;
+}
+
+function stockItems() {
+  return (D.items || []).filter(function (i) {
+    return i.item_type === 'consumable' && i.status !== 'decommissioned' && i.status !== 'disposed';
+  }).sort(function (a, b) {
+    // Most urgent first: lowest ratio of stock to its reorder point.
+    var ra = (a.min_stock_alert || 1) ? a.quantity_available / (a.min_stock_alert || 1) : 99;
+    var rb = (b.min_stock_alert || 1) ? b.quantity_available / (b.min_stock_alert || 1) : 99;
+    return ra - rb;
+  });
+}
+
+function filteredStock(cons) {
+  var q = STOCK_FILTER.q.trim().toLowerCase();
+  if (!q) return cons;
+  return cons.filter(function (i) {
+    return [i.name, i.asset_tag, locName(i.location_id), i.notes]
+      .join(' ').toLowerCase().indexOf(q) !== -1;
+  });
+}
+
+// Same trick as renderTableOnly: rebuild just the table so the search box
+// keeps focus while typing.
+function renderStockOnly() {
+  var host = $('stockHost');
+  if (host) host.innerHTML = stockTable(filteredStock(stockItems()));
+}
+
+function stockTable(cons) {
+  if (!cons.length) {
+    return '<div class="empty">' + icon('i-search', 30) + '<p>Tiada item sepadan. Cuba longgarkan carian.</p></div>';
+  }
+  var h = '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
     '<th>Tag</th><th>Item</th><th>Lokasi</th><th class="t-num">Baki</th><th class="t-num">Minimum</th>' +
     '<th style="width:130px">Paras</th><th style="width:170px"></th></tr></thead><tbody>';
 
@@ -2381,7 +2416,7 @@ function viewStock(embed) {
       '</tr>';
   }).join('');
 
-  return h + '</tbody></table></div></div>';
+  return h + '</tbody></table></div>';
 }
 
 // ══════════════════════════════════════════════════════════════════════
