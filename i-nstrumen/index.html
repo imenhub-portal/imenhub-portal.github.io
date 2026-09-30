@@ -4596,6 +4596,9 @@
                 if (isBooked) {
                     classes = 'booked';
                     title = 'Booked';
+                } else if (isBlockedWed(currentStr)) {
+                    classes = 'disabled';
+                    title = 'Closed on Wednesdays';
                 } else if (isRestricted) {
                     classes = 'disabled';
                     title = 'Unavailable (Advance notice required)';
@@ -4688,7 +4691,15 @@
             if (isValid) {
                 window._analyticsMode = false;
                 closeModal();
-                if (window.verifyCallback) window.verifyCallback(true);
+                const done = () => { if (window.verifyCallback) window.verifyCallback(true); };
+                // The maintenance PIN / master emails are also master credentials: quietly
+                // obtain a real server session so admin writes from the Maintenance page
+                // (Archive, Block Wednesdays…) aren't rejected as "Session expired".
+                if (state.adminToken) { done(); return; }
+                google.script.run
+                    .withSuccessHandler(r => { if (r && r.success) state.adminToken = r.token; done(); })
+                    .withFailureHandler(() => done())
+                    .handleFrontendAction('AdminLogin', { credential: val });
             } else {
                 showToast("Incorrect credential", "error");
                 getById('pin-input').value = "";
