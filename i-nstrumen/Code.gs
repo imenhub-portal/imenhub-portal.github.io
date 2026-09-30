@@ -45,7 +45,7 @@ const ADMIN_TOKEN_PREFIX = 'admintok_';
 // today's actual behavior — no per-lab restriction on these in the UI).
 const ADMIN_ONLY_ACTIONS = [
   'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
-  'EditCoordinator', 'EditTechStaff', 'Archive', 'ResolveMaintenance'
+  'EditCoordinator', 'EditTechStaff', 'Archive', 'ResolveMaintenance', 'SetBlockWednesdays'
 ];
 // Actions that require a valid session AND (Master OR the booking's own lab)
 // — matches the existing UI intent (pending-approvals list is already
@@ -244,7 +244,7 @@ const SYSDATA_MUTATING_ACTIONS = [
   'Usage', 'Book', 'UpdateBooking', 'Report', 'CancelBooking', 'MarkNoShow',
   'EditEquipment', 'DeleteEquipment',
   'EditLab', 'AddLab', 'DeleteLab',
-  'EditCoordinator', 'EditTechStaff', 'Archive'
+  'EditCoordinator', 'EditTechStaff', 'Archive', 'SetBlockWednesdays'
 ];
 
 function getInitialData() {
@@ -353,6 +353,7 @@ function handleFrontendAction(actionType, payload) {
       case 'EditTechStaff':
         return saveConfig({ techStaff: payload.allTechStaff });
       case 'Archive': return archiveSystem();
+      case 'SetBlockWednesdays': return setBlockWednesdays(payload);
       case 'ResolveMaintenance': return resolveMaintenance(payload, true);
       case 'CancelBooking': return cancelBooking(payload);
       case 'FindMyBookings': return findMyBookings(payload);
@@ -721,10 +722,11 @@ function getSystemData() {
   let techStaff = [];
   try { techStaff = JSON.parse(techStaffJson); } catch (e) { techStaff = []; }
 
-  const systemConfig = { officialEmail: 'imenmakmal@imen.ukm.edu.my', coordinators: coordinators };
+  const systemConfig = { officialEmail: 'imenmakmal@imen.ukm.edu.my', coordinators: coordinators, blockWednesdays: false };
   let lastArchive = null;
 
   for (let r = 1; r < cfgValues.length; r++) { // E2:F settings rows
+    if (cfgValues[r][4] === 'blockWednesdays') systemConfig.blockWednesdays = _settingIsTrue(cfgValues[r][5]);
     if (cfgValues[r][4] === 'officialEmail' && cfgValues[r][5]) systemConfig.officialEmail = cfgValues[r][5];
     if (cfgValues[r][4] === 'lastArchive' && cfgValues[r][5]) lastArchive = cfgValues[r][5];
   }
@@ -750,6 +752,10 @@ function getSystemData() {
 // ==========================================
 
 function saveLog(logObj) {
+  if (logObj && logObj.action === 'Usage' && !logObj.sessionEnded &&
+      _todayIsWednesday() && _isWednesdayBlockOn()) {
+    return { success: false, error: 'Equipment usage is not available on Wednesdays.' };
+  }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.LOGS);
   // Auto-heal: ensure the userEmail header exists (col 16 / P). Added Jul 2026 —
   // the frontend always sent userEmail but it was never persisted, which weakened
@@ -883,6 +889,9 @@ function saveLog(logObj) {
 }
 
 function saveBooking(bookingObj) {
+  if (_isWednesdayBlockOn() && _bookingTouchesWednesday(bookingObj.date, bookingObj.duration)) {
+    return { success: false, error: 'Bookings are not available on Wednesdays.' };
+  }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
   const existingBookings = getDataAsObjects(sheet);
   
@@ -1021,7 +1030,10 @@ function updateBooking(idOrObj, status) {
   if (newStatus === 'Approved') {
       const allBookings = getDataAsObjects(sheet);
       const targetBooking = allBookings.find(b => String(b.id).trim() === searchId);
-      
+      if (targetBooking && _isWednesdayBlockOn() && _bookingTouchesWednesday(targetBooking.date, targetBooking.duration)) {
+          return { success: false, error: "Approval Failed: Wednesdays are currently blocked." };
+      }
+
       if (targetBooking) {
            const reqStart = new Date(targetBooking.date); reqStart.setHours(0,0,0,0);
            const reqEnd = new Date(reqStart); reqEnd.setHours(0,0,0,0);
@@ -1135,6 +1147,11 @@ function markNoShow(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.BOOKINGS);
   const booking = getDataAsObjects(sheet).find(b => String(b.id).trim() === String(id).trim());
   if (!booking) return { success: false, error: 'Booking not found.' };
+
+  // Blocked Wednesday: nobody could have checked in, so never mark a no-show.
+  if (_isWednesdayBlockOn() && _bookingTouchesWednesday(booking.date, booking.duration)) {
+    return { success: false, error: 'Wednesday is blocked; no-show not applicable.' };
+  }
 
   if (!_isBookingWindowExpired(booking)) {
     return { success: false, error: 'Booking window has not expired yet.' };
@@ -1974,6 +1991,64 @@ function archiveSystem() {
   return { success: true };
 }
 
+// --- CONFIG KEY/VALUE SETTINGS (Config sheet, E2:F) ---
+function _getSetting(key) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.CONFIG);
+  const data = sheet.getRange("E2:F").getValues();
+  for (let i = 0; i < data.length; i++) { if (data[i][0] === key) return data[i][1]; }
+  return null;
+}
+
+function _upsertSetting(key, val) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IDS.CONFIG);
+  const data = sheet.getRange("E2:F").getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][0] === key) { sheet.getRange(i + 2, 6).setValue(val); return; }
+  }
+  let rowToUpdate = data.length + 2;
+  for (let i = 0; i < data.length; i++) { if (!data[i][0]) { rowToUpdate = i + 2; break; } }
+  sheet.getRange(rowToUpdate, 5).setValue(key);
+  sheet.getRange(rowToUpdate, 6).setValue(val);
+}
+
+function _settingIsTrue(v) { return v === true || String(v).toLowerCase() === 'true'; }
+
+// ── "Block all Wednesdays" (admin toggle) ──────────────────────────────────
+// Feature-freeze window: when ON, no booking or walk-in usage on any Wednesday.
+function setBlockWednesdays(payload) {
+  const on = _settingIsTrue(payload && payload.value);
+  _upsertSetting('blockWednesdays', on ? 'true' : 'false');
+  return { success: true, blockWednesdays: on };
+}
+
+function _isWednesdayBlockOn() { return _settingIsTrue(_getSetting('blockWednesdays')); }
+
+// 'YYYY-MM-DD' (optionally with T…) → true if that calendar day is a Wednesday.
+// Parsed as UTC y/m/d so no timezone shift can move the weekday.
+function _ymdIsWednesday(ymd) {
+  const p = String(ymd || '').split('T')[0].split('-').map(Number);
+  if (p.length < 3 || !p[0]) return false;
+  return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay() === 3;
+}
+
+function _todayIsWednesday() {
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+  return Utilities.formatDate(new Date(), tz, 'u') === '3';
+}
+
+// True if the booking's date (or the 2nd day of a "2 Days" booking) is a Wednesday.
+function _bookingTouchesWednesday(dateStr, duration) {
+  if (_ymdIsWednesday(dateStr)) return true;
+  if (duration === '2 Days') {
+    const p = String(dateStr || '').split('T')[0].split('-').map(Number);
+    if (p.length >= 3 && p[0]) {
+      const next = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 1));
+      return next.getUTCDay() === 3;
+    }
+  }
+  return false;
+}
+
 // --- EMAIL HELPERS ---
 
 function getCoordinatorEmail(labName) {
@@ -2068,8 +2143,11 @@ function _getWeeklyNoShows() {
   const today   = new Date(); today.setHours(0, 0, 0, 0);
   const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
 
+  const wedBlocked = _isWednesdayBlockOn();
   const pastBookings = allBookings.filter(function(b) {
     if ((b.status || '').toString().trim() !== 'Approved') return false;
+    // Wednesday block on → nobody could check in, so never a "no-show".
+    if (wedBlocked && _bookingTouchesWednesday(b.date, b.duration)) return false;
     // NOTE: bookings without a userEmail are kept — they can't get a student
     // reminder (grouping skips them) but MUST still appear in PIC summaries.
     const bDate = new Date(b.date); bDate.setHours(0, 0, 0, 0);
@@ -2462,6 +2540,11 @@ function _getPendingCheckInReminders(slotSet) {
   function norm(s) { return (s || '').toString().trim().toLowerCase(); }
 
   const todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+  // Blocked Wednesday: no check-ins possible today, so send no reminders.
+  if (_ymdIsWednesday(todayStr) && _isWednesdayBlockOn()) {
+    return { candidates: [], todayStr: todayStr, tz: tz };
+  }
 
   const bookings = getDataAsObjects(bookSheet);
   const logs     = getDataAsObjects(logSheet);

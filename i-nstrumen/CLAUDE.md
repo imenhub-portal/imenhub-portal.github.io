@@ -181,6 +181,18 @@ top 12 results) — never a bulk directory dump to the client.
 
 ## Recent major changes (most recent session first)
 
+- **"Block All Wednesdays" admin toggle** (feature-freeze window) — Maintenance
+  admin page card; Config key `blockWednesdays` (E2:F), written by the
+  `SetBlockWednesdays` action (in `ADMIN_ONLY_ACTIONS`, `SYSDATA_MUTATING_ACTIONS`
+  and the frontend `ADMIN_GATED_ACTIONS`). When ON: `saveBooking` rejects any
+  Wednesday date (incl. day 2 of "2 Days"), `updateBooking` won't approve one,
+  `saveLog` rejects new Usage on a Wednesday; frontend hides Start/Check-in +
+  shows "Closed on Wednesdays", `openModal`/`handleSubmit`/`checkDateConflict`
+  guard too (Book button stays; Wednesday dates are rejected in the picker).
+  Existing approved Wednesday bookings are left alone: `markNoShow`, the weekly
+  no-show job and check-in reminder job skip blocked Wednesdays. Needs the usual
+  manual Code.gs redeploy.
+
 - **Added "Volume (ml)" tracking unit + fixed historical unit-mixing bug** —
   `trackingUnit` (per-equipment dropdown: Hour / Quantity (pcs) / Weight (mg) /
   Weight (g), now also Volume (ml)) used to be a purely *live* display label —

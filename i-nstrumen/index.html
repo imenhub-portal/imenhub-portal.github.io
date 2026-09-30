@@ -452,6 +452,37 @@
             return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
         }
 
+        // ── "Block all Wednesdays" (admin toggle, Config key blockWednesdays) ──
+        // True when the toggle is ON and the given YYYY-MM-DD (or Date) is a Wednesday.
+        // Digits are parsed directly (UTC) so no timezone shift can move the weekday.
+        function isBlockedWed(v) {
+            if (!state.systemConfig || !state.systemConfig.blockWednesdays) return false;
+            const s = (v instanceof Date) ? localDayStr(v) : String(v || '').split('T')[0];
+            const [y, m, d] = s.split('-').map(Number);
+            if (!y) return false;
+            return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 3;
+        }
+        function isTodayBlockedWed() { return isBlockedWed(new Date()); }
+        // Booking touches a blocked Wednesday (its date, or day 2 of a "2 Days" booking).
+        function bookingHitsBlockedWed(dateStr, duration) {
+            if (isBlockedWed(dateStr)) return true;
+            if (duration === '2 Days') {
+                const [y, m, d] = String(dateStr || '').split('T')[0].split('-').map(Number);
+                if (y) return isBlockedWed(localDayStr(new Date(y, m - 1, d + 1)));
+            }
+            return false;
+        }
+        const WED_BLOCK_MSG = 'Closed on Wednesdays — bookings and equipment usage are unavailable.';
+
+        function toggleBlockWednesdays() {
+            if (demoBlockWrite()) return;
+            const next = !state.systemConfig.blockWednesdays;
+            state.systemConfig.blockWednesdays = next;   // optimistic
+            showToast(next ? 'Wednesdays blocked.' : 'Wednesdays re-opened.', next ? 'info' : 'success');
+            backgroundSync('SetBlockWednesdays', { value: next });
+            renderApp();
+        }
+
         // DISPLAY-ONLY: pretty booking date, e.g. "Wed, 1 Jul 2026".
         // Parses the Y-M-D digits directly (no Date-string parsing → no timezone
         // shift) and never mutates the underlying b.date value that the
@@ -1096,7 +1127,10 @@
                 
                 const mode = eq.accessMode || 'both';
                 const effectivelyDown = isMaintenance || isFullyDown(eq);
-                const showStart = !effectivelyDown && !isInUse;
+                // "Block all Wednesdays": usage/check-in is closed today. Book stays
+                // visible (other dates are fine) — Wednesday dates are rejected in the picker.
+                const wedClosedToday = isTodayBlockedWed();
+                const showStart = !effectivelyDown && !isInUse && !wedClosedToday;
                 const showBook = !effectivelyDown && (mode === 'booking' || mode === 'both');
                 // Walk-in-only equipment never generates a booking record (usage
                 // starts immediately), so there's nothing to cancel — independent
@@ -1160,6 +1194,9 @@
                             </div>
                         ` : ''}
 
+                        ${wedClosedToday && !effectivelyDown ? `
+                        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 mb-3 text-amber-800 text-xs font-bold flex items-center gap-2"><i class="ph-fill ph-calendar-x"></i> Closed on Wednesdays</div>
+                        ` : ''}
                         <div class="flex flex-wrap items-stretch gap-2 sm:gap-3 mt-auto">
                             ${showStart ? `
                             <button onclick="openModal('${eq.id}', 'Usage')" class="grow basis-0 min-w-0 py-2 sm:py-3 px-2.5 sm:px-4 xl:px-2 rounded-lg sm:rounded-xl bg-blue-600 text-white font-semibold text-xs sm:text-sm xl:text-xs whitespace-nowrap hover:bg-blue-700 transition shadow-lg shadow-blue-200/50 active:scale-95 flex items-center justify-center gap-1.5">
@@ -3255,6 +3292,22 @@
                             </button>
                         </div>
 
+                        <!-- BLOCK WEDNESDAYS (feature-freeze window) -->
+                        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                            <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><i class="ph-bold ph-calendar-x text-amber-500"></i> Block All Wednesdays</h3>
+                            <p class="text-sm text-slate-600 mb-4">A safe window for shipping new features. When ON, every Wednesday all bookings and walk-in usage are disabled for every lab.</p>
+                            <div class="flex items-center justify-between p-4 rounded-xl border ${state.systemConfig.blockWednesdays ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}">
+                                <div>
+                                    <div class="text-sm font-bold ${state.systemConfig.blockWednesdays ? 'text-amber-800' : 'text-slate-700'}">${state.systemConfig.blockWednesdays ? 'Wednesdays are BLOCKED' : 'Wednesdays are open'}</div>
+                                    <div class="text-[11px] text-slate-500 mt-0.5">Existing approved Wednesday bookings are left untouched (no no-show marks or reminder emails).</div>
+                                </div>
+                                <button onclick="toggleBlockWednesdays()" role="switch" aria-checked="${state.systemConfig.blockWednesdays ? 'true' : 'false'}" aria-label="Block all Wednesdays"
+                                    class="relative shrink-0 ml-4 w-12 h-7 rounded-full transition ${state.systemConfig.blockWednesdays ? 'bg-amber-500' : 'bg-slate-300'}">
+                                    <span class="absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${state.systemConfig.blockWednesdays ? 'translate-x-5' : ''}"></span>
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- SYSTEM CONFIGURATION (Cleaned - Removed Email Input) -->
                         <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><i class="ph-bold ph-gear text-slate-600"></i> System Configuration</h3>
@@ -4459,7 +4512,14 @@
         function openModal(identifier, mode) {
             const overlay = getById('modal-overlay');
             const content = getById('modal-content');
-            
+
+            // "Block all Wednesdays": no usage / check-in / walk-in on a blocked Wednesday.
+            // (Book stays open — the date picker rejects Wednesday dates.)
+            if ((mode === 'Usage' || mode === 'Usage_Authenticated' || mode === 'Usage_WalkIn') && isTodayBlockedWed()) {
+                showToast(WED_BLOCK_MSG, 'error');
+                return;
+            }
+
             // Determine context based on mode
             let eq = null;
             if (mode === 'Usage' || mode === 'Usage_Authenticated' || mode === 'Usage_WalkIn' || mode === 'Book' || mode === 'Report' || mode === 'EditEquipment' || mode === 'LogData') {
@@ -5091,6 +5151,13 @@
             // Only check if both Date and Slot are valid
             if (!userDate || !userSlot) return;
 
+            // "Block all Wednesdays": reject Wednesday dates (and day 2 of a 2-day booking).
+            if (bookingHitsBlockedWed(userDate, userSlot)) {
+                showToast(WED_BLOCK_MSG, 'error');
+                dateInput.value = "";
+                return;
+            }
+
             // Define the Overlap Logic
             const isOverlap = (b) => {
                 if (b.equipmentName !== eqName || b.lab !== state.selectedLab || b.status !== 'Approved') return false;
@@ -5161,7 +5228,7 @@
         // must match Code.gs's ADMIN_ONLY_ACTIONS + LAB_SCOPED_ACTIONS.
         const ADMIN_GATED_ACTIONS = [
             'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
-            'EditCoordinator', 'EditTechStaff', 'Archive', 'UpdateBooking', 'ResolveMaintenance'
+            'EditCoordinator', 'EditTechStaff', 'Archive', 'UpdateBooking', 'ResolveMaintenance', 'SetBlockWednesdays'
         ];
 
         function backgroundSync(actionType, payload) {
@@ -5215,6 +5282,13 @@
 		   	e.preventDefault();
             // Demo mode: block bookings, walk-ins, reports and edits before anything changes.
             if (demoBlockWrite()) return;
+            // "Block all Wednesdays": defensive re-check at submit time.
+            if (mode === 'Usage' && isTodayBlockedWed()) { showToast(WED_BLOCK_MSG, 'error'); return; }
+            if (mode === 'Book') {
+                const f = e.target.querySelector('input[name="date"]');
+                const dur = e.target.querySelector('select[name="duration"]');
+                if (f && bookingHitsBlockedWed(f.value, dur ? dur.value : '')) { showToast(WED_BLOCK_MSG, 'error'); return; }
+            }
             const btn = e.target.querySelector('button[type="submit"]');
             setLoading(btn, true);
 
@@ -7469,6 +7543,7 @@
             state.systemConfig = backendData.config || state.systemConfig;
             if (backendData.config && backendData.config.settings) {
     state.systemConfig.officialEmail = backendData.config.settings.officialEmail;
+    state.systemConfig.blockWednesdays = !!backendData.config.settings.blockWednesdays;
 }
             // Ensure techStaff array always exists
             if (!state.systemConfig.techStaff) state.systemConfig.techStaff = [];
