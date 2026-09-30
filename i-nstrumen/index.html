@@ -4749,9 +4749,9 @@
                         <i class="ph-fill ph-lock-key text-3xl"></i>
                     </div>
                     <h3 class="text-xl font-bold text-slate-800 mb-2">Security Verification</h3>
-                    <p class="text-slate-500 text-sm mb-6">Enter System Maintenance PIN to proceed.</p>
+                    <p class="text-slate-500 text-sm mb-6">Enter your PIN or PIC email to proceed.</p>
                     <form onsubmit="verifyPin(event)">
-                        <input type="password" id="pin-input" placeholder="Enter PIN" class="w-full text-center text-xl tracking-widest p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none mb-4 text-slate-800" autofocus>
+                        <input type="password" id="pin-input" placeholder="PIN or PIC email" class="w-full text-center text-xl tracking-widest p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none mb-4 text-slate-800" autofocus>
                         <div class="flex gap-2">
                             <button type="button" onclick="closeModal()" class="flex-1 py-2 border rounded-lg text-slate-600 hover:bg-slate-50 font-medium">Cancel</button>
                             <button type="submit" class="flex-1 py-2 bg-brand-900 text-white rounded-lg font-bold hover:bg-brand-800">Verify</button>
@@ -4773,7 +4773,7 @@
 
         // Maintenance / Analytics gate. The PIN and master emails are NOT in this file any
         // more — they live only in the Apps Script Script Property MASTER_CREDS_JSON and are
-        // checked server-side (AdminLogin). Only a *master* credential passes here.
+        // checked server-side (AdminLogin). Any valid master or PIC credential passes here.
         function verifyPin(e) {
             e.preventDefault();
             const val = getById('pin-input').value.trim();
@@ -4783,7 +4783,7 @@
             google.script.run
                 .withSuccessHandler(r => {
                     if (btn) setLoading(btn, false);
-                    if (r && r.success && r.role === 'master') {
+                    if (r && r.success) {   // master PIN/email or a PIC coordinator email
                         window._analyticsMode = false;
                         state.adminToken = r.token;   // real server session for admin writes
                         closeModal();
