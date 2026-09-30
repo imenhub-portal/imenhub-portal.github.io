@@ -45,7 +45,7 @@ const ADMIN_TOKEN_PREFIX = 'admintok_';
 // today's actual behavior — no per-lab restriction on these in the UI).
 const ADMIN_ONLY_ACTIONS = [
   'EditEquipment', 'DeleteEquipment', 'EditLab', 'AddLab', 'DeleteLab',
-  'EditCoordinator', 'EditTechStaff', 'Archive', 'ResolveMaintenance', 'SetBlockWednesdays'
+  'EditCoordinator', 'EditTechStaff', 'Archive', 'ResolveMaintenance', 'SetBlockWednesdays', 'ListGuests', 'SetGuestStatus'
 ];
 // Actions that require a valid session AND (Master OR the booking's own lab)
 // — matches the existing UI intent (pending-approvals list is already
@@ -362,14 +362,106 @@ function memberVerify(payload) {
   if (tries >= 60) return { success: false, error: 'Too many attempts. Try again later.' };
   cache.put('mv_tries', String(tries + 1), 600);
 
-  const person = _getIMenianDirectory().filter(function (u) { return _normId(u.matric) === id; })[0];
-  if (!person) return { success: false, error: 'ID not recognised.' };
+  let person = _getIMenianDirectory().filter(function (u) { return _normId(u.matric) === id; })[0];
+  let isGuest = false;
+  if (!person) {
+    // Not in i-Menian → may be a guest registered and approved by a PIC.
+    const g = _findGuest(id);
+    if (!g) return { success: false, error: 'ID not recognised. If you are not an IMEN member, register as a guest.' };
+    if (g.status === 'Pending')  return { success: false, error: 'Your guest registration is waiting for PIC approval. Please try again later.' };
+    if (g.status !== 'Approved') return { success: false, error: 'Your guest registration was not approved. Please contact the lab PIC.' };
+    person = { name: g.name };
+    isGuest = true;
+  }
 
   const token = Utilities.getUuid();
-  const rec = { id: id, name: person.name, expiresAt: Date.now() + MEMBER_TOKEN_TTL_MS };
+  const rec = { id: id, name: person.name, guest: isGuest, expiresAt: Date.now() + MEMBER_TOKEN_TTL_MS };
   PropertiesService.getScriptProperties().setProperty(MEMBER_TOKEN_PREFIX + token, JSON.stringify(rec));
   _logConsent(id);
-  return { success: true, token: token, name: person.name };
+  return { success: true, token: token, name: person.name, guest: isGuest };
+}
+
+// ── GUESTS (not in i-Menian): self-register, PIC approves once ──────────────
+// Sheet "Guests": id | name | email | phone | affiliation | status | requestedAt | actionedAt
+function _guestSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('Guests');
+  if (!sh) {
+    sh = ss.insertSheet('Guests');
+    sh.appendRow(['id', 'name', 'email', 'phone', 'affiliation', 'status', 'requestedAt', 'actionedAt']);
+  }
+  return sh;
+}
+
+function _findGuest(id) {
+  const rows = _guestSheet().getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (_normId(rows[i][0]) === id) {
+      return { row: i + 1, id: _normId(rows[i][0]), name: String(rows[i][1]), email: String(rows[i][2]),
+               phone: String(rows[i][3]), affiliation: String(rows[i][4]), status: String(rows[i][5]),
+               requestedAt: String(rows[i][6]) };
+    }
+  }
+  return null;
+}
+
+// Public. Creates a Pending guest (or reports the existing status).
+function guestRegister(payload) {
+  const id = _normId(payload && payload.id);
+  const name = String((payload && payload.name) || '').trim();
+  const email = String((payload && payload.email) || '').trim().toLowerCase();
+  const phone = String((payload && payload.phone) || '').trim();
+  const aff = String((payload && payload.affiliation) || '').trim();
+  if (!payload || payload.consent !== true) return { success: false, error: 'Please accept the privacy notice.' };
+  if (!/^[A-Z0-9\-\/\.]+$/.test(id) || id.length < 4 || name.length < 3 || !/^\S+@\S+\.\S+$/.test(email) || phone.length < 7) {
+    return { success: false, error: 'Please fill in your name, Student/Staff ID, a valid email and phone number.' };
+  }
+  if (name.length > 120 || aff.length > 120 || id.length > 30) return { success: false, error: 'Some entries are too long.' };
+
+  const cache = CacheService.getScriptCache();
+  const tries = Number(cache.get('gr_tries') || 0);
+  if (tries >= 30) return { success: false, error: 'Too many registrations right now. Try again later.' };
+  cache.put('gr_tries', String(tries + 1), 600);
+
+  if (_getIMenianDirectory().some(function (u) { return _normId(u.matric) === id; })) {
+    return { success: false, error: 'This ID is already an IMEN member — just tap Verify with your ID.' };
+  }
+  const existing = _findGuest(id);
+  if (existing) {
+    return { success: true, status: existing.status,
+             message: existing.status === 'Approved' ? 'You are already approved — tap Verify with your ID.'
+                    : existing.status === 'Pending' ? 'Already registered. Waiting for PIC approval.'
+                    : 'This registration was not approved. Please contact the lab PIC.' };
+  }
+  _guestSheet().appendRow(["'" + id, name, email, "'" + phone, aff, 'Pending', new Date().toISOString(), '']);
+  _logConsent(id);
+  return { success: true, status: 'Pending', message: 'Registered. A lab PIC will review and approve you — then verify here with your ID.' };
+}
+
+// Admin/PIC only (token-gated). Returns all guests, newest first.
+function listGuests() {
+  const rows = _guestSheet().getDataRange().getValues();
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    out.push({ id: _normId(rows[i][0]), name: String(rows[i][1]), email: String(rows[i][2]), phone: String(rows[i][3]),
+               affiliation: String(rows[i][4]), status: String(rows[i][5]), requestedAt: String(rows[i][6]),
+               actionedAt: String(rows[i][7]) });
+  }
+  return out.reverse();
+}
+
+// Admin/PIC only. status: Approved | Rejected | Pending (revoke)
+function setGuestStatus(payload) {
+  const id = _normId(payload && payload.id);
+  const status = String((payload && payload.status) || '');
+  if (['Approved', 'Rejected', 'Pending'].indexOf(status) === -1) return { success: false, error: 'Invalid status.' };
+  const g = _findGuest(id);
+  if (!g) return { success: false, error: 'Guest not found.' };
+  const sh = _guestSheet();
+  sh.getRange(g.row, 6).setValue(status);
+  sh.getRange(g.row, 8).setValue(new Date().toISOString());
+  return { success: true };
 }
 
 // Returns {id,name} for a valid member OR admin token, else null. Slides expiry.
@@ -459,6 +551,9 @@ function handleFrontendAction(actionType, payload) {
     switch (actionType) {
       case 'AdminLogin': return adminLogin(payload && payload.credential);
       case 'MemberVerify': return memberVerify(payload);
+      case 'GuestRegister': return guestRegister(payload);
+      case 'ListGuests': return listGuests();
+      case 'SetGuestStatus': return setGuestStatus(payload);
       case 'Usage': return saveLog(payload);
       case 'Book': return saveBooking(payload);
       case 'UpdateBooking': return updateBooking(payload);

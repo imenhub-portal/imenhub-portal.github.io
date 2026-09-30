@@ -192,6 +192,13 @@ top 12 results) — never a bulk directory dump to the client.
   prompts visitors, real body is `_openModalCore`). Consent rows are appended to an
   auto-created `Consents` sheet tab (hashed ID + notice version); bookings capped at 6
   per verified ID per day. Verified name is pre-filled in the name search.
+  **Guests (non-i-Menian):** the verify box has "Register as a guest" →
+  `GuestRegister` appends a Pending row to an auto-created `Guests` sheet tab
+  (id/name/email/phone/affiliation/status); a PIC approves once in the PIC page
+  ("Guest Approvals" card, `ListGuests` / `SetGuestStatus`, admin-token gated), which
+  unlocks booking, hybrid and walk-in. After approval the guest verifies with their ID
+  (`MemberVerify` falls back to the Guests tab; token carries `guest:true`, no
+  i-Menian name prefill). Guest text is HTML-escaped in the PIC card.
   **Known limits:** matric-only proof can be impersonated by someone who knows another
   member's number; `getInitialData` still returns bookings/logs incl. contact fields to
   everyone (needs a follow-up before going fully public); `MAINTENANCE_PIN` is still
