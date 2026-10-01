@@ -181,13 +181,6 @@ top 12 results) — never a bulk directory dump to the client.
 
 ## Recent major changes (most recent session first)
 
-- **3D IMEN logo on the landing hero** — `imen3dAttach()` lazy-loads three.js (jsdelivr ESM)
-  and renders `imen-logo.webp` (tracked, 700px RGBA) as a stacked-layer extruded card that
-  floats, slowly auto-rotates, tilts toward the mouse and can be dragged/swiped to spin
-  (inertia; `touch-action: pan-y` so vertical page scroll still works). The line-art SVG
-  is kept in the markup as a fallback (hidden once WebGL is ready). The canvas is
-  re-attached after each `renderApp()`.
-
 - **Equipment rates (UKM vs Others)** — three new Equipment-sheet columns `rateUKM`,
   `rateOthers` (RM per the equipment's tracking unit) and `rateNote` (cols 15-17 / O-Q,
   headers auto-created by `saveEquipment()`; blank = not set). Public: lab-page cards show
