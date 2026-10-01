@@ -462,6 +462,25 @@
             return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 3;
         }
         function isTodayBlockedWed() { return isBlockedWed(new Date()); }
+        // Approved booking for this equipment covering today → stays usable on a blocked Wednesday.
+        function eqHasApprovedBookingToday(eq) {
+            if (!eq) return false;
+            const today = localDayStr(new Date());
+            return (state.bookings || []).some(b => {
+                if (String(b.status).trim() !== 'Approved' || b.equipmentName !== eq.name || b.lab !== eq.lab) return false;
+                const start = String(b.date || '').split('T')[0];
+                if (start === today) return true;
+                if (b.duration === '2 Days') {
+                    const [y, m, d] = start.split('-').map(Number);
+                    if (y) return localDayStr(new Date(y, m - 1, d + 1)) === today;
+                }
+                return false;
+            });
+        }
+        function wedBlocksUsage(eqId) {
+            if (!isTodayBlockedWed()) return false;
+            return !eqHasApprovedBookingToday(state.equipment.find(e => e.id === eqId));
+        }
         // Booking touches a blocked Wednesday (its date, or day 2 of a "2 Days" booking).
         function bookingHitsBlockedWed(dateStr, duration) {
             if (isBlockedWed(dateStr)) return true;
@@ -1559,7 +1578,7 @@
                 const effectivelyDown = isMaintenance || isFullyDown(eq);
                 // "Block all Wednesdays": usage/check-in is closed today. Book stays
                 // visible (other dates are fine) — Wednesday dates are rejected in the picker.
-                const wedClosedToday = isTodayBlockedWed();
+                const wedClosedToday = isTodayBlockedWed() && !eqHasApprovedBookingToday(eq);
                 const showStart = !effectivelyDown && !isInUse && !wedClosedToday;
                 const showBook = !effectivelyDown && (mode === 'booking' || mode === 'both');
                 // Walk-in-only equipment never generates a booking record (usage
@@ -3744,7 +3763,7 @@
                             <div class="flex items-center justify-between p-4 rounded-xl border ${state.systemConfig.blockWednesdays ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}">
                                 <div>
                                     <div class="text-sm font-bold ${state.systemConfig.blockWednesdays ? 'text-amber-800' : 'text-slate-700'}">${state.systemConfig.blockWednesdays ? 'Equipment use is BLOCKED on Wednesdays' : 'Equipment use is open on Wednesdays'}</div>
-                                    <div class="text-[11px] text-slate-500 mt-0.5">Existing approved Wednesday bookings are left untouched (no no-show marks or reminder emails).</div>
+
                                 </div>
                                 <button onclick="toggleBlockWednesdays()" role="switch" aria-checked="${state.systemConfig.blockWednesdays ? 'true' : 'false'}" aria-label="Block all Wednesdays"
                                     class="relative shrink-0 ml-4 w-12 h-7 rounded-full transition ${state.systemConfig.blockWednesdays ? 'bg-amber-500' : 'bg-slate-300'}">
@@ -4980,7 +4999,7 @@
 
             // "Block all Wednesdays": no usage / check-in / walk-in on a blocked Wednesday.
             // (Book stays open — the date picker rejects Wednesday dates.)
-            if ((mode === 'Usage' || mode === 'Usage_Authenticated' || mode === 'Usage_WalkIn') && isTodayBlockedWed()) {
+            if ((mode === 'Usage' || mode === 'Usage_Authenticated' || mode === 'Usage_WalkIn') && wedBlocksUsage(identifier)) {
                 showToast(WED_BLOCK_MSG, 'error');
                 return;
             }
@@ -5767,7 +5786,7 @@
             // Demo mode: block bookings, walk-ins, reports and edits before anything changes.
             if (demoBlockWrite()) return;
             // "Block all Wednesdays": defensive re-check at submit time.
-            if (mode === 'Usage' && isTodayBlockedWed()) { showToast(WED_BLOCK_MSG, 'error'); return; }
+            if (mode === 'Usage' && wedBlocksUsage(identifier)) { showToast(WED_BLOCK_MSG, 'error'); return; }
             if (mode === 'Book') {
                 const f = e.target.querySelector('input[name="date"]');
                 const dur = e.target.querySelector('select[name="duration"]');

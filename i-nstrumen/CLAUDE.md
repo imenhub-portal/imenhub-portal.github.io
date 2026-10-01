@@ -220,8 +220,10 @@ top 12 results) — never a bulk directory dump to the client.
   `saveLog` rejects new Usage on a Wednesday; frontend hides Start/Check-in +
   shows "Equipment use not permitted on Wednesdays" (the lab itself stays open — only equipment operation/bookings are blocked), `openModal`/`handleSubmit`/`checkDateConflict`
   guard too (Book button stays; Wednesday dates are rejected in the picker).
-  Existing approved Wednesday bookings are left alone: `markNoShow`, the weekly
-  no-show job and check-in reminder job skip blocked Wednesdays. Needs the usual
+  An Approved booking covering today stays usable even while the block is on
+  (`_hasApprovedBookingToday` / `eqHasApprovedBookingToday`) and counts normally for
+  no-show/reminder jobs — so an admin can switch the toggle off, approve Wednesday
+  bookings, switch it back on, and those bookings still work. Needs the usual
   manual Code.gs redeploy.
 
 - **Added "Volume (ml)" tracking unit + fixed historical unit-mixing bug** —
