@@ -1295,6 +1295,15 @@
                     <div onclick="setView('LabView')" class="lg:col-span-3 relative overflow-hidden rounded-3xl cursor-pointer group p-7 sm:p-9 bg-gradient-to-br from-blue-700 via-indigo-600 to-violet-500 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-900/40 min-h-[300px] flex flex-col justify-between">
                         <style>
                             #imen3d[data-ready] > svg { display: none }
+                            @keyframes godray { 0%,100% { transform: rotate(var(--a)); opacity: var(--o) } 50% { transform: rotate(calc(var(--a) + 4deg)); opacity: calc(var(--o) * .5) } }
+                            @keyframes bloom { 0%,100% { opacity: .85 } 50% { opacity: .55 } }
+                            .godrays { position: absolute; inset: 0; overflow: hidden; pointer-events: none; mix-blend-mode: screen }
+                            .gr { position: absolute; right: -40px; top: -60px; width: 820px; height: 820px; transform-origin: 100% 0; filter: blur(9px);
+                                  background: linear-gradient(to bottom left, rgba(255,255,255,.55), rgba(255,255,255,.18) 45%, rgba(255,255,255,0) 85%);
+                                  animation: godray var(--d) ease-in-out infinite; animation-delay: var(--dl) }
+                            .gr-bloom { position: absolute; right: -90px; top: -110px; width: 360px; height: 360px; border-radius: 9999px; filter: blur(14px);
+                                        background: radial-gradient(circle, rgba(255,255,255,.75), rgba(255,255,255,0) 68%); animation: bloom 7s ease-in-out infinite }
+                            @media (prefers-reduced-motion: reduce) { .gr, .gr-bloom { animation: none !important } }
                             @keyframes imenDraw  { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
                             @keyframes imenFade  { from { opacity: 0 } to { opacity: 1 } }
                             @keyframes imenFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
@@ -1306,6 +1315,16 @@
                             .imen-logo .tx { fill: none; stroke: #fff; stroke-width: .9; animation: imenFade 1.6s 1.4s backwards }
                             @media (prefers-reduced-motion: reduce) { .imen-logo, .imen-logo * { animation: none !important } .imen-logo .ln { stroke-dashoffset: 0 } }
                         </style>
+                        <!-- soft volumetric light rays (decorative) -->
+                        <div class="godrays" aria-hidden="true">
+                            <div class="gr-bloom"></div>
+                            <div class="gr" style="--a:18deg;--o:0.55;--d:9s;--dl:0s;clip-path:polygon(100% 0, 94% 100%, 100% 100%)"></div>
+                            <div class="gr" style="--a:30deg;--o:0.4;--d:12s;--dl:-3s;clip-path:polygon(100% 0, 89% 100%, 100% 100%)"></div>
+                            <div class="gr" style="--a:42deg;--o:0.5;--d:10s;--dl:-6s;clip-path:polygon(100% 0, 93% 100%, 100% 100%)"></div>
+                            <div class="gr" style="--a:55deg;--o:0.32;--d:14s;--dl:-2s;clip-path:polygon(100% 0, 87% 100%, 100% 100%)"></div>
+                            <div class="gr" style="--a:68deg;--o:0.4;--d:11s;--dl:-8s;clip-path:polygon(100% 0, 92% 100%, 100% 100%)"></div>
+                            <div class="gr" style="--a:80deg;--o:0.25;--d:13s;--dl:-5s;clip-path:polygon(100% 0, 90% 100%, 100% 100%)"></div>
+                        </div>
                         <div id="imen3d" onclick="event.stopPropagation()" class="absolute right-2 sm:right-6 top-4 sm:top-1/2 sm:-translate-y-1/2 w-32 sm:w-52 aspect-[2/3]"><svg class="imen-logo w-full h-auto" viewBox="-14 -6 240 312" role="img" aria-label="IMEN — Institute of Microengineering and Nanoelectronics">
                             <defs><clipPath id="imenWafer"><circle cx="100" cy="112" r="78"/></clipPath>
                                 <path id="imenArcTxt" d="M 7.9 145.5 A 98 98 0 0 1 149 27"/></defs>
