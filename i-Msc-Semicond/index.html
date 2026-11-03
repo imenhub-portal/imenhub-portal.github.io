@@ -422,7 +422,7 @@
             </div>
 
             <div class="mt-3 shrink-0">
-              <div class="flex items-center justify-between text-[14px] font-bold uppercase tracking-wider text-slate-400">
+              <div class="flex items-center justify-between gap-3 text-[12px] font-semibold text-slate-500 sm:text-[14px]">
                 <span x-text="step === 1 ? t('card_of', { n: deckIndex + 1, total: courseCount }) : t('step_of', { n: step, total: totalSteps })"></span>
                 <span class="text-royal" x-text="Math.round(progress) + '%'"></span>
               </div>
@@ -432,7 +432,11 @@
             </div>
 
             <div class="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
-              <!-- SECTION 1 · CURRICULUM (read-only) -->
+              <!-- SECTION 1 · COURSE FEEDBACK -->
+              <div x-show="step===1 && deckIndex===0" class="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3.5">
+                <h3 class="text-[16px] font-extrabold leading-snug text-royal" x-text="t('h_courses')"></h3>
+                <p class="mt-1.5 text-[14px] leading-relaxed text-slate-600" x-text="t('courses_lead')"></p>
+              </div>
               <div x-show="step===1" x-transition.opacity class="grid gap-3 lg:h-full lg:gap-4 lg:grid-cols-[0.9fr_1.3fr] xl:grid-cols-[0.8fr_1.4fr]">
                 <!-- left column on desktop: illustration + rating. On phones the blocks are re-ordered: title, illustration, points, rating, overview -->
                 <div class="flex flex-col gap-3 max-lg:contents lg:min-h-0">
@@ -445,6 +449,7 @@
                   </div>
 
                   <div class="shrink-0 rounded-2xl border border-slate-300 panel-shade p-3.5 max-lg:order-4">
+                    <p class="mb-2 text-[13px] font-bold text-royal" x-text="t('card_feedback')"></p>
                     <p class="text-[16px] font-extrabold leading-snug text-slate-900" x-text="t('card_rate_q')"></p>
                     <div class="mt-2 grid grid-cols-5 gap-2">
                       <template x-for="v in [1,2,3,4,5]" :key="v">
@@ -466,7 +471,7 @@
                   <div class="max-lg:order-1">
                     <div class="overflow-hidden rounded-xl bg-gradient-to-br from-royal to-[#0b3a8f] p-4 text-white shadow-md shadow-blue-900/20">
                       <div class="flex flex-wrap items-center gap-2">
-                        <span class="inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-[13px] font-extrabold uppercase tracking-[0.14em]" x-text="t('card_course_label') + ' ' + String(deckIndex + 1).padStart(2, '0')"></span>
+                        <span class="text-[13px] font-semibold text-white/80" x-text="t('card_course_label')"></span>
                         <span class="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-extrabold" :class="deckCourse.type==='core' ? 'bg-amber-300 text-amber-950' : 'bg-cyan-200 text-cyan-950'" x-text="deckCourse.type==='core' ? t('tag_core') : t('tag_elective')"></span>
                         <span class="ml-auto text-[13px] font-semibold text-white/80">About <span x-text="readSecs(deckCourse)"></span> sec read</span>
                       </div>
@@ -490,7 +495,7 @@
 
                   <details class="group overflow-hidden rounded-xl border border-slate-300 bg-slate-50 max-lg:order-5">
                     <summary class="flex min-h-[48px] cursor-pointer list-none items-center justify-between px-4 py-3 text-[15px] font-extrabold text-slate-600 transition hover:text-royal [&::-webkit-details-marker]:hidden">
-                      <span x-text="t('sheet_full')"></span>
+                      <span x-text="t('card_information')"></span>
                       <svg class="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </summary>
                     <p class="whitespace-pre-line border-t border-slate-200 px-4 py-3 text-[15px] leading-[1.7] text-slate-600" x-text="deckCourse.overview"></p>
