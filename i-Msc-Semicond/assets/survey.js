@@ -48,8 +48,7 @@ function surveyApp() {
 
     /* ---------- init ---------- */
     init() {
-      const saved = localStorage.getItem(APP_CONFIG.LANG_KEY);
-      this.lang = saved === "ms" ? "ms" : "en";
+      this.lang = "en";
       document.documentElement.lang = this.lang;
 
       COURSES.forEach((c) => {
@@ -218,14 +217,6 @@ function surveyApp() {
       try {
         localStorage.setItem(READ_KEY, JSON.stringify(all));
       } catch (e) {}
-    },
-    setLang(l) {
-      this.lang = l;
-      localStorage.setItem(APP_CONFIG.LANG_KEY, l);
-      document.documentElement.lang = l;
-    },
-    toggleLang() {
-      this.setLang(this.lang === "en" ? "ms" : "en");
     },
 
     /* ---------- curriculum explorer: stages + deck ---------- */
