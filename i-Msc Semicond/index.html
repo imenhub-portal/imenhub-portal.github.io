@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M.Sc. Semiconductor Engineering — Marketability Study | IMEN, UKM</title>
+  <meta name="description" content="Marketability study for the proposed Master of Science in Semiconductor Engineering at IMEN, Universiti Kebangsaan Malaysia." />
+  <link rel="icon" href="https://www.ukm.my/portal/wp-content/uploads/2019/04/favicon.png" type="image/png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: "#002366",
+            royal: "#0b3a8f",
+            gold: "#d99a00",
+            cyanx: "#0ea5e9"
+          },
+          fontFamily: {
+            sans: ["Inter", "system-ui", "sans-serif"],
+            display: ["Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="assets/imen.css?v=35" />
+</head>
+
+<body x-data="surveyApp()" x-init="init()" class="bg-aurora min-h-screen overflow-x-hidden text-slate-900 antialiased">
+
+  <!-- ================= NAV ================= -->
+  <header class="fixed inset-x-0 top-0 z-50 bg-gradient-to-b from-[#f6f9fe] via-[#f6f9fe]/85 to-transparent pb-3">
+    <div class="mx-auto max-w-7xl px-3 sm:px-6">
+      <div class="glass mt-3 flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 sm:px-5">
+        <a href="#hero" class="flex items-center gap-3">
+          <img src="assets/logo-dark.png" alt="IMEN · UKM" class="h-8 w-auto sm:h-9" />
+          <span class="hidden h-6 w-px bg-slate-200 lg:block"></span>
+          <span class="hidden text-[13px] font-bold uppercase tracking-[0.2em] text-slate-400 lg:block">Marketability Study</span>
+        </a>
+
+        <nav x-show="!started" class="hidden items-center gap-1 lg:flex">
+          <a href="#about" class="rounded-full px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100 hover:text-royal" x-text="t('nav_about')"></a>
+          <a href="#survey" class="rounded-full px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100 hover:text-royal" x-text="t('nav_survey')"></a>
+        </nav>
+
+        <div class="flex items-center gap-2">
+          <button @click="toggleLang()" class="btn-ghost rounded-full px-3 py-2 text-[13px] font-extrabold tracking-wide" x-text="t('nav_lang')"></button>
+          <button x-show="!started" @click="scrollToSurvey()" class="btn-primary btn-pulse hidden rounded-full px-4 py-2 text-sm font-extrabold sm:inline-flex" x-text="t('hero_cta_start')"></button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= HERO ================= -->
+    <section id="hero" x-show="!started" class="relative overflow-hidden pb-16 pt-28 sm:pt-32">
+      <div class="pointer-events-none absolute inset-0 grid-overlay"></div>
+      <div class="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-blue-200/35 blur-3xl"></div>
+      <div class="pointer-events-none absolute -left-40 top-40 h-[420px] w-[420px] rounded-full bg-cyan-200/30 blur-3xl"></div>
+
+      <div class="relative mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-[1.04fr_.96fr] lg:gap-16">
+        <div class="reveal in">
+          <span class="chip chip-gold">
+            <span class="h-1.5 w-1.5 rounded-full bg-gold"></span>
+            <span x-text="t('hero_eyebrow')"></span>
+          </span>
+
+          <h1 class="font-display mt-6 text-[2.1rem] font-extrabold leading-[1.06] tracking-tight text-slate-900 sm:text-5xl lg:text-[3.6rem]">
+            <span x-text="t('hero_title_1')"></span><br />
+            <span class="font-display text-royal" x-text="t('hero_title_accent')"></span>
+          </h1>
+
+          <p class="mt-6 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base" x-text="t('hero_lead')"></p>
+
+          <div class="mt-8 flex flex-wrap items-center gap-3">
+            <button @click="scrollToSurvey()" class="btn-primary btn-pulse group inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-extrabold sm:w-auto">
+              <span x-text="t('hero_cta_start')"></span>
+              <svg class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+
+          <div class="mt-9 flex flex-wrap gap-2">
+            <span class="chip"><span class="text-royal">◈</span><span x-text="t('hero_meta_mode')"></span> · 12 / 24 mo</span>
+            <span class="chip"><span class="text-cyanx">◈</span><span x-text="t('hero_meta_credits')"></span> · 40</span>
+            <span class="chip"><span class="text-gold">◈</span><span x-text="t('hero_core_elective')"></span></span>
+          </div>
+        </div>
+
+        <div class="reveal in">
+          <div class="visual-panel rounded-[2rem] p-3">
+            <div class="hero-stage relative h-[290px] overflow-hidden rounded-[1.55rem] border border-white/70 bg-white/30 sm:h-[360px] lg:h-[450px]" :class="circuitOn ? 'is-live' : ''">
+              <!-- circuit-board backdrop: powers up when the chip is seated -->
+              <div class="circuit-bg" aria-hidden="true">
+                <div class="circuit-aura"></div>
+                <div class="circuit-aura circuit-aura-b"></div>
+                <svg x-ref="circuitSvg" class="circuit-svg" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice"></svg>
+                <span class="circuit-ring"></span>
+                <span class="circuit-ring" style="animation-delay:1.4s"></span>
+                <div class="circuit-vignette"></div>
+              </div>
+              <canvas x-ref="heroCanvas" class="absolute inset-0 h-full w-full"></canvas>
+
+              <!-- floating label pinned to the gold die -->
+              <div
+                x-ref="dieLabelEl"
+                x-show="!diePlaced"
+                class="pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-full flex-col items-center"
+                style="left:-999px; top:-999px; visibility:hidden"
+              >
+                <span class="die-label whitespace-nowrap rounded-full bg-gold px-3.5 py-1.5 text-[13px] font-extrabold uppercase tracking-[0.12em] text-slate-900 shadow-lg shadow-amber-500/40 ring-2 ring-white/80">
+                  <span x-text="t('hero_die_label')"></span>
+                </span>
+                <svg class="mt-0.5 h-3.5 w-3.5 animate-bounce text-gold drop-shadow" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l7 8h-4v8h-6v-8H5z" transform="rotate(180 12 12)"/></svg>
+              </div>
+
+              <!-- unlock instruction / done state -->
+              <div class="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3">
+                <span x-show="!diePlaced" class="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3.5 py-2 text-[13px] font-bold text-white shadow-lg backdrop-blur-sm">
+                  <svg class="h-3.5 w-3.5 text-gold" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 007.5 7.5 7.5 7.5 0 007.5-7.5v-2a1.5 1.5 0 00-3 0M10 5.5a1.5 1.5 0 013 0v6m0 0V11a1.5 1.5 0 013 .5"/></svg>
+                  <span x-text="t('hero_unlock_hint')"></span>
+                </span>
+                <span x-show="diePlaced" x-cloak class="inline-flex items-center gap-2 rounded-full bg-emerald-600/90 px-3.5 py-2 text-[13px] font-bold text-white shadow-lg backdrop-blur-sm">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  <span x-text="t('hero_unlock_done')"></span>
+                </span>
+              </div>
+            </div>
+
+            <div class="mt-3 rounded-[1.4rem] border border-slate-200/80 bg-white/90 p-4 sm:p-5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-[13px] font-bold uppercase tracking-[0.2em] text-slate-400">Proposed programme</p>
+                  <p class="mt-1 text-sm font-extrabold leading-snug text-slate-900">Master of Science in<br />Semiconductor Engineering</p>
+                </div>
+                <span class="chip chip-cyan shrink-0">40 credits</span>
+              </div>
+              <div class="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-4">
+                <div>
+                  <p class="text-base font-extrabold text-royal">12 / 24</p>
+                  <p class="text-[13px] font-semibold uppercase tracking-wider text-slate-400">Months</p>
+                </div>
+                <div>
+                  <p class="text-base font-extrabold text-slate-900">34 + 6</p>
+                  <p class="text-[13px] font-semibold uppercase tracking-wider text-slate-400">Core + elective</p>
+                </div>
+                <div>
+                  <p class="text-base font-extrabold text-gold">MQA</p>
+                  <p class="text-[13px] font-semibold uppercase tracking-wider text-slate-400">NSS · NIMP 2030</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STATS ================= -->
+    <section x-show="!started" class="relative mx-auto max-w-7xl px-5 pb-6 sm:px-8">
+      <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <template x-for="i in [1,2,3,4]" :key="i">
+          <div class="reveal glass rounded-2xl p-5 sm:p-6">
+            <p class="text-2xl font-extrabold sm:text-3xl" :class="i===1?'text-royal':(i===2?'text-cyanx':(i===3?'text-slate-900':'text-gold'))" x-text="t('stat_'+i+'_k')"></p>
+            <p class="mt-1 text-[13px] font-semibold leading-snug text-slate-500" x-text="t('stat_'+i+'_v')"></p>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- ================= ABOUT ================= -->
+    <section id="about" x-show="!started" class="relative mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
+      <div class="reveal glass rounded-[1.75rem] p-6 sm:p-10">
+          <div class="flex items-center gap-2 text-[13px] font-bold uppercase tracking-[0.18em] text-cyanx">
+            <span class="h-2 w-2 rounded-full bg-cyanx"></span> <span x-text="t('about_survey_title')"></span>
+          </div>
+          <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="relative flex flex-col items-start rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+              <span class="absolute right-4 top-4 text-[13px] font-extrabold text-slate-300">01</span>
+              <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-800 text-white shadow-md"><svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg></span>
+              <p class="mt-4 text-[24px] font-extrabold leading-tight tracking-tight text-slate-900" x-text="t('about_g1_k')"></p>
+              <p class="mt-1.5 text-[16px] font-medium leading-snug text-slate-600" x-text="t('about_g1_v')"></p>
+            </div>
+            <div class="relative flex flex-col items-start rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+              <span class="absolute right-4 top-4 text-[13px] font-extrabold text-slate-300">02</span>
+              <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 text-white shadow-md"><svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></span>
+              <p class="mt-4 text-[24px] font-extrabold leading-tight tracking-tight text-slate-900" x-text="t('about_g2_k')"></p>
+              <p class="mt-1.5 text-[16px] font-medium leading-snug text-slate-600" x-text="t('about_g2_v')"></p>
+            </div>
+            <div class="relative flex flex-col items-start rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+              <span class="absolute right-4 top-4 text-[13px] font-extrabold text-slate-300">03</span>
+              <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-md"><svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="8" width="14" height="12" rx="2"/><path d="M7 8V6a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg></span>
+              <p class="mt-4 text-[24px] font-extrabold leading-tight tracking-tight text-slate-900" x-text="t('about_g3_k')"></p>
+              <p class="mt-1.5 text-[16px] font-medium leading-snug text-slate-600" x-text="t('about_g3_v')"></p>
+            </div>
+            <div class="relative flex flex-col items-start rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+              <span class="absolute right-4 top-4 text-[13px] font-extrabold text-slate-300">04</span>
+              <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-md"><svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+              <p class="mt-4 text-[24px] font-extrabold leading-tight tracking-tight text-slate-900" x-text="t('about_g4_k')"></p>
+              <p class="mt-1.5 text-[16px] font-medium leading-snug text-slate-600" x-text="t('about_g4_v')"></p>
+            </div>
+          </div>
+        </div>
+    </section>
+
+
+    <!-- ================= SURVEY ================= -->
+    <section id="survey" class="relative py-16 sm:py-24" :class="started ? '!fixed inset-0 z-40 flex flex-col overflow-hidden bg-aurora !py-0 !pb-3 !pt-[84px]' : ''">
+      <div id="survey-top" class="mx-auto max-w-7xl px-5 sm:px-8" :class="started ? '!max-w-7xl !px-3 sm:!px-6 w-full min-h-0 flex-1 flex flex-col' : ''">
+        <div x-show="!started" class="reveal mb-7 text-center">
+          <span class="chip chip-gold" x-text="t('survey_eyebrow')"></span>
+          <h2 class="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl" x-text="t('survey_title')"></h2>
+
+        </div>
+
+        <div id="survey-card" class="glass rounded-[1.75rem] p-5 sm:p-8" :class="started ? 'min-h-0 flex-1 flex flex-col !p-4 sm:!p-5' : ''">
+          <div x-show="!started">
+              <!-- ============ INFOGRAPHIC ============ -->
+              <div class="mt-5 overflow-hidden rounded-2xl border border-slate-300 panel-shade">
+                <div class="relative overflow-hidden bg-gradient-to-br from-[#edf4ff] via-white to-[#eefaff] px-4 py-5 sm:px-6">
+                  <div class="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-blue-200/30 blur-2xl"></div>
+                  <div class="relative flex items-start justify-between gap-3">
+                    <p class="text-[14px] font-extrabold uppercase tracking-[0.18em] text-royal" x-text="t('info_heading')"></p>
+                    <span class="chip chip-gold !text-[13px]">MQA</span>
+                  </div>
+
+                  <div class="relative mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    <div class="rounded-xl border border-white bg-white/85 p-3 shadow-sm">
+                      <p class="text-[30px] font-extrabold leading-none tracking-tight text-royal">40</p>
+                      <p class="mt-1.5 text-[14px] font-semibold leading-snug text-slate-500" x-text="t('info_credits')"></p>
+                    </div>
+                    <div class="rounded-xl border border-white bg-white/85 p-3 shadow-sm">
+                      <p class="text-[30px] font-extrabold leading-none tracking-tight text-slate-900">12<span class="text-[17px] text-slate-400">/</span>24</p>
+                      <p class="mt-1.5 text-[14px] font-semibold leading-snug text-slate-500"><span x-text="t('info_duration')"></span> · <span x-text="t('info_full_part')"></span></p>
+                    </div>
+                    <div class="rounded-xl border border-white bg-white/85 p-3 shadow-sm">
+                      <p class="text-[30px] font-extrabold leading-none tracking-tight text-gold">9</p>
+                      <p class="mt-1.5 text-[14px] font-semibold leading-snug text-slate-500" x-text="t('info_core_n')"></p>
+                    </div>
+                    <div class="rounded-xl border border-white bg-white/85 p-3 shadow-sm">
+                      <p class="text-[30px] font-extrabold leading-none tracking-tight text-cyanx">5</p>
+                      <p class="mt-1.5 text-[14px] font-semibold leading-snug text-slate-500" x-text="t('info_elective_n')"></p>
+                    </div>
+                  </div>
+
+                  <!-- credit split -->
+                  <div class="relative mt-4">
+                    <div class="flex items-center justify-between gap-3 text-[14px] font-bold">
+                      <span class="text-[#8a6400]" x-text="t('info_core_split')"></span>
+                      <span class="text-[#075e85]" x-text="t('info_elective_split')"></span>
+                    </div>
+                    <div class="mt-1.5 flex h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div class="h-full w-[85%] bg-gradient-to-r from-[#e6b21f] to-[#f7d268]"></div>
+                      <div class="h-full w-[15%] bg-gradient-to-r from-[#38bdf8] to-[#0ea5e9]"></div>
+                    </div>
+                    <p class="mt-1.5 text-[14px] font-medium text-slate-500" x-text="t('info_split_note')"></p>
+                  </div>
+                </div>
+
+                <!-- programme flow -->
+                <div class="border-t border-slate-100 px-4 py-5 sm:px-6">
+                  <p class="text-[14px] font-extrabold uppercase tracking-[0.18em] text-slate-400" x-text="t('info_flow')"></p>
+                  <div class="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="rounded-xl border border-slate-300 panel-shade p-3">
+                      <div class="flex items-center gap-2">
+                        <span class="flex h-5 w-5 items-center justify-center rounded-md bg-royal text-[13px] font-extrabold text-white">01</span>
+                        <p class="text-[15px] font-extrabold text-slate-900" x-text="t('info_stage_1')"></p>
+                      </div>
+                      <p class="mt-1.5 text-[14px] leading-snug text-slate-500" x-text="t('info_stage_1_d')"></p>
+                    </div>
+                    <div class="rounded-xl border border-slate-300 panel-shade p-3">
+                      <div class="flex items-center gap-2">
+                        <span class="flex h-5 w-5 items-center justify-center rounded-md bg-gold text-[13px] font-extrabold text-white">02</span>
+                        <p class="text-[15px] font-extrabold text-slate-900" x-text="t('info_stage_2')"></p>
+                      </div>
+                      <p class="mt-1.5 text-[14px] leading-snug text-slate-500" x-text="t('info_stage_2_d')"></p>
+                    </div>
+                    <div class="rounded-xl border border-slate-300 panel-shade p-3">
+                      <div class="flex items-center gap-2">
+                        <span class="flex h-5 w-5 items-center justify-center rounded-md bg-cyanx text-[13px] font-extrabold text-white">03</span>
+                        <p class="text-[15px] font-extrabold text-slate-900" x-text="t('info_stage_3')"></p>
+                      </div>
+                      <p class="mt-1.5 text-[14px] leading-snug text-slate-500" x-text="t('info_stage_3_d')"></p>
+                    </div>
+                    <div class="rounded-xl border border-slate-300 panel-shade p-3">
+                      <div class="flex items-center gap-2">
+                        <span class="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-600 text-[13px] font-extrabold text-white">04</span>
+                        <p class="text-[15px] font-extrabold text-slate-900" x-text="t('info_stage_4')"></p>
+                      </div>
+                      <p class="mt-1.5 text-[14px] leading-snug text-slate-500" x-text="t('info_stage_4_d')"></p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-6">
+                  <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-royal" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7l7-4z"/></svg>
+                  <p class="text-[14px] font-medium leading-relaxed text-slate-500" x-text="t('info_note')"></p>
+                </div>
+              </div>
+
+            <div class="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-8">
+              <span class="chip chip-gold">
+                <span class="h-1.5 w-1.5 rounded-full bg-gold"></span>
+                <span x-text="t('gate_eyebrow')"></span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 text-[14px] font-bold text-slate-400">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 7v5l3 2"/></svg>
+                <span x-text="t('gate_note')"></span>
+              </span>
+            </div>
+
+            <h3 class="mt-4 max-w-lg text-[1.7rem] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-[1.9rem]" x-html="t('gate_title')"></h3>
+
+            <div class="mt-7 grid gap-4 lg:grid-cols-2">
+              <!-- profile -->
+              <div class="flex flex-col rounded-2xl border border-slate-300 panel-shade p-4 sm:p-5">
+                <div class="flex items-center gap-2">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-full bg-royal text-white"><svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.2c1.2-2.2 3.2-3.2 5.5-3.2s4.3 1 5.5 3.2"/></svg></span>
+                  <p class="text-[14px] font-extrabold uppercase tracking-[0.16em] text-slate-500" x-text="t('gate_profile')"></p>
+                </div>
+
+                <div class="mt-4 space-y-3">
+                  <div>
+                    <label class="flex items-center gap-2.5 text-[14px] font-bold uppercase tracking-[0.12em] text-slate-500"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal"><svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7.5l8.5 6 8.5-6"/></svg></span><span><span x-text="t('p_email')"></span> <span class="text-rose-500">*</span></span><span x-show="emailOk(form.email)" x-cloak class="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></label>
+                    <input type="email" x-model="form.email" :placeholder="t('p_email_ph')" class="field mt-1.5" />
+                  </div>
+
+                  <div>
+                    <label class="flex items-center gap-2.5 text-[14px] font-bold uppercase tracking-[0.12em] text-slate-500"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal"><svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.8-3.8 3.7-5.8 7.5-5.8s6.7 2 7.5 5.8"/></svg></span><span x-text="t('p_name')"></span><span x-show="form.name.trim().length > 1" x-cloak class="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></label>
+                    <input type="text" x-model="form.name" :placeholder="t('p_name_ph')" class="field mt-1.5" />
+                  </div>
+
+                  <div>
+                    <label class="flex items-center gap-2.5 text-[14px] font-bold uppercase tracking-[0.12em] text-slate-500"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal"><svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="3.5" width="11" height="17" rx="1.5"/><path d="M15 9.5h4a1.5 1.5 0 011.5 1.5v9.5H15M8 8h3M8 12h3M8 16h3"/></svg></span><span><span x-text="qCategory"></span> <span class="text-rose-500">*</span></span><span x-show="!!form.category" x-cloak class="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></label>
+                    <select x-model="form.category" class="field mt-1.5">
+                      <option value="" x-text="t('p_select')"></option>
+                      <template x-for="c in categories" :key="c">
+                        <option :value="c" x-text="c"></option>
+                      </template>
+                    </select>
+                  </div>
+
+                  <div x-show="form.category==='Others'" x-cloak>
+                    <label class="flex items-center gap-2.5 text-[14px] font-bold uppercase tracking-[0.12em] text-slate-500"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal"><svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17z"/></svg></span><span x-text="t('p_other')"></span></label>
+                    <input type="text" x-model="form.category_other" :placeholder="t('p_other_ph')" class="field mt-1.5" />
+                  </div>
+                </div>
+
+                <div class="mt-auto flex items-start gap-2 border-t border-slate-100 pt-4 text-[14px] leading-relaxed text-slate-400">
+                  <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path stroke-linecap="round" d="M8 10V7a4 4 0 018 0v3"/></svg>
+                  <span x-text="t('gate_privacy')"></span>
+                </div>
+              </div>
+
+              <!-- priorities -->
+              <div class="rounded-2xl border border-slate-300 panel-shade p-4 sm:p-5">
+                <div class="flex items-center gap-2">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-full bg-cyanx text-white"><svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg></span>
+                  <p class="text-[14px] font-extrabold uppercase tracking-[0.16em] text-slate-500" x-text="t('gate_priorities')"></p>
+                </div>
+
+                <p class="mt-4 text-[17px] font-semibold leading-relaxed text-slate-800" x-text="qCriteria"></p>
+                <p class="mt-1 text-[14px] leading-relaxed text-slate-400" x-text="t('p_criteria_lead')"></p>
+
+                <div class="mt-3 grid gap-2">
+                  <template x-for="(c, i) in criteriaOptions" :key="i">
+                    <button type="button" @click="toggleCriterion(c)" class="opt !py-2.5" :class="form.criteria.includes(c) ? 'opt-on' : ''">
+                      <span class="opt-box">
+                        <svg x-show="form.criteria.includes(c)" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="3.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      </span>
+                      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal" x-html="critIcon(i)"></span>
+                      <span x-text="c"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <button @click="startSurvey()" class="btn-primary btn-pulse mt-6 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-[17px] font-extrabold">
+              <span x-text="t('gate_start')"></span>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+            <p class="mt-3 text-center text-[14px] text-slate-400">IMEN · Universiti Kebangsaan Malaysia</p>
+          </div>
+
+          <!-- ============================================================
+               SURVEY — three sections only
+               ============================================================ -->
+          <div x-show="started" x-cloak class="flex min-h-0 flex-1 flex-col">
+            <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <button @click="editProfile()" class="chip chip-blue">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                <span x-text="t('gate_profile_short')"></span>
+              </button>
+
+              <div class="flex items-center gap-2 sm:gap-3">
+                <template x-for="n in totalSteps" :key="n">
+                  <button @click="n < step && goStep(n)" class="flex min-h-[44px] min-w-[44px] items-center justify-center gap-2" :class="n < step ? 'cursor-pointer' : 'cursor-default'">
+                    <span class="stepper-dot" :class="step===n ? 'on' : (n < step ? 'done' : '')">
+                      <template x-if="n < step">
+                        <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      </template>
+                      <template x-if="n >= step">
+                        <span x-text="n"></span>
+                      </template>
+                    </span>
+                    <span class="hidden text-[14px] font-bold uppercase tracking-wider sm:inline" :class="step===n ? 'text-royal' : 'text-slate-400'" x-text="stepName(n)"></span>
+                    <span x-show="n < totalSteps" class="hidden h-px w-6 bg-slate-300 sm:block"></span>
+                  </button>
+                </template>
+              </div>
+
+              <span class="hidden max-w-[30%] break-all text-right text-[14px] font-semibold leading-tight text-slate-400 md:block" x-text="form.email"></span>
+            </div>
+
+            <div class="mt-3 shrink-0">
+              <div class="flex items-center justify-between text-[14px] font-bold uppercase tracking-wider text-slate-400">
+                <span x-text="step === 1 ? t('card_of', { n: deckIndex + 1, total: courseCount }) : t('step_of', { n: step, total: totalSteps })"></span>
+                <span class="text-royal" x-text="Math.round(progress) + '%'"></span>
+              </div>
+              <div class="progress-track mt-1.5">
+                <div class="progress-fill" :style="'width:' + progress + '%'"></div>
+              </div>
+            </div>
+
+            <div class="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+              <!-- SECTION 1 · CURRICULUM (read-only) -->
+              <div x-show="step===1" x-transition.opacity class="grid gap-3 lg:h-full lg:gap-4 lg:grid-cols-[0.9fr_1.3fr] xl:grid-cols-[0.8fr_1.4fr]">
+                <!-- left column on desktop: illustration + rating. On phones the blocks are re-ordered: title, illustration, points, rating, overview -->
+                <div class="flex flex-col gap-3 max-lg:contents lg:min-h-0">
+                  <div class="relative h-52 w-full overflow-hidden rounded-2xl border border-slate-700 bg-[radial-gradient(ellipse_at_50%_38%,#1d3470_0%,#0d1636_58%,#050816_100%)] max-lg:order-2 lg:h-auto lg:min-h-[170px] lg:flex-1">
+                    <canvas x-ref="deckCanvas" class="absolute inset-0 h-full w-full"></canvas>
+                    <span class="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full bg-slate-900/55 px-3 py-1.5 text-[13px] font-bold text-white backdrop-blur-sm">
+                      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
+                      <span x-text="t('drag_hint')"></span>
+                    </span>
+                  </div>
+
+                  <div class="shrink-0 rounded-2xl border border-slate-300 panel-shade p-3.5 max-lg:order-4">
+                    <p class="text-[16px] font-extrabold leading-snug text-slate-900" x-text="t('card_rate_q')"></p>
+                    <div class="mt-2 grid grid-cols-5 gap-2">
+                      <template x-for="v in [1,2,3,4,5]" :key="v">
+                        <button @click="rate(deckCourse.id, v)" class="rate rate-c flex min-h-[68px] flex-col items-center justify-center gap-0.5 !py-2" :class="['rate-c' + v, ratings[deckCourse.id] === v ? 'rate-on' : '']" :aria-label="v + ' — ' + scaleLabel(v)">
+                          <span class="flex items-center justify-center" x-html="rateIcon(v)"></span>
+                          <span class="text-[16px] font-extrabold leading-none" x-text="v"></span>
+                        </button>
+                      </template>
+                    </div>
+                    <div class="mt-1.5 flex justify-between text-[13px] font-semibold text-slate-400">
+                      <span x-text="scaleLabel(1)"></span>
+                      <span class="font-extrabold" :style="ratings[deckCourse.id] ? 'color:' + rateColor(ratings[deckCourse.id]) : ''" x-text="ratings[deckCourse.id] ? scaleLabel(ratings[deckCourse.id]) : ''"></span>
+                      <span x-text="scaleLabel(5)"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="lg-panel max-lg:contents lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:overflow-y-auto">
+                  <div class="max-lg:order-1">
+                    <div class="overflow-hidden rounded-xl bg-gradient-to-br from-royal to-[#0b3a8f] p-4 text-white shadow-md shadow-blue-900/20">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-[13px] font-extrabold uppercase tracking-[0.14em]" x-text="t('card_course_label') + ' ' + String(deckIndex + 1).padStart(2, '0')"></span>
+                        <span class="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-extrabold" :class="deckCourse.type==='core' ? 'bg-amber-300 text-amber-950' : 'bg-cyan-200 text-cyan-950'" x-text="deckCourse.type==='core' ? t('tag_core') : t('tag_elective')"></span>
+                        <span class="ml-auto text-[13px] font-semibold text-white/80">About <span x-text="readSecs(deckCourse)"></span> sec read</span>
+                      </div>
+                      <h4 class="mt-2.5 text-[26px] font-extrabold leading-tight tracking-tight" x-text="deckCourse.title"></h4>
+                    </div>
+                    <p class="mt-3 text-[16px] font-semibold leading-snug text-slate-600" x-text="deckCourse.summary"></p>
+                  </div>
+
+                  <div class="overflow-hidden rounded-xl border border-slate-300 panel-shade max-lg:order-3">
+                    <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3.5 py-2 text-[13px] font-extrabold uppercase tracking-[0.16em] text-royal">
+                      <span class="w-9 text-center">No.</span>
+                      <span x-text="t('sheet_learn')"></span>
+                    </div>
+                    <template x-for="(pt, pi) in skimPoints(deckCourse)" :key="deckCourse.id + pi">
+                      <div class="flex items-stretch border-b border-slate-100 last:border-b-0" :class="pi % 2 ? 'bg-slate-50/60' : 'bg-white'">
+                        <span class="flex w-12 shrink-0 items-center justify-center text-[20px] font-extrabold text-white" :class="['bg-royal','bg-cyanx','bg-gold'][pi % 3]" x-text="pi + 1"></span>
+                        <span class="px-3.5 py-2.5 text-[15px] font-medium leading-snug text-slate-800" x-text="pt"></span>
+                      </div>
+                    </template>
+                  </div>
+
+                  <details class="group overflow-hidden rounded-xl border border-slate-300 bg-slate-50 max-lg:order-5">
+                    <summary class="flex min-h-[48px] cursor-pointer list-none items-center justify-between px-4 py-3 text-[15px] font-extrabold text-slate-600 transition hover:text-royal [&::-webkit-details-marker]:hidden">
+                      <span x-text="t('sheet_full')"></span>
+                      <svg class="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </summary>
+                    <p class="whitespace-pre-line border-t border-slate-200 px-4 py-3 text-[15px] leading-[1.7] text-slate-600" x-text="deckCourse.overview"></p>
+                  </details>
+                </div>
+              </div>
+
+
+              <!-- SECTION 2 · PREFERENCES -->
+              <div x-show="step===2" x-cloak x-transition.opacity>
+                <h3 class="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="t('h_prefs')"></h3>
+                <p class="mt-1.5 text-[16px] leading-relaxed text-slate-500" x-text="t('prefs_lead')"></p>
+
+                <div class="mt-6 space-y-6">
+                  <div>
+                    <p class="text-[17px] font-bold leading-snug text-slate-800" x-text="qMode"></p>
+                    <div class="mt-2.5 grid gap-2 sm:grid-cols-2">
+                      <template x-for="(m, i) in studyModes" :key="i">
+                        <button type="button" @click="form.study_mode = m" class="opt" :class="form.study_mode===m ? 'opt-on' : ''">
+                          <span class="opt-dot"></span><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal" x-html="prefIcon('mode', i)"></span><span x-text="m"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p class="text-[17px] font-bold leading-snug text-slate-800" x-text="qFee"></p>
+                    <div class="mt-2.5 grid gap-2 sm:grid-cols-2">
+                      <template x-for="(f, i) in feeRanges" :key="i">
+                        <button type="button" @click="form.fee_range = f" class="opt" :class="form.fee_range===f ? 'opt-on' : ''">
+                          <span class="opt-dot"></span><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal" x-html="prefIcon('fee', i)"></span><span x-text="f"></span>
+                        </button>
+                      </template>
+                    </div>
+                    <div x-show="form.fee_range==='Others'" x-cloak class="mt-3">
+                      <label class="text-[13px] font-bold uppercase tracking-[0.16em] text-slate-500" x-text="t('p_fee_other')"></label>
+                      <div class="relative mt-2">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[15px] font-bold text-slate-400">RM</span>
+                        <input type="number" min="0" x-model="form.fee_other" class="field pl-12" placeholder="0" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p class="text-[17px] font-bold leading-snug text-slate-800" x-text="qInterest"></p>
+                    <div class="mt-2.5 grid gap-2 sm:grid-cols-2">
+                      <template x-for="(o, i) in interestOptions" :key="i">
+                        <button type="button" @click="form.interest = o" class="opt" :class="form.interest===o ? 'opt-on' : ''">
+                          <span class="opt-dot"></span><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal/10 text-royal" x-html="prefIcon('interest', i)"></span><span x-text="o"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <div class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <p class="text-[17px] font-semibold leading-relaxed text-slate-800" x-text="qFeedback"></p>
+                      <span class="chip shrink-0 !py-1 !text-[13px]" x-text="t('optional')"></span>
+                    </div>
+                    <textarea x-model="form.feedback" rows="4" :placeholder="t('p_feedback_ph')" class="field mt-3 resize-none"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION 3 · REVIEW -->
+              <div x-show="step===3" x-cloak x-transition.opacity>
+                <h3 class="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl" x-text="t('h_review')"></h3>
+                <p class="mt-1.5 text-[16px] leading-relaxed text-slate-500" x-text="t('review_lead')"></p>
+
+                <div class="mt-5 space-y-3">
+                  <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-300 panel-shade p-4">
+                    <div class="min-w-0">
+                      <p class="text-[13px] font-bold uppercase tracking-[0.16em] text-slate-400" x-text="t('review_profile')"></p>
+                      <p class="mt-1.5 break-all text-[16px] font-semibold text-slate-900" x-text="form.email"></p>
+                      <p class="mt-0.5 text-[15px] leading-snug text-slate-500" x-text="form.category + (form.category==='Others' && form.category_other ? ' — ' + form.category_other : '')"></p>
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        <template x-for="(c, i) in form.criteria" :key="i">
+                          <span class="chip !whitespace-normal !py-1 !text-[13px] !leading-snug" x-text="c"></span>
+                        </template>
+                      </div>
+                    </div>
+                    <button @click="editProfile()" class="chip shrink-0 !px-3 !py-2 !text-[14px]" x-text="t('review_edit')"></button>
+                  </div>
+
+                  <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-300 panel-shade p-4">
+                    <div class="min-w-0">
+                      <p class="text-[13px] font-bold uppercase tracking-[0.16em] text-slate-400" x-text="t('review_courses')"></p>
+                      <p class="mt-1.5 text-[16px] font-semibold text-slate-900" x-text="ratedCount + ' / ' + courseCount + ' ' + t('review_rated')"></p>
+                      <p class="mt-0.5 text-[15px] text-slate-500">40 credits · 34 core / 6 elective</p>
+                    </div>
+                    <button @click="goStep(1)" class="chip shrink-0 !px-3 !py-2 !text-[14px]" x-text="t('review_edit')"></button>
+                  </div>
+
+                  <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-300 panel-shade p-4">
+                    <div class="min-w-0">
+                      <p class="text-[13px] font-bold uppercase tracking-[0.16em] text-slate-400" x-text="t('review_prefs')"></p>
+                      <p class="mt-1.5 text-[16px] font-semibold leading-snug text-slate-900" x-text="form.study_mode || '—'"></p>
+                      <p class="mt-0.5 text-[15px] leading-snug text-slate-500" x-text="(form.fee_range || '—') + (form.fee_range==='Others' && form.fee_other ? ' : RM ' + form.fee_other : '')"></p>
+                      <p class="mt-0.5 text-[15px] leading-snug text-slate-500" x-text="form.interest || '—'"></p>
+                    </div>
+                    <button @click="goStep(2)" class="chip shrink-0 !px-3 !py-2 !text-[14px]" x-text="t('review_edit')"></button>
+                  </div>
+
+                  <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-300 panel-shade p-4">
+                    <div class="min-w-0">
+                      <p class="text-[13px] font-bold uppercase tracking-[0.16em] text-slate-400" x-text="t('review_feedback')"></p>
+                      <p class="mt-1.5 break-words text-[15px] leading-relaxed text-slate-500" x-text="form.feedback || '—'"></p>
+                    </div>
+                    <button @click="goStep(2)" class="chip shrink-0 !px-3 !py-2 !text-[14px]" x-text="t('review_edit')"></button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- footer nav (always visible) -->
+            <div class="mt-3 flex shrink-0 items-stretch gap-3">
+              <button x-show="step===1" @click="deckPrev()" :disabled="deckIndex === 0" class="btn-ghost flex-1 rounded-xl py-3.5 text-[16px] font-extrabold disabled:opacity-40" x-text="t('card_prev')"></button>
+              <button x-show="step>1" @click="back()" class="btn-ghost flex-1 rounded-xl py-3.5 text-[16px] font-extrabold" x-text="t('btn_back')"></button>
+              <button x-show="step===1" @click="deckNext()" class="btn-primary flex-[2] rounded-xl py-3.5 text-[17px] font-extrabold" x-text="deckLast ? t('card_continue') : t('card_next')"></button>
+              <button x-show="step===2" @click="next()" class="btn-primary flex-[2] rounded-xl py-3.5 text-[17px] font-extrabold" x-text="t('btn_next')"></button>
+              <button x-show="step===3" @click="submit()" :disabled="loading" class="btn-gold flex-[2] flex items-center justify-center gap-2 rounded-xl py-3.5 text-[17px] font-extrabold">
+                <svg x-show="loading" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                <span x-text="loading ? '…' : t('btn_submit')"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p x-show="!started" class="mt-6 text-center text-[14px] text-slate-400">
+          © <span x-text="new Date().getFullYear()"></span> IMEN · Universiti Kebangsaan Malaysia. Responses are used for programme development only.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="border-t border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row sm:px-8">
+      <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center sm:text-left">
+        <img src="assets/logo-dark.png" alt="IMEN" class="h-8 w-auto opacity-80" />
+        <div class="hidden h-6 w-px bg-slate-200 sm:block"></div>
+        <p class="text-[13px] font-semibold uppercase tracking-[0.14em] text-slate-400">Institute of Microengineering &amp; Nanoelectronics</p>
+      </div>
+      <p class="text-[13px] text-slate-400">Universiti Kebangsaan Malaysia · Marketability Study 2026</p>
+    </div>
+  </footer>
+
+  
+
+  <!-- ================= ALERT ================= -->
+  <div x-show="showAlert" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center p-6">
+    <div class="absolute inset-0 bg-slate-900/35 backdrop-blur-sm" @click="showAlert=false"></div>
+    <div class="glass-sheet relative w-full max-w-[340px] rounded-[1.5rem] p-6 text-center">
+      <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.9L2.5 18a1.8 1.8 0 001.6 2.7h15.8A1.8 1.8 0 0021.5 18L13.7 3.9a1.9 1.9 0 00-3.4 0z"/></svg>
+      </div>
+      <h3 class="mt-3 text-lg font-extrabold text-slate-900" x-text="alertTitle"></h3>
+      <p class="mt-1.5 text-[16px] leading-relaxed text-slate-500" x-text="alertMsg"></p>
+      <button @click="showAlert=false" class="btn-primary mt-5 w-full rounded-xl py-3.5 text-[16px] font-extrabold">OK</button>
+    </div>
+  </div>
+
+  <!-- ================= THANK YOU ================= -->
+  <div x-show="submitted" x-cloak class="fixed inset-0 z-[110] overflow-y-auto">
+    <div class="absolute inset-0 bg-aurora"></div>
+    <div class="grid-overlay absolute inset-0"></div>
+    <div class="relative flex min-h-full items-center justify-center px-5 py-16">
+      <div class="glass w-full max-w-lg rounded-[1.75rem] p-8 text-center sm:p-12">
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+          <svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h2 class="mt-6 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl" x-text="t('thank_title')"></h2>
+        <p class="mt-3 text-[15px] leading-relaxed text-slate-600" x-text="t('thank_msg')"></p>
+        <button @click="reset()" class="btn-primary mt-8 w-full rounded-xl py-4 text-[15px] font-extrabold" x-text="t('thank_again')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SCRIPTS ================= -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="assets/data.js?v=35"></script>
+  <script src="assets/course-kit.js?v=35"></script>
+    <script src="assets/courses/device.js?v=35"></script>
+  <script src="assets/courses/fab.js?v=35"></script>
+  <script src="assets/courses/materials.js?v=35"></script>
+  <script src="assets/courses/package.js?v=35"></script>
+  <script src="assets/courses/systems.js?v=35"></script>
+  <script src="assets/courses/research.js?v=35"></script>
+  <script src="assets/courses/management.js?v=35"></script>
+  <script src="assets/courses/project1.js?v=35"></script>
+  <script src="assets/courses/project2.js?v=35"></script>
+  <script src="assets/courses/vlsi.js?v=35"></script>
+  <script src="assets/courses/mems.js?v=35"></script>
+  <script src="assets/courses/photonics.js?v=35"></script>
+  <script src="assets/courses/failure.js?v=35"></script>
+  <script src="assets/courses/supply.js?v=35"></script>
+  <script src="assets/scenes.js?v=35"></script>
+  <script src="assets/survey.js?v=35"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</body>
+</html>

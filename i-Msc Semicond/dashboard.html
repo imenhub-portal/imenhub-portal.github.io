@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Analysis Dashboard — M.Sc. Semiconductor Engineering | IMEN</title>
+  <link rel="icon" href="https://www.ukm.my/portal/wp-content/uploads/2019/04/favicon.png" type="image/png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { navy: "#002366", royal: "#0b3a8f", gold: "#d99a00", cyanx: "#0ea5e9" },
+          fontFamily: {
+            sans: ["Inter", "system-ui", "sans-serif"],
+            display: ["Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="assets/imen.css?v=41" />
+  <style>
+    .sec { scroll-margin-top: 16px; }
+    @media (min-width: 640px) { .sec { scroll-margin-top: 150px; } }
+    .card { border: 1px solid #cbd5e1; background: #f8fafd; border-radius: 1.25rem; box-shadow: 0 8px 18px -14px rgba(11,27,51,.35), inset 0 1px 0 #fff; }
+    .tbl th { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: #64748b; font-weight: 800; text-align: left; padding: .65rem .75rem; background: #eef3fb; position: sticky; top: 0; }
+    .tbl td { padding: .7rem .75rem; font-size: 15px; border-top: 1px solid #e2e8f0; vertical-align: middle; }
+    .tbl tr:hover td { background: #f1f6fd; }
+    .menu { display: none; }
+    .menu.open { display: block; }
+    @media print {
+      @page { size: A4; margin: 12mm; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { background: #fff !important; }
+      table { font-size: 12px; }
+      .tbl td, .tbl th { padding: .35rem .5rem !important; font-size: 12px !important; }
+      .no-print { display: none !important; }
+      .card, .print-block { box-shadow: none !important; break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      main { max-width: 100% !important; padding: 0 !important; }
+      .sec { break-inside: avoid-page; }
+      .print-only { display: block !important; }
+      .scroll-x { overflow: visible !important; }
+    }
+    .print-only { display: none; }
+  </style>
+</head>
+
+<body class="bg-aurora min-h-screen text-slate-900 antialiased">
+
+  <!-- ================= LOGIN GATE ================= -->
+  <div id="gate" class="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-5">
+    <div class="grid-overlay pointer-events-none absolute inset-0"></div>
+    <div class="relative w-full max-w-md">
+      <div class="glass rounded-[2rem] p-7 sm:p-9">
+        <div class="flex items-center justify-between">
+          <img src="assets/logo-dark.png" alt="IMEN" class="h-10 w-auto" />
+          <span class="chip chip-gold">Admin</span>
+        </div>
+        <h1 class="mt-7 text-3xl font-extrabold tracking-tight text-slate-900">Analysis dashboard</h1>
+        <p class="mt-2 text-[16px] leading-relaxed text-slate-500">Marketability study · M.Sc. Semiconductor Engineering. Authorised access only.</p>
+
+        <label class="mt-7 block text-[14px] font-bold uppercase tracking-[0.14em] text-slate-500">Dashboard password</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Enter dashboard password" class="field mt-2" />
+        <p id="gateError" class="mt-2 min-h-[20px] text-[15px] font-semibold text-rose-600"></p>
+        <button id="unlockBtn" class="btn-primary mt-3 w-full rounded-2xl py-4 text-[17px] font-extrabold">Unlock dashboard</button>
+
+        <div id="gateHint" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[14px] font-semibold leading-relaxed text-amber-700">
+          Demo mode — password: <span class="font-extrabold">imen-demo</span>
+        </div>
+        <a href="?preview=1" class="mt-5 flex items-center justify-center gap-2 rounded-xl border border-royal/25 bg-royal/5 px-4 py-3 text-[15px] font-extrabold text-royal transition hover:bg-royal/10">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview with sample data
+        </a>
+        <div class="mt-6 flex items-center gap-2 border-t border-slate-200 pt-4 text-[14px] font-semibold text-slate-400">
+          Responses are aggregated anonymously for programme analysis.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= APP ================= -->
+  <div id="app" class="hidden min-h-screen">
+    <header class="no-print z-40 sm:sticky sm:top-0 border-b border-slate-300 bg-white/95">
+      <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 sm:px-6">
+        <div class="flex min-w-0 items-center gap-3">
+          <img src="assets/logo-dark.png" alt="IMEN" class="h-9 w-auto shrink-0" />
+          <div class="hidden h-8 w-px bg-slate-300 sm:block"></div>
+          <div class="hidden sm:block">
+            <p class="text-[16px] font-extrabold leading-tight text-slate-900">Analysis Dashboard</p>
+            <p class="text-[12.5px] font-semibold uppercase tracking-[0.12em] text-slate-400">M.Sc. Semiconductor Engineering</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <span id="badgeSample" class="chip chip-gold hidden">Sample data</span>
+          <span id="badgeLive" class="chip chip-cyan hidden">Live</span>
+
+          <div class="relative">
+            <button id="dlBtn" class="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-extrabold">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+              Download
+            </button>
+            <div id="dlMenu" class="menu absolute right-0 z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-xl">
+              <button data-dl="xlsx" class="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-[12px] font-extrabold text-emerald-700">XLSX</span>
+                <span><span class="block text-[15px] font-extrabold text-slate-900">Excel workbook</span><span class="block text-[13px] text-slate-500">Every analysis table, one sheet each + raw data</span></span>
+              </button>
+              <button data-dl="pdf" class="flex w-full items-start gap-3 border-t border-slate-100 px-4 py-3 text-left hover:bg-slate-50">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-[12px] font-extrabold text-rose-700">PDF</span>
+                <span><span class="block text-[15px] font-extrabold text-slate-900">Full report (PDF)</span><span class="block text-[13px] text-slate-500">Opens print view — choose “Save as PDF”</span></span>
+              </button>
+              <button data-dl="csv-raw" class="flex w-full items-start gap-3 border-t border-slate-100 px-4 py-3 text-left hover:bg-slate-50">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-[12px] font-extrabold text-sky-700">CSV</span>
+                <span><span class="block text-[15px] font-extrabold text-slate-900">Raw responses</span><span class="block text-[13px] text-slate-500">One row per respondent (filtered view)</span></span>
+              </button>
+              <button data-dl="csv-summary" class="flex w-full items-start gap-3 border-t border-slate-100 px-4 py-3 text-left hover:bg-slate-50">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-[12px] font-extrabold text-sky-700">CSV</span>
+                <span><span class="block text-[15px] font-extrabold text-slate-900">Analysis summary</span><span class="block text-[13px] text-slate-500">All result tables in one CSV file</span></span>
+              </button>
+              <button data-dl="json" class="flex w-full items-start gap-3 border-t border-slate-100 px-4 py-3 text-left hover:bg-slate-50">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-[12px] font-extrabold text-amber-700">JSON</span>
+                <span><span class="block text-[15px] font-extrabold text-slate-900">JSON export</span><span class="block text-[13px] text-slate-500">Tables + responses for further analysis</span></span>
+              </button>
+            </div>
+          </div>
+          <button id="refreshBtn" class="btn-ghost rounded-xl px-3.5 py-2.5 text-[15px] font-bold">Refresh</button>
+          <button id="logoutBtn" class="btn-ghost rounded-xl px-3.5 py-2.5 text-[15px] font-bold !text-rose-600">Log out</button>
+        </div>
+      </div>
+      <nav class="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2.5 sm:px-6" id="secNav">
+        <a href="#sec-summary" class="chip chip-blue shrink-0 !text-[14px]">Summary</a>
+        <a href="#sec-courses" class="chip chip-blue shrink-0 !text-[14px]">Courses</a>
+        <a href="#sec-segments" class="chip chip-blue shrink-0 !text-[14px]">Segments</a>
+        <a href="#sec-demand" class="chip chip-blue shrink-0 !text-[14px]">Demand</a>
+        <a href="#sec-criteria" class="chip chip-blue shrink-0 !text-[14px]">Criteria</a>
+        <a href="#sec-profile" class="chip chip-blue shrink-0 !text-[14px]">Respondents</a>
+        <a href="#sec-feedback" class="chip chip-blue shrink-0 !text-[14px]">Feedback</a>
+        <a href="#sec-data" class="chip chip-blue shrink-0 !text-[14px]">Data</a>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-7xl space-y-8 px-3 py-6 sm:px-6">
+      <div id="sampleBanner" class="no-print hidden rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-[15px] font-semibold text-amber-800">
+        You are viewing a <b>preview with generated sample data</b> — these are not real responses. Real responses appear here after you unlock the dashboard with the admin password.
+      </div>
+
+      <!-- print title -->
+      <div class="print-only">
+        <h1 class="text-2xl font-extrabold">M.Sc. Semiconductor Engineering — Marketability Study Report</h1>
+        <p id="printMeta" class="mt-1 text-[13px] text-slate-500"></p>
+      </div>
+
+      <!-- filters -->
+      <section class="no-print card p-4 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="text-[14px] font-extrabold uppercase tracking-[0.14em] text-slate-500">Filter the analysis</p>
+          <p class="text-[15px] font-bold text-slate-600"><span id="filterCount" class="text-royal">0</span> of <span id="totalCount">0</span> responses · updated <span id="lastUpdated">—</span></p>
+        </div>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <label class="block"><span class="mb-1 block text-[13px] font-bold text-slate-500">Respondent category</span><select id="fCategory" class="field !py-2.5"></select></label>
+          <label class="block"><span class="mb-1 block text-[13px] font-bold text-slate-500">Preferred study mode</span><select id="fMode" class="field !py-2.5"></select></label>
+          <label class="block"><span class="mb-1 block text-[13px] font-bold text-slate-500">Interest</span><select id="fInterest" class="field !py-2.5"></select></label>
+          <label class="block"><span class="mb-1 block text-[13px] font-bold text-slate-500">Language</span><select id="fLang" class="field !py-2.5"></select></label>
+          <label class="block"><span class="mb-1 block text-[13px] font-bold text-slate-500">Period</span>
+            <select id="fPeriod" class="field !py-2.5">
+              <option value="0">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option>
+            </select></label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <div id="activeFilters" class="flex flex-wrap gap-2"></div>
+          <button id="clearFilters" class="min-h-[44px] rounded-xl px-3 py-2 text-[15px] font-bold text-royal hover:bg-slate-100">Clear all filters</button>
+        </div>
+      </section>
+
+      <!-- 1 · summary -->
+      <section id="sec-summary" class="sec space-y-5">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" id="kpis"></div>
+        <div class="card print-block p-5 sm:p-7">
+          <div class="flex items-center gap-3">
+            <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-royal to-blue-700 text-white"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 3h6l1 3h3v14H5V6h3zM9 12h6M9 16h4"/></svg></span>
+            <div><h2 class="text-2xl font-extrabold tracking-tight">Key findings</h2><p class="text-[15px] text-slate-500">Generated automatically from the filtered responses.</p></div>
+          </div>
+          <ol id="findings" class="mt-4 space-y-3"></ol>
+        </div>
+      </section>
+
+      <!-- 2 · courses -->
+      <section id="sec-courses" class="sec card print-block p-5 sm:p-7">
+        <h2 class="text-2xl font-extrabold tracking-tight">Course suitability ratings</h2>
+        <p class="mt-1 text-[15px] text-slate-500">Mean rating on the 1–5 scale (1 = Highly Unsuitable, 5 = Highly Suitable) with 95% confidence interval. <b>Favourable</b> = share rating 4 or 5.</p>
+        <div class="mt-4 flex flex-wrap items-center gap-2 no-print" id="courseSort"></div>
+        <div class="scroll-x mt-3 overflow-x-auto rounded-xl border border-slate-300 bg-white"><table class="tbl w-full min-w-[920px]"><thead><tr>
+          <th>#</th><th>Course</th><th>Type</th><th>n</th><th>Mean ± 95% CI</th><th>SD</th><th>Favourable</th><th style="min-width:210px">Rating distribution</th><th>Verdict</th></tr></thead>
+          <tbody id="courseTable"></tbody></table></div>
+        <div id="courseLegend" class="mt-3 flex flex-wrap items-center gap-3 text-[14px] font-semibold text-slate-600"></div>
+        <div class="mt-6 grid gap-4 md:grid-cols-2" id="typeCompare"></div>
+      </section>
+
+      <!-- 3 · segments -->
+      <section id="sec-segments" class="sec card print-block p-5 sm:p-7">
+        <h2 class="text-2xl font-extrabold tracking-tight">Who rates what? Course × respondent category</h2>
+        <p class="mt-1 text-[15px] text-slate-500">Mean rating per category. Cells with fewer than 3 responses are greyed — read them as indicative only.</p>
+        <div id="segHeat" class="scroll-x mt-4 overflow-x-auto"></div>
+      </section>
+
+      <!-- 4 · demand -->
+      <section id="sec-demand" class="sec space-y-5">
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Interest in the programme</h2><p class="mt-1 text-[15px] text-slate-500">How respondents would engage.</p><div id="interestChart" class="mt-4"></div></div>
+          <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Preferred study mode</h2><p class="mt-1 text-[15px] text-slate-500">Recommended delivery format.</p><div id="modeChart" class="mt-4"></div></div>
+          <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Tuition fee preference</h2><p class="mt-1 text-[15px] text-slate-500">Suggested reasonable fee for local students.</p><div id="feeChart" class="mt-4"></div></div>
+          <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Interest by respondent category</h2><p class="mt-1 text-[15px] text-slate-500">Share of each category that would enrol, sponsor or encourage others.</p><div id="interestByCat" class="mt-4"></div></div>
+        </div>
+        <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Study mode × fee band</h2><p class="mt-1 text-[15px] text-slate-500">Which delivery mode goes with which fee expectation (counts).</p><div id="modeFee" class="scroll-x mt-4 overflow-x-auto"></div></div>
+      </section>
+
+      <!-- 5 · criteria -->
+      <section id="sec-criteria" class="sec card print-block p-5 sm:p-7">
+        <h2 class="text-2xl font-extrabold tracking-tight">What makes the programme valuable to the market?</h2>
+        <p class="mt-1 text-[15px] text-slate-500">Share of respondents who selected each criterion (multiple answers allowed).</p>
+        <div id="criteriaChart" class="mt-4"></div>
+        <div id="criteriaByCat" class="scroll-x mt-6 overflow-x-auto"></div>
+      </section>
+
+      <!-- 6 · respondents -->
+      <section id="sec-profile" class="sec grid gap-5 lg:grid-cols-3">
+        <div class="card print-block p-5 sm:p-7 lg:col-span-2"><h2 class="text-xl font-extrabold">Respondent categories</h2><div id="catChart" class="mt-4"></div></div>
+        <div class="space-y-5">
+          <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Language used</h2><div id="langChart" class="mt-4"></div></div>
+          <div class="card print-block p-5 sm:p-7"><h2 class="text-xl font-extrabold">Responses per day</h2><div id="timeline" class="mt-4"></div></div>
+        </div>
+      </section>
+
+      <!-- 7 · feedback -->
+      <section id="sec-feedback" class="sec card print-block p-5 sm:p-7">
+        <h2 class="text-2xl font-extrabold tracking-tight">Open feedback</h2>
+        <p class="mt-1 text-[15px] text-slate-500">Suggestions to improve the programme, and the words that come up most.</p>
+        <div id="keywords" class="mt-4 flex flex-wrap gap-2"></div>
+        <div id="feedbackList" class="mt-5 grid gap-3 md:grid-cols-2"></div>
+      </section>
+
+      <!-- 8 · data -->
+      <section id="sec-data" class="sec card print-block p-5 sm:p-7">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 class="text-2xl font-extrabold tracking-tight">Response data</h2><p class="mt-1 text-[15px] text-slate-500">Every response in the current filter.</p></div>
+          <input id="dataSearch" type="search" placeholder="Search responses…" class="field no-print !w-full !py-2.5 sm:!w-72" />
+        </div>
+        <div class="scroll-x mt-4 overflow-x-auto rounded-xl border border-slate-300 bg-white"><table class="tbl w-full min-w-[900px]"><thead><tr>
+          <th>Date</th><th>Category</th><th>Mode</th><th>Fee</th><th>Interest</th><th>Core ⌀</th><th>Elective ⌀</th><th>Lang</th></tr></thead><tbody id="dataTable"></tbody></table></div>
+        <div class="no-print mt-3 flex items-center justify-between gap-3">
+          <p id="pageInfo" class="text-[14px] font-semibold text-slate-500"></p>
+          <div class="flex gap-2"><button id="prevPage" class="btn-ghost rounded-xl px-4 py-2 text-[15px] font-bold">Previous</button><button id="nextPage" class="btn-ghost rounded-xl px-4 py-2 text-[15px] font-bold">Next</button></div>
+        </div>
+      </section>
+
+      <section class="card print-block p-5 sm:p-7">
+        <h2 class="text-xl font-extrabold">Method notes</h2>
+        <ul class="mt-3 list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-slate-600">
+          <li>Ratings use a 1–5 scale; the confidence interval is mean ± 1.96 × SD ÷ √n (normal approximation). With fewer than 30 responses treat intervals as indicative.</li>
+          <li>Verdict: <b>Strong</b> = mean ≥ 4.2 and ≥ 80% favourable; <b>Good</b> = mean ≥ 3.8 and ≥ 65% favourable; <b>Review</b> = mean ≥ 3.3; otherwise <b>Reconsider</b>.</li>
+          <li>Interest groups: “Intent” = would enrol personally or nominate / sponsor staff; “Advocacy” = would encourage family or friends.</li>
+          <li>Fee midpoints used for the median: RM 12,500 · RM 17,500 · RM 22,500; “Others” uses the amount typed by the respondent.</li>
+          <li>All language versions of the survey are combined; the questionnaire answers are always stored in English.</li>
+        </ul>
+      </section>
+      <p class="no-print pb-6 text-center text-[14px] text-slate-400">IMEN · Universiti Kebangsaan Malaysia</p>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="assets/data.js"></script>
+  <script src="assets/dashboard.js?v=42"></script>
+</body>
+</html>

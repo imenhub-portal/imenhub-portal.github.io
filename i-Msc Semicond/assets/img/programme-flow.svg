@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-label="Programme flow: foundations, fabrication, systems and practice, research and specialisation">
+  <defs>
+    <linearGradient id="track" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="0.55" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <path d="M120 150 H840" stroke="#e3eaf6" stroke-width="4" stroke-linecap="round"/>
+  <path d="M120 150 H840" stroke="url(#track)" stroke-width="4" stroke-linecap="round" stroke-dasharray="0 0"/>
+  <g>
+    <circle cx="120" cy="150" r="30" fill="#0b3a8f"/>
+    <text x="120" y="157" text-anchor="middle" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#fff">01</text>
+  </g>
+  <g>
+    <circle cx="360" cy="150" r="30" fill="#d99a00"/>
+    <text x="360" y="157" text-anchor="middle" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#fff">02</text>
+  </g>
+  <g>
+    <circle cx="600" cy="150" r="30" fill="#0ea5e9"/>
+    <text x="600" y="157" text-anchor="middle" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#fff">03</text>
+  </g>
+  <g>
+    <circle cx="840" cy="150" r="30" fill="#10b981"/>
+    <text x="840" y="157" text-anchor="middle" font-family="Inter, sans-serif" font-size="16" font-weight="800" fill="#fff">04</text>
+  </g>
+</svg>
