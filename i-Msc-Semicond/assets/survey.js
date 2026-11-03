@@ -326,8 +326,9 @@ function surveyApp() {
         }
         return;
       }
-      setTimeout(() => {
+      this.$nextTick(() => {
         const canvas = this.$refs.deckCanvas;
+        if (!(this.started && this.step === 1)) return;
         if (!canvas || !window.IMEN) return;
         try {
           if (!this.deckViewer) {
@@ -338,7 +339,7 @@ function surveyApp() {
         } catch (e) {
           console.warn("Course scene unavailable:", e);
         }
-      }, 80);
+      });
     },
     /* ---------- icons: rating faces + preference options ---------- */
     rateColor(v) {

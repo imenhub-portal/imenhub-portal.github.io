@@ -632,6 +632,8 @@
       die.dragging = true;
       die.hovering = false;
       pendingPtr = { clientX: e.clientX, clientY: e.clientY };
+      applyDrag();
+      easeChip();
       e.stopImmediatePropagation();
       canvas.style.cursor = "grabbing";
       dragPlane = makeDragPlane();
@@ -640,8 +642,9 @@
     }
     function dieMove(e) {
       if (!die.dragging) return;
-      // only remember the latest position; the frame loop applies it once per frame
       pendingPtr = { clientX: e.clientX, clientY: e.clientY };
+      applyDrag();
+      easeChip();
       e.stopImmediatePropagation();
     }
     function applyDrag() {
@@ -659,7 +662,7 @@
     }
     function easeChip() {
       if (!die.dragging || !dragTarget) return;
-      const k = 0.6; // light smoothing so the chip glides instead of jittering
+      const k = 1; // track the pointer directly, without trailing interpolation
       const x = chip.position.x + (dragTarget.x - chip.position.x) * k;
       const z = chip.position.z + (dragTarget.z - chip.position.z) * k;
       chip.position.set(x, 0.55, z);
@@ -669,6 +672,9 @@
     }
     function dieUp(e) {
       if (!die.dragging) return;
+      pendingPtr = { clientX: e.clientX, clientY: e.clientY };
+      applyDrag();
+      easeChip();
       die.dragging = false;
       canvas.style.cursor = "grab";
       try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
