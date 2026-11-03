@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex,nofollow" />
   <title>Analysis Dashboard — M.Sc. Semiconductor Engineering | IMEN</title>
-  <link rel="icon" href="https://www.ukm.my/portal/wp-content/uploads/2019/04/favicon.png" type="image/png" />
+  <link rel="icon" href="assets/favicon.png" type="image/png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="assets/imen-emblem.png" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,6 +27,7 @@
     };
   </script>
   <link rel="stylesheet" href="assets/imen.css?v=41" />
+  <link rel="stylesheet" href="assets/dashboard.css?v=1" />
   <style>
     .sec { scroll-margin-top: 16px; }
     @media (min-width: 640px) { .sec { scroll-margin-top: 150px; } }
@@ -66,9 +68,9 @@
         <h1 class="mt-7 text-3xl font-extrabold tracking-tight text-slate-900">Analysis dashboard</h1>
         <p class="mt-2 text-[16px] leading-relaxed text-slate-500">Marketability study · M.Sc. Semiconductor Engineering. Authorised access only.</p>
 
-        <label class="mt-7 block text-[14px] font-bold uppercase tracking-[0.14em] text-slate-500">Dashboard password</label>
+        <label for="password" class="mt-7 block text-[14px] font-bold uppercase tracking-[0.14em] text-slate-500">Dashboard password</label>
         <input id="password" type="password" autocomplete="current-password" placeholder="Enter dashboard password" class="field mt-2" />
-        <p id="gateError" class="mt-2 min-h-[20px] text-[15px] font-semibold text-rose-600"></p>
+        <p id="gateError" role="alert" class="mt-2 min-h-[20px] text-[15px] font-semibold text-rose-600"></p>
         <button id="unlockBtn" class="btn-primary mt-3 w-full rounded-2xl py-4 text-[17px] font-extrabold">Unlock dashboard</button>
 
         <div id="gateHint" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[14px] font-semibold leading-relaxed text-amber-700">
@@ -133,7 +135,7 @@
           <button id="logoutBtn" class="btn-ghost rounded-xl px-3.5 py-2.5 text-[15px] font-bold !text-rose-600">Log out</button>
         </div>
       </div>
-      <nav class="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2.5 sm:px-6" id="secNav">
+      <nav aria-label="Analysis sections" class="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2.5 sm:px-6" id="secNav">
         <a href="#sec-summary" class="chip chip-blue shrink-0 !text-[14px]">Summary</a>
         <a href="#sec-courses" class="chip chip-blue shrink-0 !text-[14px]">Courses</a>
         <a href="#sec-segments" class="chip chip-blue shrink-0 !text-[14px]">Segments</a>
@@ -146,6 +148,14 @@
     </header>
 
     <main class="mx-auto max-w-7xl space-y-8 px-3 py-6 sm:px-6">
+      <div class="dashboard-intro no-print">
+        <div>
+          <p class="dashboard-eyebrow">IMEN · Programme development</p>
+          <h1>Survey insights</h1>
+          <p>Marketability study for the M.Sc. Semiconductor Engineering programme.</p>
+        </div>
+        <a href="index.html" class="dashboard-survey-link">View survey <span aria-hidden="true">↗</span></a>
+      </div>
       <div id="sampleBanner" class="no-print hidden rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-[15px] font-semibold text-amber-800">
         You are viewing a <b>preview with generated sample data</b> — these are not real responses. Real responses appear here after you unlock the dashboard with the admin password.
       </div>
@@ -180,6 +190,7 @@
 
       <!-- 1 · summary -->
       <section id="sec-summary" class="sec space-y-5">
+        <div class="dashboard-section-heading"><p class="dashboard-eyebrow">At a glance</p><h2>Response overview</h2><p>Key indicators for the current selection of responses.</p></div>
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" id="kpis"></div>
         <div class="card print-block p-5 sm:p-7">
           <div class="flex items-center gap-3">

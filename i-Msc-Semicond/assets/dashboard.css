@@ -1,0 +1,63 @@
+/* Dashboard-only presentation; survey styling and analysis logic stay separate. */
+body { background: #f3f6fb; }
+#app header { border-color: #e2e8f0; box-shadow: 0 4px 24px -16px #0b1b3333; backdrop-filter: blur(16px); }
+#app header > div { padding-top: 1rem; padding-bottom: 1rem; }
+#secNav { gap: .35rem; padding-bottom: .75rem; scrollbar-width: thin; }
+#secNav .chip { min-height: 40px; border-color: transparent; border-radius: .7rem; background: transparent; color: #52627a; padding: .5rem .85rem; text-decoration: none; }
+#secNav .chip:hover, #secNav .chip:focus-visible { background: #eaf1ff; color: #0b3a8f; }
+.dashboard-intro { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; padding: .75rem 0 .25rem; }
+.dashboard-eyebrow { color: #0b3a8f; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.dashboard-intro h1 { margin-top: .5rem; font-family: 'Plus Jakarta Sans', sans-serif; font-size: clamp(28px, 4vw, 38px); font-weight: 800; letter-spacing: -.045em; line-height: 1.2; }
+.dashboard-intro h1 + p, .dashboard-section-heading > p:last-child { color: #64748b; font-size: 14px; line-height: 1.6; margin-top: .5rem; }
+.dashboard-survey-link { display: inline-flex; align-items: center; gap: 1rem; flex-shrink: 0; min-height: 44px; color: #0b3a8f; font-size: 14px; font-weight: 700; }
+#app .card { background: #fff; border: 1px solid #e0e7f1; border-radius: 1rem; box-shadow: 0 4px 20px -12px #183d7020; }
+#app .card h2, .dashboard-section-heading h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800; line-height: 1.35; letter-spacing: -.025em; }
+.dashboard-section-heading h2 { margin-top: .35rem; }
+#app .sec { scroll-margin-top: 160px; }
+#app .field { border: 1px solid #ccd7e7; border-radius: .65rem; box-shadow: none; font-size: 14px; background-color: #fafcff; min-height: 44px; }
+#app .field:focus { background: #fff; border-color: #2563eb; box-shadow: 0 0 0 3px #2563eb18; }
+#app button:focus-visible, #app a:focus-visible, #gate a:focus-visible, #gate button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+#app button { min-height: 40px; }
+#kpis > .card { position: relative; overflow: hidden; padding: 1.2rem; }
+#kpis > .card::before { content: ''; position: absolute; left: 0; top: 1.2rem; bottom: 1.2rem; width: 3px; background: #dbeafe; border-radius: 0 3px 3px 0; }
+#kpis > .card > div { gap: .75rem; align-items: flex-start; }
+#kpis > .card > div > p { font-size: 11px; letter-spacing: .06em; line-height: 1.5; }
+#kpis > .card > div > span { flex-shrink: 0; }
+#kpis > .card > p:last-child { font-size: 12px; font-weight: 500; line-height: 1.6; }
+#findings { display: grid; gap: .65rem; }
+#findings li { background: #f7f9fd; border: 1px solid #edf1f7; padding: .9rem; border-radius: .75rem; }
+#findings li > span:last-child { font-size: 14px; line-height: 1.75; }
+#app .tbl th { background: #f5f8fc; color: #64748b; font-size: 10px; letter-spacing: .07em; padding: .9rem .85rem; white-space: nowrap; }
+#app .tbl td { font-size: 13px; padding: .9rem .85rem; border-color: #edf1f7; line-height: 1.6; }
+#app .tbl tbody tr:nth-child(even) { background: #fbfcfe; }
+#app .tbl tr:hover td { background: #eff5ff; }
+#app .scroll-x { border-radius: .75rem; scrollbar-width: thin; scrollbar-color: #bfcee3 #f5f8fc; }
+#activeFilters .chip { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+#gate { background: radial-gradient(ellipse at top, #dfeaff, transparent 65%), #f3f6fb; }
+#gate .glass { background: #fff; border-color: #dce5f2; box-shadow: 0 24px 70px -30px #0b3a8f40; }
+#gate h1 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; }
+@media (max-width: 639px) {
+  #app header > div { justify-content: center; padding: .85rem 1rem; gap: .85rem; }
+  #app header > div > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: .5rem; }
+  #app header > div > div:last-child > .chip { justify-content: center; }
+  #app header #dlBtn { width: 100%; justify-content: center; }
+  #app header button { font-size: 12px; padding: .6rem .75rem; min-height: 44px; }
+  #secNav { padding-top: .25rem; }
+  #secNav .chip { font-size: 12px !important; min-height: 44px; }
+  #app main { padding: 1.25rem 1rem 2rem; }
+  .dashboard-intro { align-items: flex-start; flex-direction: column; gap: .5rem; }
+  .dashboard-survey-link { font-size: 13px; }
+  #app .sec { scroll-margin-top: 1rem; }
+  #app .card h2 { font-size: 18px; }
+  #kpis { gap: .65rem; }
+  #kpis > .card { padding: .9rem; }
+  #kpis > .card > div { flex-direction: column-reverse; gap: .5rem; }
+  #kpis > .card > p:first-of-type { font-size: 26px; }
+  #app .field { font-size: 16px; }
+  #dlMenu { width: min(300px, calc(100vw - 2rem)); right: auto; left: 0; }
+}
+@media print {
+  #app .card { box-shadow: none; border-color: #cbd5e1; }
+  #app .sec { scroll-margin-top: 0; }
+  #findings li { padding: .5rem; }
+}
