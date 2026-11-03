@@ -148,6 +148,20 @@ body {
 .chip-blue { background: #eef4ff; border-color: #cfdffa; color: #0b3a8f; }
 
 /* ---------- cards ---------- */
+/* Keep the introduction short enough to reach the profile sooner on phones. */
+@media (max-width: 639px) {
+  #about { padding-top: 1rem; padding-bottom: 1rem; }
+  #about > .glass { padding: 1rem; }
+  #about .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625rem; margin-top: 1rem; }
+  #about .grid > div { padding: 0.75rem; }
+  #about .grid > div > span.absolute { top: 0.75rem; right: 0.75rem; font-size: 11px; }
+  #about .grid > div > span:not(.absolute) { width: 2rem; height: 2rem; border-radius: 0.625rem; }
+  #about .grid svg { width: 1.125rem; height: 1.125rem; }
+  #about .grid p:first-of-type { margin-top: 0.625rem; font-size: 17px; line-height: 1.25; }
+  #about .grid p:last-of-type { margin-top: 0.375rem; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+  #survey { padding-top: 1.5rem; }
+}
+
 .course-card {
   position: relative;
   overflow: hidden;

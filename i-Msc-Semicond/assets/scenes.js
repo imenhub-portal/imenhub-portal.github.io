@@ -183,7 +183,7 @@
       alpha: true,
       powerPreference: "high-performance"
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
@@ -581,10 +581,10 @@
     const pointerNdc = new THREE.Vector2();
     const hitPoint = new THREE.Vector3();
     // drag plane — the wafer's own surface (root-local y = 0)
-    function makeDragPlane() {
-      const o = new THREE.Vector3(0, 0, 0);
-      const x = new THREE.Vector3(1, 0, 0);
-      const z = new THREE.Vector3(0, 0, 1);
+    function makeDragPlane(height = 0.55) {
+      const o = new THREE.Vector3(0, height, 0);
+      const x = new THREE.Vector3(1, height, 0);
+      const z = new THREE.Vector3(0, height, 1);
       root.localToWorld(o);
       root.localToWorld(x);
       root.localToWorld(z);
@@ -596,6 +596,10 @@
     let onFrame = null;
     let pendingPtr = null; // latest pointer position, applied once per frame
     let dragTarget = null;
+    const grabOffset = new THREE.Vector2();
+    let activePointer = null;
+    const originalTouchAction = canvas.style.touchAction;
+    canvas.style.touchAction = "none";
 
     function toRootLocal(v) {
       const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
@@ -627,24 +631,32 @@
       return raycaster.ray.distanceToPoint(world) < 1.05;
     }
     function dieDown(e) {
+      if (activePointer !== null || (e.button != null && e.button !== 0)) return;
       if (die.placed) return;
       if (!overDie(e)) return;
+      activePointer = e.pointerId;
+      root.updateMatrixWorld(true);
+      dragPlane = makeDragPlane(chip.position.y);
+      const grab = pointerToWafer(e);
+      grabOffset.set(grab ? chip.position.x - grab.x : 0, grab ? chip.position.z - grab.z : 0);
       die.dragging = true;
       die.hovering = false;
       pendingPtr = { clientX: e.clientX, clientY: e.clientY };
       applyDrag();
       easeChip();
+      if (e.cancelable) e.preventDefault();
       e.stopImmediatePropagation();
       canvas.style.cursor = "grabbing";
-      dragPlane = makeDragPlane();
       // keep receiving moves even if the pointer leaves the canvas
       try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     }
     function dieMove(e) {
-      if (!die.dragging) return;
+      if (!die.dragging || e.pointerId !== activePointer) return;
       pendingPtr = { clientX: e.clientX, clientY: e.clientY };
       applyDrag();
       easeChip();
+      if (REDUCED) renderer.render(scene, camera);
+      if (e.cancelable) e.preventDefault();
       e.stopImmediatePropagation();
     }
     function applyDrag() {
@@ -652,6 +664,8 @@
       const p = pointerToWafer(pendingPtr);
       pendingPtr = null;
       if (!p) return;
+      p.x += grabOffset.x;
+      p.z += grabOffset.y;
       const r = Math.hypot(p.x, p.z);
       const maxR = 2.05;
       if (r > maxR) {
@@ -665,17 +679,18 @@
       const k = 1; // track the pointer directly, without trailing interpolation
       const x = chip.position.x + (dragTarget.x - chip.position.x) * k;
       const z = chip.position.z + (dragTarget.z - chip.position.z) * k;
-      chip.position.set(x, 0.55, z);
+      chip.position.set(x, chip.position.y, z);
       chipEdge.position.copy(chip.position);
       shadow.position.set(x, 0.096, z);
       shadow.material.opacity = 0.34;
     }
     function dieUp(e) {
-      if (!die.dragging) return;
+      if (!die.dragging || e.pointerId !== activePointer) return;
       pendingPtr = { clientX: e.clientX, clientY: e.clientY };
       applyDrag();
       easeChip();
       die.dragging = false;
+      activePointer = null;
       canvas.style.cursor = "grab";
       try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
       applyDrag();
@@ -689,6 +704,7 @@
       if (d < 0.7) {
         place();
       }
+      if (REDUCED) renderer.render(scene, camera);
       e.stopImmediatePropagation();
     }
     function place() {
@@ -732,6 +748,7 @@
     canvas.addEventListener("pointercancel", dieUp, true);
     canvas.addEventListener("click", tapPlace);
     function disposeDie() {
+      canvas.style.touchAction = originalTouchAction;
       canvas.removeEventListener("pointerdown", dieDown, true);
       canvas.removeEventListener("pointermove", dieMove, true);
       canvas.removeEventListener("pointerup", dieUp, true);
