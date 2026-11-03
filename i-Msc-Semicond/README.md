@@ -110,7 +110,7 @@ study_mode, fee_range, fee_other, interest, feedback, user_agent`
 ## Deploy to GitHub Pages
 
 The site lives at:
-`https://imenhub-portal.github.io/i-Msc%20Semicond/`
+`https://imenhub-portal.github.io/i-Msc-Semicond/`
 
 Commit and push the folder to `imenhub-portal/imenhub-portal.github.io` on the
 `main` branch. GitHub Pages serves it automatically.
