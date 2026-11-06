@@ -14,6 +14,7 @@ function surveyApp() {
     resumeStep: 1,
     step: 1,
     deckIndex: 0,
+    showingCriteria: false,
     totalSteps: 3,
     tab: "core",
     loading: false,
@@ -357,13 +358,23 @@ function surveyApp() {
       return t(this.lang, "scale_" + v);
     },
     deckNext() {
+      if (this.showingCriteria) return this.next();
       if (!this.ratings[this.deckCourse.id]) return this.alert(this.t("err_title"), this.t("err_rate"));
       this.markRead(this.deckCourse.id);
-      if (this.deckLast) return this.next();
+      if (this.deckLast) {
+        this.showingCriteria = true;
+        this.resetScroll();
+        return;
+      }
       this.deckIndex++;
       this.$nextTick(() => this.scrollTop());
     },
     deckPrev() {
+      if (this.showingCriteria) {
+        this.showingCriteria = false;
+        this.resetScroll();
+        return;
+      }
       if (this.deckIndex > 0) {
         this.deckIndex--;
         this.$nextTick(() => this.scrollTop());
@@ -527,7 +538,10 @@ function surveyApp() {
     back() {
       if (this.step > 1) {
         this.step--;
-        if (this.step === 1) this.deckIndex = COURSES.length - 1;
+        if (this.step === 1) {
+          this.deckIndex = COURSES.length - 1;
+          this.showingCriteria = true;
+        }
         this.saveDraft();
         this.$nextTick(() => this.scrollTop());
       }
@@ -535,7 +549,10 @@ function surveyApp() {
     goStep(n) {
       if (!this.started || n > this.step) return;
       this.step = n;
-      if (n === 1) this.deckIndex = 0;
+      if (n === 1) {
+        this.deckIndex = 0;
+        this.showingCriteria = false;
+      }
       this.saveDraft();
       this.$nextTick(() => this.scrollTop());
     },
