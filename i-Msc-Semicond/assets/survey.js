@@ -475,7 +475,6 @@ function surveyApp() {
       if (!f.category) return this.alert(this.t("err_title"), this.t("err_required"));
       if (f.category === "Others" && !String(f.category_other || "").trim())
         return this.alert(this.t("err_title"), this.t("err_other"));
-      if (!f.criteria.length) return this.alert(this.t("err_title"), this.t("err_criteria"));
 
       this.started = true;
       this.deckIndex = 0;
@@ -505,6 +504,8 @@ function surveyApp() {
     },
     validateStep() {
       const f = this.form;
+      if (this.step === 1 && !f.criteria.length)
+        return this.alert(this.t("err_title"), this.t("err_criteria"));
       if (this.step === 2) {
         if (!f.study_mode || !f.fee_range || !f.interest)
           return this.alert(this.t("err_title"), this.t("err_prefs"));
