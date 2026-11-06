@@ -73,6 +73,8 @@ function surveyApp() {
           // always open on the landing page; Proceed resumes where they left off
           this.started = false;
           this.resumeStep = d.step || 1;
+          this.deckIndex = Math.max(0, Math.min(COURSES.length - 1, Number(d.deckIndex) || 0));
+          this.showingCriteria = !!d.showingCriteria;
         }
       } catch (e) {}
 
@@ -363,20 +365,24 @@ function surveyApp() {
       this.markRead(this.deckCourse.id);
       if (this.deckLast) {
         this.showingCriteria = true;
+        this.saveDraft();
         this.resetScroll();
         return;
       }
       this.deckIndex++;
+      this.saveDraft();
       this.$nextTick(() => this.scrollTop());
     },
     deckPrev() {
       if (this.showingCriteria) {
         this.showingCriteria = false;
+        this.saveDraft();
         this.resetScroll();
         return;
       }
       if (this.deckIndex > 0) {
         this.deckIndex--;
+        this.saveDraft();
         this.$nextTick(() => this.scrollTop());
       }
     },
@@ -488,7 +494,6 @@ function surveyApp() {
         return this.alert(this.t("err_title"), this.t("err_other"));
 
       this.started = true;
-      this.deckIndex = 0;
       this.step = this.resumeStep || 1;
       this.resumeStep = 1;
       this.saveDraft();
@@ -505,7 +510,7 @@ function surveyApp() {
 
     saveDraft() {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: this.form, ratings: this.ratings, started: this.started, step: this.step }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: this.form, ratings: this.ratings, started: this.started, step: this.step, deckIndex: this.deckIndex, showingCriteria: this.showingCriteria }));
       } catch (e) {}
     },
 
@@ -565,11 +570,20 @@ function surveyApp() {
       const i = this.form.criteria.indexOf(c);
       if (i === -1) this.form.criteria.push(c);
       else this.form.criteria.splice(i, 1);
+      this.saveDraft();
     },
 
     /* ---------- submit ---------- */
     async submit() {
+      if (this.loading) return;
       const f = this.form;
+      if (!f.criteria.length) {
+        this.step = 1;
+        this.deckIndex = COURSES.length - 1;
+        this.showingCriteria = true;
+        this.resetScroll();
+        return this.alert(this.t("err_title"), this.t("err_criteria"));
+      }
       if (!f.study_mode || !f.fee_range || !f.interest) {
         this.step = 2;
         this.$nextTick(() => this.scrollTop());
@@ -633,6 +647,8 @@ function surveyApp() {
       this.started = false;
       this.resumeStep = 1;
       this.step = 1;
+      this.deckIndex = 0;
+      this.showingCriteria = false;
       this.form = {
         email: "",
         name: "",
