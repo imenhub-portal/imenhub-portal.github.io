@@ -1,53 +1,957 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kajian Pasaran Pelanggan IMEN</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; overflow: hidden; }
-    iframe {
-      width: 100%;
-      height: 100vh;
-      border: none;
-      display: block;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IMEN Customer Satisfaction Survey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #F2F2F7;
+            -webkit-tap-highlight-color: transparent;
+            background-image:
+                linear-gradient(rgba(242,242,247,0.5), rgba(242,242,247,0.5)),
+                url('https://www.ukm.my/imenhub/wp-content/uploads/2026/01/Banner-For-Homepage-2556-x-950-px.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        .step-container { transition: transform 0.5s cubic-bezier(0.32,0.72,0,1), opacity 0.4s ease; }
+        .fade-enter { opacity:0; transform:translateY(20px) scale(0.98); }
+        .fade-enter-active { opacity:1; transform:translateY(0) scale(1); }
+        .fade-exit-active { opacity:0; transform:scale(0.95); pointer-events:none; position:absolute; width:100%; }
+        .glass-panel { background:rgba(255,255,255,0.85); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.5); }
+        .ios-input { width:100%; padding:16px; border-radius:12px; background-color:#F2F2F7; border:1px solid transparent; font-size:16px; transition:all 0.2s; }
+        .ios-input:focus { background-color:#fff; border-color:#007AFF; outline:none; box-shadow:0 0 0 4px rgba(0,122,255,0.1); }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+        .shake { animation:shake 0.3s ease-in-out; }
+        ::-webkit-scrollbar { width:0px; background:transparent; }
+        @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+         
+        .rate-btn { transition: all 0.15s; }
+         
+        .rate-btn[data-scale="4"]               { border-color:#86efac; color:#166534; background:#f0fdf4; }
+        .rate-btn[data-scale="4"]:hover         { background:#bbf7d0; border-color:#22c55e; }
+        .rate-btn[data-scale="4"].selected      { background:#16a34a; border-color:#15803d; color:#fff; }
+         
+        .rate-btn[data-scale="3"]               { border-color:#a7f3d0; color:#065f46; background:#f0fdfa; }
+        .rate-btn[data-scale="3"]:hover         { background:#6ee7b7; border-color:#10b981; }
+        .rate-btn[data-scale="3"].selected      { background:#059669; border-color:#047857; color:#fff; }
+         
+        .rate-btn[data-scale="2"]               { border-color:#fdba74; color:#9a3412; background:#fff7ed; }
+        .rate-btn[data-scale="2"]:hover         { background:#fed7aa; border-color:#f97316; }
+        .rate-btn[data-scale="2"].selected      { background:#ea580c; border-color:#c2410c; color:#fff; }
+         
+        .rate-btn[data-scale="1"]               { border-color:#fca5a5; color:#991b1b; background:#fef2f2; }
+        .rate-btn[data-scale="1"]:hover         { background:#fecaca; border-color:#ef4444; }
+        .rate-btn[data-scale="1"].selected      { background:#dc2626; border-color:#b91c1c; color:#fff; }
+
+         
+        #admin-modal { display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:16px; }
+        #admin-modal.open { display:flex; }
+    </style>
 </head>
-<body>
+<body class="text-gray-900 antialiased h-screen flex flex-col overflow-hidden selection:bg-blue-100">
 
-  <iframe
-    id="survey-frame"
-    src="https://script.google.com/macros/s/AKfycbz1BqWcJLm81Ug27QybGQzGbs-cbxd_-ebmJJm647WBc-RpVJqujQyFE8dBeBulVFD_hw/exec?authuser=0"
-    allow="downloads"
-    allowfullscreen>
-  </iframe>
+    
+    <header class="fixed top-0 w-full z-50 glass-panel border-b border-gray-200/50">
+        <div class="max-w-2xl mx-auto px-6 h-14 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <img src="https://imenhub-portal.github.io/i-KKPelanggan/assets/imen-emblem.png" alt="IMEN" class="w-9 h-9 object-contain">
+                <span class="font-semibold text-xs tracking-tight text-gray-500">IMEN Customer Satisfaction</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button id="home-btn" onclick="goHome()" class="hidden p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                </button>
+                <div id="progress-indicator" class="hidden text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    Step <span id="current-step-num">1</span> of 3
+                </div>
+                <button id="admin-login-btn" onclick="openAdminModal()" class="p-2 rounded-full hover:bg-gray-100 text-gray-400" title="Admin Login">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
 
-  <script>
-    // ── PDF download bridge ──────────────────────────────────
-    // Browsers block downloads triggered inside cross-origin iframes.
-    // The GAS app posts a message here; the parent page (this file)
-    // lives on the same origin as itself, so it CAN trigger the download.
-    window.addEventListener("message", function(event) {
-      // Only handle our specific message type
-      if (!event.data || event.data.type !== "IMEN_PDF_DOWNLOAD") return;
+    
+    <div id="admin-modal" role="dialog" aria-modal="true">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 space-y-5">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="shield" class="w-6 h-6 text-white"></i>
+                </div>
+                <h2 class="text-xl font-bold">Admin Access</h2>
+                <p class="text-sm text-gray-400 mt-1">Enter password to continue</p>
+            </div>
+            <div>
+                <input type="password" id="admin-password-input" class="ios-input" placeholder="Password"
+                    onkeydown="if(event.key==='Enter') attemptAdminLogin()">
+                <p id="admin-error-msg" class="hidden text-red-500 text-xs mt-2 text-center">Incorrect password. Please try again.</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeAdminModal()" class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition-colors">Cancel</button>
+                <button onclick="attemptAdminLogin()" class="flex-1 py-3 rounded-xl bg-gray-900 text-white font-medium text-sm hover:bg-black transition-colors">Login</button>
+            </div>
+        </div>
+    </div>
 
-      var url      = event.data.url;
-      var filename = event.data.filename || "Laporan_IMEN.pdf";
+    
+    <main class="flex-1 w-full max-w-2xl mx-auto pt-20 pb-24 px-4 relative overflow-y-auto overflow-x-hidden" id="main-container">
 
-      var a = document.createElement("a");
-      a.href     = url;
-      a.download = filename;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function() {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 1000);
+        
+        <div id="view-intro" class="flex flex-col h-full justify-center items-center text-center space-y-6 fade-enter-active step-container px-2">
+            <div class="space-y-4 mb-2 w-full">
+                <img src="https://imenhub-portal.github.io/i-KKPelanggan/assets/imen-emblem.png" alt="Institut Kejuruteraan Mikro dan Nanoelektronik (IMEN)" class="w-28 h-28 object-contain mx-auto drop-shadow-md">
+                <h1 class="text-lg font-bold tracking-tight text-gray-900 leading-snug max-w-md mx-auto px-4">
+                    Maklumbalas Tahap Kepuasan Pelanggan Institut Kejuruteraan Mikro dan Nanoelektronik (IMEN), UKM <span id="dynamic-year"></span>
+                </h1>
+                <p class="text-xs text-gray-400 font-medium tracking-wide uppercase">Customer Satisfaction Survey</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 w-full max-w-sm mx-auto">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center active:scale-95 transition-transform">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mb-2 text-blue-600"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+                    <h3 class="font-bold text-xs text-gray-800">Tingkat Mutu</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Improving Services</p>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center active:scale-95 transition-transform">
+                    <div class="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center mb-2 text-green-600"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
+                    <h3 class="font-bold text-xs text-gray-800">Sulit & Rahsia</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Confidential</p>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center active:scale-95 transition-transform">
+                    <div class="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center mb-2 text-purple-600"><i data-lucide="message-square-quote" class="w-5 h-5"></i></div>
+                    <h3 class="font-bold text-xs text-gray-800">Suara Anda</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Your Feedback Matters</p>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center active:scale-95 transition-transform">
+                    <div class="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center mb-2 text-orange-600"><i data-lucide="clock" class="w-5 h-5"></i></div>
+                    <h3 class="font-bold text-xs text-gray-800">Hanya 2 Minit</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">~2 Minutes</p>
+                </div>
+            </div>
+            <div class="pt-4 w-full flex justify-center">
+                <button onclick="startSurvey()" class="bg-blue-900 hover:bg-blue-950 active:scale-95 transition-all text-white font-medium py-3.5 px-12 rounded-2xl shadow-lg shadow-blue-900/30 w-full max-w-xs text-lg flex items-center justify-center space-x-2">
+                    <span>Mula / Start</span>
+                    <i data-lucide="arrow-right" class="w-5 h-5 opacity-80"></i>
+                </button>
+            </div>
+            <p class="text-[10px] text-gray-400 max-w-xs mx-auto leading-relaxed">
+                Kerjasama anda amat dihargai. Terima kasih!<br>
+                <span class="italic">Your cooperation is greatly appreciated. Thank you!</span>
+            </p>
+        </div>
+
+        
+        <div id="view-step-1" class="hidden absolute top-20 left-0 w-full px-4 step-container fade-enter">
+            <div class="bg-white rounded-3xl shadow-sm p-6 space-y-6 pb-8">
+                <div>
+                    <span class="text-xs font-bold text-blue-900 uppercase tracking-wider">Bahagian A / Part A</span>
+                    <h2 class="text-xl font-bold mt-1">Profil Pelanggan</h2>
+                    <p class="text-gray-400 text-sm">Customer Profile</p>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 ml-1">Fakulti / Pusat / Institut / PTj <span class="text-gray-400 font-normal text-xs">(Optional)</span></label>
+                        <input type="text" id="input-faculty" class="ios-input" placeholder="e.g., FKEKK">
+                    </div>
+                    <div id="input-category-container">
+                        <label class="block text-sm font-medium text-gray-700 mb-2 ml-1">Kategori / Category <span class="text-red-500">*</span></label>
+                        <div class="grid grid-cols-1 gap-2">
+                            <button onclick="selectSingle(this)" data-val="Student"    class="cat-opt w-full text-left p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-white hover:border-blue-200 transition-all flex items-center"><span class="w-4 h-4 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></span> Pelajar / Student</button>
+                            <button onclick="selectSingle(this)" data-val="Academic"   class="cat-opt w-full text-left p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-white hover:border-blue-200 transition-all flex items-center"><span class="w-4 h-4 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></span> Kakitangan Akademik / Academic Staff</button>
+                            <button onclick="selectSingle(this)" data-val="Management" class="cat-opt w-full text-left p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-white hover:border-blue-200 transition-all flex items-center"><span class="w-4 h-4 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></span> Pengurusan & Profesional</button>
+                            <button onclick="selectSingle(this)" data-val="Support"    class="cat-opt w-full text-left p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-white hover:border-blue-200 transition-all flex items-center"><span class="w-4 h-4 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></span> Kumpulan Pelaksana / Support Staff</button>
+                            <button onclick="selectSingle(this)" data-val="Supplier"   class="cat-opt w-full text-left p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-white hover:border-blue-200 transition-all flex items-center"><span class="w-4 h-4 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></span> Pembekal / Supplier</button>
+                            <button onclick="selectSingle(this)" data-val="External"   class="cat-opt w-full text-left p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-white hover:border-blue-200 transition-all flex items-center"><span class="w-4 h-4 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></span> Pelanggan Luar / External</button>
+                        </div>
+                        <p id="error-category" class="hidden text-red-500 text-xs mt-2 ml-1">Sila pilih kategori / Please select a category.</p>
+                        <input type="hidden" id="selected-category" value="">
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button onclick="validateAndNext(1,2)" class="bg-blue-900 text-white px-8 py-3.5 rounded-2xl font-medium shadow-lg active:scale-95 transition-transform flex items-center">
+                    Seterusnya / Next <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        
+        <div id="view-step-2" class="hidden absolute top-20 left-0 w-full px-4 step-container fade-enter pb-20">
+            <div class="bg-white rounded-3xl shadow-sm p-6 mb-4">
+                <div class="mb-5">
+                    <span class="text-xs font-bold text-blue-900 uppercase tracking-wider">Bahagian B / Part B</span>
+                    <h2 class="text-xl font-bold mt-1">Penilaian Perkhidmatan</h2>
+                    <p class="text-gray-400 text-sm mb-3">Service Evaluation — all questions mandatory</p>
+                    <p id="error-q-general" class="hidden text-red-500 text-xs font-medium mb-2">Sila jawab semua soalan / Please answer all questions.</p>
+                    
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="text-[10px] bg-green-100 text-green-800 px-2 py-1 rounded-lg border border-green-200 font-medium">4 — Sangat Memuaskan</span>
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg border border-emerald-200 font-medium">3 — Memuaskan</span>
+                        <span class="text-[10px] bg-orange-100 text-orange-800 px-2 py-1 rounded-lg border border-orange-200 font-medium">2 — Tidak Memuaskan</span>
+                        <span class="text-[10px] bg-red-100 text-red-800 px-2 py-1 rounded-lg border border-red-200 font-medium">1 — Sangat Tidak Memuaskan</span>
+                    </div>
+                </div>
+                <div class="space-y-5" id="questions-container">
+
+                    
+                    <div id="q1-container" class="p-4 rounded-2xl bg-gray-50 border border-gray-100 transition-colors">
+                        <p class="font-medium text-gray-800 text-sm mb-3">1. Kakitangan mengamalkan sikap mesra pelanggan / Customer friendly <span class="text-red-500">*</span></p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="rate(this,'q1')" data-scale="4" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">4</button>
+                            <button onclick="rate(this,'q1')" data-scale="3" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">3</button>
+                            <button onclick="rate(this,'q1')" data-scale="2" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">2</button>
+                            <button onclick="rate(this,'q1')" data-scale="1" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">1</button>
+                        </div>
+                        <input type="hidden" id="q1-val">
+                    </div>
+
+                    
+                    <div id="q2-container" class="p-4 rounded-2xl bg-gray-50 border border-gray-100 transition-colors">
+                        <p class="font-medium text-gray-800 text-sm mb-3">2. Kakitangan berpengetahuan dan berkemahiran / Knowledgeable and competent staff <span class="text-red-500">*</span></p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="rate(this,'q2')" data-scale="4" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">4</button>
+                            <button onclick="rate(this,'q2')" data-scale="3" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">3</button>
+                            <button onclick="rate(this,'q2')" data-scale="2" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">2</button>
+                            <button onclick="rate(this,'q2')" data-scale="1" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">1</button>
+                        </div>
+                        <input type="hidden" id="q2-val">
+                    </div>
+
+                    
+                    <div id="q3-container" class="p-4 rounded-2xl bg-gray-50 border border-gray-100 transition-colors">
+                        <p class="font-medium text-gray-800 text-sm mb-3">3. Kualiti perkhidmatan / produk yang disediakan / Quality of service/product <span class="text-red-500">*</span></p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="rate(this,'q3')" data-scale="4" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">4</button>
+                            <button onclick="rate(this,'q3')" data-scale="3" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">3</button>
+                            <button onclick="rate(this,'q3')" data-scale="2" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">2</button>
+                            <button onclick="rate(this,'q3')" data-scale="1" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">1</button>
+                        </div>
+                        <input type="hidden" id="q3-val">
+                    </div>
+
+                    
+                    <div id="q4-container" class="p-4 rounded-2xl bg-gray-50 border border-gray-100 transition-colors">
+                        <p class="font-medium text-gray-800 text-sm mb-3">4. Tempoh masa untuk mendapatkan perkhidmatan / produk / Waiting time <span class="text-red-500">*</span></p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="rate(this,'q4')" data-scale="4" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">4</button>
+                            <button onclick="rate(this,'q4')" data-scale="3" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">3</button>
+                            <button onclick="rate(this,'q4')" data-scale="2" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">2</button>
+                            <button onclick="rate(this,'q4')" data-scale="1" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">1</button>
+                        </div>
+                        <input type="hidden" id="q4-val">
+                    </div>
+
+                    
+                    <div id="q5-container" class="p-4 rounded-2xl bg-gray-50 border border-gray-100 transition-colors">
+                        <p class="font-medium text-gray-800 text-sm mb-3">5. Persekitaran tempat berurusan adalah selesa dan berinformatif / Comfortable environment <span class="text-red-500">*</span></p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="rate(this,'q5')" data-scale="4" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">4</button>
+                            <button onclick="rate(this,'q5')" data-scale="3" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">3</button>
+                            <button onclick="rate(this,'q5')" data-scale="2" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">2</button>
+                            <button onclick="rate(this,'q5')" data-scale="1" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">1</button>
+                        </div>
+                        <input type="hidden" id="q5-val">
+                    </div>
+
+                    
+                    <div id="q6-container" class="p-4 rounded-2xl bg-gray-50 border border-gray-100 transition-colors">
+                        <p class="font-medium text-gray-800 text-sm mb-3">6. Persepsi umum anda terhadap IMEN / Your overall perception about IMEN <span class="text-red-500">*</span></p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="rate(this,'q6')" data-scale="4" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">4</button>
+                            <button onclick="rate(this,'q6')" data-scale="3" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">3</button>
+                            <button onclick="rate(this,'q6')" data-scale="2" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">2</button>
+                            <button onclick="rate(this,'q6')" data-scale="1" class="rate-btn h-11 rounded-xl border-2 text-sm font-bold">1</button>
+                        </div>
+                        <input type="hidden" id="q6-val">
+                    </div>
+
+                </div>
+            </div>
+            <div class="mt-4 pb-20 flex justify-between items-center">
+                <button onclick="prevStep(2,1)" class="text-gray-500 font-medium px-4 py-2 hover:bg-gray-100 rounded-xl transition-colors">Kembali / Back</button>
+                <button onclick="validateAndNext(2,3)" class="bg-blue-900 text-white px-8 py-3.5 rounded-2xl font-medium shadow-lg active:scale-95 transition-transform flex items-center">
+                    Seterusnya <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        
+        <div id="view-step-3" class="hidden absolute top-20 left-0 w-full px-4 step-container fade-enter">
+            <div class="bg-white rounded-3xl shadow-sm p-6 space-y-6">
+                <div>
+                    <span class="text-xs font-bold text-blue-900 uppercase tracking-wider">Bahagian Akhir / Final Part</span>
+                    <h2 class="text-xl font-bold mt-1">Cadangan & Komen</h2>
+                    <p class="text-gray-400 text-sm">Suggestions & Comments (Optional)</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Sekiranya anda ada cadangan untuk memperbaiki perkhidmatan IMEN:</label>
+                    <textarea id="input-comment" class="w-full bg-gray-50 rounded-2xl p-4 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:bg-white transition-all resize-none h-40 text-base border border-transparent focus:border-blue-200" placeholder="Type here..."></textarea>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-between items-center">
+                <button onclick="prevStep(3,2)" class="text-gray-500 font-medium px-4 py-2 hover:bg-gray-100 rounded-xl transition-colors">Kembali / Back</button>
+                <button id="submit-btn" onclick="handleSubmit()" class="bg-blue-900 text-white px-10 py-3.5 rounded-2xl font-medium shadow-lg shadow-blue-900/30 active:scale-95 transition-transform flex items-center gap-2">
+                    Hantar / Submit
+                </button>
+            </div>
+        </div>
+
+        
+        <div id="view-success" class="hidden absolute top-0 left-0 w-full h-full flex flex-col justify-center items-center bg-[#F2F2F7] z-10 space-y-4 px-6 text-center">
+            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <i data-lucide="check" class="w-10 h-10 text-green-600"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900">Terima Kasih!</h3>
+            <p class="text-gray-500 max-w-xs">Maklum balas anda telah berjaya dihantar. Kerjasama anda amat dihargai.</p>
+            <button onclick="location.reload()" class="mt-8 text-blue-900 font-medium hover:text-blue-800">↩ Kembali ke Halaman Utama</button>
+        </div>
+
+        
+        <div id="view-loading" class="hidden absolute top-0 left-0 w-full h-full flex flex-col justify-center items-center bg-[#F2F2F7] z-10 space-y-4">
+            <div class="relative">
+                <div class="w-16 h-16 rounded-full border-4 border-blue-100"></div>
+                <div class="absolute top-0 left-0 w-16 h-16 rounded-full border-4 border-blue-900 border-t-transparent animate-spin"></div>
+            </div>
+            <div class="text-center space-y-1">
+                <h3 class="text-lg font-semibold text-gray-900">Processing</h3>
+                <p class="text-sm text-gray-500" id="loading-text">Please wait...</p>
+            </div>
+        </div>
+
+        
+        <div id="view-admin" class="hidden absolute top-20 left-0 w-full px-4 step-container fade-enter pb-32">
+            <div class="bg-white rounded-t-3xl shadow-sm border-b border-gray-100 overflow-hidden">
+                
+                <div class="bg-gray-900 p-6 text-white">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="bg-blue-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Confidential</span>
+                            <h2 class="text-xl font-bold mt-2">Admin Dashboard</h2>
+                            <p class="text-gray-400 text-sm" id="admin-period-label">Loading...</p>
+                        </div>
+                        <button onclick="location.reload()" class="text-gray-400 hover:text-white" title="Logout">
+                            <i data-lucide="log-out" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                
+                <div class="p-4 bg-gray-50 border-b border-gray-200 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <label for="admin-year-select" class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Tahun Laporan</label>
+                        <select id="admin-year-select" onchange="onAdminYearChange()"
+                            class="flex-1 max-w-[140px] bg-white border border-gray-200 text-sm font-medium text-gray-900 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-300">
+                            <option value="" id="admin-year-loading">Memuat...</option>
+                        </select>
+                    </div>
+                    <div class="bg-gray-200/80 p-1 rounded-xl flex items-center gap-1">
+                        <button onclick="switchTab('summary')"  id="tab-btn-summary"  class="flex-1 py-2 text-xs font-medium rounded-lg bg-white shadow-sm text-gray-900 transition-all">Ringkasan</button>
+                        <button onclick="switchTab('analysis')" id="tab-btn-analysis" class="flex-1 py-2 text-xs font-medium rounded-lg text-gray-500 hover:text-gray-700 transition-all">Analisis</button>
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    
+                    <div id="tab-summary" class="space-y-6">
+                        <div class="bg-green-50 rounded-2xl p-5 flex items-center justify-between border border-green-100">
+                            <div>
+                                <p class="text-green-800 text-sm font-medium">Purata Keseluruhan</p>
+                                <p class="text-3xl font-bold text-green-700 mt-1" id="summary-overall">—<span class="text-lg text-green-500">%</span></p>
+                                <p class="text-xs text-green-600 mt-1" id="summary-status">Memuat...</p>
+                            </div>
+                            <div class="h-12 w-12 rounded-full border-4 border-green-200 border-r-green-600 transform -rotate-45"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <p class="text-gray-500 text-xs">Total Responden</p>
+                                <p class="text-xl font-bold text-gray-900" id="summary-total">—</p>
+                            </div>
+                            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <p class="text-gray-500 text-xs">Tahun</p>
+                                <p class="text-sm font-bold text-gray-900" id="summary-year">—</p>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-gray-900 mb-4">Performance Overview</h3>
+                            <div id="summary-bars" class="space-y-3">
+                                <p class="text-gray-400 text-sm">Memuat data...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                    <div id="tab-analysis" class="hidden space-y-4">
+                        <div class="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
+                            <p class="text-xs text-blue-800 leading-relaxed">
+                                <strong>Formula:</strong> ((Skala 3 + Skala 4) / Jumlah Responden) × 100
+                            </p>
+                        </div>
+                        <div class="overflow-x-auto -mx-4 px-4 pb-2">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-white bg-blue-900">
+                                    <tr>
+                                        <th class="px-2 py-3 font-medium w-2/5 rounded-tl-lg">Soalan</th>
+                                        <th class="px-1 py-3 font-medium text-center w-10 bg-green-700">4</th>
+                                        <th class="px-1 py-3 font-medium text-center w-10 bg-emerald-600">3</th>
+                                        <th class="px-1 py-3 font-medium text-center w-10 bg-orange-500">2</th>
+                                        <th class="px-1 py-3 font-medium text-center w-10 bg-red-600">1</th>
+                                        <th class="px-2 py-3 font-bold text-right rounded-tr-lg">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="analysis-table-body" class="divide-y divide-gray-100 text-gray-700">
+                                    <tr><td colspan="6" class="px-2 py-4 text-center text-gray-400">Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="mt-6 space-y-3">
+
+                
+                <div class="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">SPPP — Pascasiswazah</p>
+                        <span class="text-[10px] text-gray-400">Skala 1 – 5</span>
+                    </div>
+                    <p class="text-[11px] text-gray-500 -mt-1 leading-snug">Masukkan markah SPPP Semester 1 dan Semester 2 sebelum menjana laporan PDF.</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-medium text-gray-500 mb-1 ml-1">Semester 1</label>
+                            <input type="number" id="sppp-sem1" min="0" max="5" step="0.01" inputmode="decimal"
+                                oninput="updateSpppPreview()"
+                                class="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:bg-white focus:border-blue-300"
+                                placeholder="cth. 4.74">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-gray-500 mb-1 ml-1">Semester 2</label>
+                            <input type="number" id="sppp-sem2" min="0" max="5" step="0.01" inputmode="decimal"
+                                oninput="updateSpppPreview()"
+                                class="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:bg-white focus:border-blue-300"
+                                placeholder="cth. 4.89">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                            <p class="text-[10px] text-gray-500">Purata Markah</p>
+                            <p class="text-sm font-bold text-gray-900 mt-0.5" id="sppp-avg">—</p>
+                        </div>
+                        <div class="bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+                            <p class="text-[10px] text-green-700">Peratus Pencapaian</p>
+                            <p class="text-sm font-bold text-green-700 mt-0.5" id="sppp-pct">—</p>
+                        </div>
+                    </div>
+                    <p id="sppp-error" class="hidden text-red-500 text-[11px] font-medium"></p>
+                </div>
+
+                <div class="flex items-center justify-between px-1 pt-2 gap-3">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Jana Laporan Rasmi</p>
+                    <div class="bg-gray-200/80 p-1 rounded-xl flex items-center gap-1" role="radiogroup" aria-label="Format laporan">
+                        <button type="button" id="fmt-btn-pdf"  onclick="setReportFormat('pdf')"  role="radio" aria-checked="true"
+                            class="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-white shadow-sm text-gray-900 transition-all">PDF</button>
+                        <button type="button" id="fmt-btn-docx" onclick="setReportFormat('docx')" role="radio" aria-checked="false"
+                            class="px-3 py-1.5 text-[11px] font-semibold rounded-lg text-gray-500 hover:text-gray-700 transition-all">DOCX</button>
+                    </div>
+                </div>
+                <p class="text-[10px] text-gray-400 px-1 -mt-2" id="fmt-hint">PDF — sedia untuk dicetak / dihantar.</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="downloadReport('jan-jun')" data-period="jan-jun"
+                        class="report-btn bg-blue-900 hover:bg-blue-950 text-white font-medium py-3 px-2 rounded-2xl shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1 text-center">
+                        <i data-lucide="file-text" class="w-4 h-4 flex-shrink-0"></i>
+                        <span class="text-[11px] leading-tight">Jan – Jun</span>
+                    </button>
+                    <button onclick="downloadReport('jul-nov')" data-period="jul-nov"
+                        class="report-btn bg-blue-900 hover:bg-blue-950 text-white font-medium py-3 px-2 rounded-2xl shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1 text-center">
+                        <i data-lucide="file-text" class="w-4 h-4 flex-shrink-0"></i>
+                        <span class="text-[11px] leading-tight">Jul – Nov</span>
+                    </button>
+                    <button onclick="downloadReport('jan-nov')" data-period="jan-nov"
+                        class="report-btn bg-blue-900 hover:bg-blue-950 text-white font-medium py-3 px-2 rounded-2xl shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1 text-center">
+                        <i data-lucide="file-text" class="w-4 h-4 flex-shrink-0"></i>
+                        <span class="text-[11px] leading-tight">Jan – Nov</span>
+                    </button>
+                </div>
+                <p class="text-[10px] text-gray-400 px-1 -mt-1">Data ditapis mengikut tahun semasa dan tempoh yang dipilih.</p>
+                <button id="btn-csv" onclick="downloadCSV()" class="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 px-6 rounded-2xl shadow-sm flex items-center justify-center space-x-2 active:scale-95 transition-transform hover:bg-gray-50">
+                    <i data-lucide="table" class="w-4 h-4"></i>
+                    <span>Export Raw Data (CSV)</span>
+                </button>
+            </div>
+            <div class="h-20"></div>
+        </div>
+
+    </main>
+
+    <script>
+    
+    
+    
+    // ── Apps Script API endpoint ────────────────────────────────
+    var GAS_URL = 'https://script.google.com/macros/s/AKfycbz1BqWcJLm81Ug27QybGQzGbs-cbxd_-ebmJJm647WBc-RpVJqujQyFE8dBeBulVFD_hw/exec';
+
+    function gasCall(fn, data, onSuccess, onFailure) {
+        fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ fn: fn, data: data || {} }),
+            headers: { 'Content-Type': 'text/plain' },
+            redirect: 'follow'
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) { if (onSuccess) onSuccess(result); })
+        .catch(function(err) { if (onFailure) onFailure(err); else console.error(fn, err); });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('dynamic-year').textContent = new Date().getFullYear();
+        lucide.createIcons();
     });
-  </script>
 
+    
+    function startSurvey() {
+        transition('view-intro', 'view-step-1');
+        document.getElementById('progress-indicator').classList.remove('hidden');
+        document.getElementById('admin-login-btn').classList.add('hidden');
+        document.getElementById('home-btn').classList.remove('hidden');
+        updateProgress(1);
+    }
+
+    function goHome() {
+        var steps = ['view-step-1','view-step-2','view-step-3'];
+        var active = null;
+        steps.forEach(function(id) { if (!document.getElementById(id).classList.contains('hidden')) active = id; });
+        if (active) backTransition(active, 'view-intro');
+        else showOnly('view-intro');
+        document.getElementById('progress-indicator').classList.add('hidden');
+        document.getElementById('home-btn').classList.add('hidden');
+        document.getElementById('admin-login-btn').classList.remove('hidden');
+    }
+
+    function validateAndNext(current, next) {
+        var valid = true;
+        if (current === 1) {
+            if (!document.getElementById('selected-category').value) {
+                valid = false;
+                document.getElementById('error-category').classList.remove('hidden');
+                document.getElementById('input-category-container').classList.add('shake');
+                setTimeout(function(){ document.getElementById('input-category-container').classList.remove('shake'); }, 300);
+            } else {
+                document.getElementById('error-category').classList.add('hidden');
+            }
+        } else if (current === 2) {
+            var allOk = true;
+            ['q1','q2','q3','q4','q5','q6'].forEach(function(id) {
+                var val = document.getElementById(id+'-val').value;
+                var box = document.getElementById(id+'-container');
+                if (!val) { allOk = false; box.classList.add('border-red-300','bg-red-50'); box.classList.add('shake'); setTimeout(function(){box.classList.remove('shake');},300); }
+                else { box.classList.remove('border-red-300','bg-red-50'); }
+            });
+            if (!allOk) { valid = false; document.getElementById('error-q-general').classList.remove('hidden'); }
+            else { document.getElementById('error-q-general').classList.add('hidden'); }
+        }
+        if (valid) { updateProgress(next); transition('view-step-'+current, 'view-step-'+next); }
+    }
+
+    function prevStep(cur, prev) { updateProgress(prev); backTransition('view-step-'+cur, 'view-step-'+prev); }
+    function updateProgress(n) { document.getElementById('current-step-num').textContent = n; }
+
+    function selectSingle(btn) {
+        btn.parentElement.querySelectorAll('.cat-opt').forEach(function(o) {
+            o.classList.remove('bg-white','border-blue-500','text-blue-900','shadow-sm');
+            o.classList.add('bg-gray-50','border-gray-100','text-gray-600');
+            o.querySelector('span').classList.remove('border-blue-500','bg-blue-500');
+            o.querySelector('span').classList.add('border-gray-300');
+        });
+        btn.classList.remove('bg-gray-50','border-gray-100','text-gray-600');
+        btn.classList.add('bg-white','border-blue-500','text-blue-900','shadow-sm');
+        btn.querySelector('span').classList.remove('border-gray-300');
+        btn.querySelector('span').classList.add('border-blue-500','bg-blue-500');
+        document.getElementById('selected-category').value = btn.getAttribute('data-val');
+        document.getElementById('error-category').classList.add('hidden');
+    }
+
+    function rate(btn, qId) {
+        
+        btn.parentElement.querySelectorAll('.rate-btn').forEach(function(b) {
+            b.classList.remove('selected');
+        });
+        btn.classList.add('selected');
+        document.getElementById(qId+'-val').value = btn.getAttribute('data-scale');
+        document.getElementById(qId+'-container').classList.remove('border-red-300','bg-red-50');
+        document.getElementById('error-q-general').classList.add('hidden');
+    }
+
+    
+    function handleSubmit() {
+        var btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin"></div>';
+
+        var payload = {
+            faculty:  document.getElementById('input-faculty').value.trim(),
+            category: document.getElementById('selected-category').value,
+            q1: document.getElementById('q1-val').value,
+            q2: document.getElementById('q2-val').value,
+            q3: document.getElementById('q3-val').value,
+            q4: document.getElementById('q4-val').value,
+            q5: document.getElementById('q5-val').value,
+            q6: document.getElementById('q6-val').value,
+            comment: document.getElementById('input-comment').value.trim()
+        };
+
+        gasCall('submitSurvey', payload,
+            function(r) {
+                if (r && r.success) showSuccess();
+                else { alert("Ralat: " + (r ? r.error : "Unknown")); btn.disabled = false; btn.innerHTML = 'Hantar / Submit'; }
+            },
+            function(e) { alert("Error: " + e.message); btn.disabled = false; btn.innerHTML = 'Hantar / Submit'; });
+    }
+
+    function showSuccess() {
+        var s3 = document.getElementById('view-step-3');
+        s3.classList.remove('fade-enter-active'); s3.classList.add('fade-exit-active');
+        setTimeout(function() {
+            s3.classList.add('hidden'); s3.classList.remove('fade-exit-active');
+            document.getElementById('progress-indicator').classList.add('hidden');
+            document.getElementById('home-btn').classList.add('hidden');
+            var ok = document.getElementById('view-success');
+            ok.classList.remove('hidden');
+            setTimeout(function(){ ok.classList.add('fade-enter-active'); lucide.createIcons(); }, 50);
+        }, 400);
+    }
+
+    
+    function openAdminModal() {
+        document.getElementById('admin-modal').classList.add('open');
+        document.getElementById('admin-password-input').value = '';
+        document.getElementById('admin-error-msg').classList.add('hidden');
+        setTimeout(function(){ document.getElementById('admin-password-input').focus(); }, 100);
+    }
+    function closeAdminModal() { document.getElementById('admin-modal').classList.remove('open'); }
+    document.getElementById('admin-modal').addEventListener('click', function(e) { if (e.target === this) closeAdminModal(); });
+
+    function attemptAdminLogin() {
+        var pw = document.getElementById('admin-password-input').value;
+        if (!pw) return;
+        closeAdminModal();
+        showLoading("Verifying Admin Access...");
+        gasCall('verifyAdminPassword', { pw: pw },
+            function(r) {
+                if (r && r.ok) loadAdminDashboard();
+                else { hideLoading(); openAdminModal(); document.getElementById('admin-error-msg').classList.remove('hidden'); }
+            },
+            function(e) { hideLoading(); alert("Error: " + e.message); });
+    }
+
+    
+    var adminData    = null;
+    var adminYear    = new Date().getFullYear();
+    var adminYearList = [adminYear];
+
+    function loadAdminDashboard() {
+        showLoading("Loading dashboard...");
+        document.getElementById('admin-login-btn').classList.add('hidden');
+        gasCall('getAvailableYears', {},
+            function(y) {
+                adminYearList = (y && y.years && y.years.length) ? y.years : [new Date().getFullYear()];
+                adminYear     = (y && y.current) ? y.current : adminYearList[0];
+                populateYearSelect();
+                fetchAdminData();
+            },
+            function(e) {
+                adminYearList = [new Date().getFullYear()];
+                adminYear     = adminYearList[0];
+                populateYearSelect();
+                fetchAdminData();
+            });
+    }
+
+    function populateYearSelect() {
+        var sel = document.getElementById('admin-year-select');
+        sel.innerHTML = '';
+        adminYearList.forEach(function(y) {
+            var o = document.createElement('option');
+            o.value = String(y);
+            o.textContent = String(y);
+            if (y === adminYear) o.selected = true;
+            sel.appendChild(o);
+        });
+    }
+
+    function fetchAdminData() {
+        showLoading("Loading dashboard...");
+        gasCall('getAdminData', { periodKey: null, year: adminYear },
+            function(d) { adminData = d; hideLoading(); renderAdmin(d); },
+            function(e) { hideLoading(); alert("Error: " + e.message); });
+    }
+
+    function onAdminYearChange() {
+        var sel  = document.getElementById('admin-year-select');
+        var next = Number(sel.value);
+        if (!isFinite(next) || next === adminYear) return;
+        adminYear = next;
+        // SPPP is per-year/per-period and must not carry over.
+        var s1 = document.getElementById('sppp-sem1');
+        var s2 = document.getElementById('sppp-sem2');
+        if (s1) s1.value = '';
+        if (s2) s2.value = '';
+        if (typeof updateSpppPreview === 'function') updateSpppPreview();
+        fetchAdminData();
+    }
+
+    function renderAdmin(data) {
+        showOnly('view-admin');
+        setTimeout(function(){ document.getElementById('view-admin').classList.add('fade-enter-active'); }, 50);
+
+        document.getElementById('summary-total').textContent  = data.total || 0;
+        document.getElementById('summary-year').textContent   = adminYear;
+        document.getElementById('admin-period-label').textContent = "Data — " + adminYear;
+
+        var ov = data.overall || "0.0";
+        document.getElementById('summary-overall').innerHTML = ov + '<span class="text-lg text-green-500">%</span>';
+        document.getElementById('summary-status').textContent = Number(ov) >= 90 ? "Status: Cemerlang ✓" : Number(ov) >= 75 ? "Status: Baik" : "Status: Perlu Perhatian";
+
+        
+        var stats = data.stats || [];
+        var barsEl = document.getElementById('summary-bars');
+        if (!stats.length) { barsEl.innerHTML = '<p class="text-gray-400 text-sm">Tiada data</p>'; }
+        else {
+            var sorted = stats.slice().sort(function(a,b){ return b.score-a.score; });
+            barsEl.innerHTML = sorted.map(function(s) {
+                var barColor = s.score >= 95 ? 'bg-green-600' : s.score >= 85 ? 'bg-yellow-500' : 'bg-red-500';
+                return '<div>' +
+                    '<div class="flex justify-between text-xs mb-1"><span class="text-gray-500 truncate max-w-[75%]">' + s.q.substring(0,45) + '…</span>' +
+                    '<span class="font-medium ml-2">' + s.score.toFixed(1) + '%</span></div>' +
+                    '<div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden">' +
+                    '<div class="h-full ' + barColor + ' rounded-full transition-all duration-1000" style="width:' + s.score + '%"></div></div></div>';
+            }).join('');
+        }
+
+        
+        var tbody = document.getElementById('analysis-table-body');
+        tbody.innerHTML = '';
+        if (!stats.length) { tbody.innerHTML = '<tr><td colspan="6" class="px-2 py-4 text-center text-gray-400">Tiada data</td></tr>'; }
+        else {
+            stats.forEach(function(s) {
+                var sc = s.score >= 95 ? "text-green-600" : s.score >= 85 ? "text-yellow-600" : "text-red-600";
+                var tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 border-b border-gray-100 last:border-0";
+                tr.innerHTML =
+                    '<td class="px-2 py-3 font-medium text-gray-900">' + s.q + '</td>' +
+                    '<td class="px-1 py-3 text-center font-medium bg-green-50 text-green-800">' + s.s4 + '</td>' +
+                    '<td class="px-1 py-3 text-center text-emerald-700">' + s.s3 + '</td>' +
+                    '<td class="px-1 py-3 text-center text-orange-600">' + s.s2 + '</td>' +
+                    '<td class="px-1 py-3 text-center text-red-600">' + s.s1 + '</td>' +
+                    '<td class="px-2 py-3 text-right font-bold ' + sc + '">' + s.score.toFixed(1) + '%</td>';
+                tbody.appendChild(tr);
+            });
+        }
+        lucide.createIcons();
+    }
+
+    function switchTab(tab) {
+        ['summary','analysis'].forEach(function(t) {
+            var btn = document.getElementById('tab-btn-'+t);
+            var con = document.getElementById('tab-'+t);
+            if (t === tab) { btn.classList.add('bg-white','shadow-sm','text-gray-900'); btn.classList.remove('text-gray-500'); con.classList.remove('hidden'); }
+            else { btn.classList.remove('bg-white','shadow-sm','text-gray-900'); btn.classList.add('text-gray-500'); con.classList.add('hidden'); }
+        });
+    }
+
+    
+    
+    function parseSpppField(id) {
+        var raw = (document.getElementById(id).value || "").trim();
+        if (raw === "") return { empty: true };
+        var n = Number(raw);
+        if (isNaN(n) || n < 0 || n > 5) return { invalid: true };
+        return { value: n };
+    }
+
+    function updateSpppPreview() {
+        var a = parseSpppField('sppp-sem1');
+        var b = parseSpppField('sppp-sem2');
+        var avgEl = document.getElementById('sppp-avg');
+        var pctEl = document.getElementById('sppp-pct');
+        var errEl = document.getElementById('sppp-error');
+        errEl.classList.add('hidden'); errEl.textContent = '';
+
+        if (a.invalid || b.invalid) {
+            avgEl.textContent = '—';
+            pctEl.textContent = '—';
+            errEl.textContent = 'Nilai mesti antara 0 dan 5.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        if (a.empty || b.empty) {
+            avgEl.textContent = '—';
+            pctEl.textContent = '—';
+            return;
+        }
+        var avg = (a.value + b.value) / 2;
+        var pct = avg / 5 * 100;
+        avgEl.textContent = avg.toFixed(3);
+        pctEl.textContent = (Math.round(pct * 10) / 10).toFixed(1) + '%';
+    }
+
+    function readSpppInputs() {
+        var a = parseSpppField('sppp-sem1');
+        var b = parseSpppField('sppp-sem2');
+        var errEl = document.getElementById('sppp-error');
+        if (a.invalid || b.invalid) {
+            errEl.textContent = 'Nilai mesti antara 0 dan 5.';
+            errEl.classList.remove('hidden');
+            return null;
+        }
+        if (a.empty || b.empty) {
+            errEl.textContent = 'Sila isi markah SPPP Semester 1 dan Semester 2.';
+            errEl.classList.remove('hidden');
+            return null;
+        }
+        errEl.classList.add('hidden');
+        return { sem1: a.value, sem2: b.value };
+    }
+
+    
+    var reportFormat = 'pdf';   // 'pdf' | 'docx'
+
+    function setReportFormat(fmt) {
+        reportFormat = (fmt === 'docx') ? 'docx' : 'pdf';
+        var on  = ['bg-white','shadow-sm','text-gray-900'];
+        var off = ['text-gray-500','hover:text-gray-700'];
+        ['pdf','docx'].forEach(function(f) {
+            var b = document.getElementById('fmt-btn-' + f);
+            var active = (f === reportFormat);
+            on.forEach(function(c){ b.classList.toggle(c, active); });
+            off.forEach(function(c){ b.classList.toggle(c, !active); });
+            b.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        document.getElementById('fmt-hint').textContent = reportFormat === 'docx'
+            ? 'DOCX — boleh disunting di Microsoft Word / Google Docs.'
+            : 'PDF — sedia untuk dicetak / dihantar.';
+    }
+
+    
+    function downloadReport(periodKey) {
+        var allBtns    = document.querySelectorAll('.report-btn');
+        var clickedBtn = document.querySelector('.report-btn[data-period="' + periodKey + '"]');
+        var labels     = {'jan-jun':'Jan – Jun','jul-nov':'Jul – Nov','jan-nov':'Jan – Nov'};
+        var fmt        = reportFormat;   // lock in the format at click time
+
+        
+        var sppp = readSpppInputs();
+        if (!sppp) return;  // validation message already shown
+
+        
+        allBtns.forEach(function(b){ b.disabled = true; b.style.opacity = '0.6'; });
+        if (clickedBtn) {
+            clickedBtn.innerHTML = '<div class="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin mx-auto"></div><span class="text-[11px]">Jana...</span>';
+        }
+
+        function restoreButtons() {
+            document.querySelector('.report-btn[data-period="jan-jun"]').innerHTML = '<i data-lucide="file-text" class="w-4 h-4 flex-shrink-0"></i><span class="text-[11px] leading-tight">Jan \u2013 Jun</span>';
+            document.querySelector('.report-btn[data-period="jul-nov"]').innerHTML = '<i data-lucide="file-text" class="w-4 h-4 flex-shrink-0"></i><span class="text-[11px] leading-tight">Jul \u2013 Nov</span>';
+            document.querySelector('.report-btn[data-period="jan-nov"]').innerHTML = '<i data-lucide="file-text" class="w-4 h-4 flex-shrink-0"></i><span class="text-[11px] leading-tight">Jan \u2013 Nov</span>';
+            allBtns.forEach(function(b){ b.disabled = false; b.style.opacity = ''; });
+            lucide.createIcons();
+        }
+
+        function triggerDownload(r) {
+            
+            var b64     = r.file || r.pdf;
+            var mime    = r.mime || "application/pdf";
+            var byteStr = atob(b64);
+            var ab = new ArrayBuffer(byteStr.length);
+            var ia = new Uint8Array(ab);
+            for (var i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+            var blob    = new Blob([ab], { type: mime });
+            var dataUrl = URL.createObjectURL(blob);
+
+            // Page is served directly from GitHub Pages — no iframe parent to message.
+            // Trigger the download directly.
+            var a = document.createElement("a");
+            a.href     = dataUrl;
+            a.download = r.filename;
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(dataUrl);
+            }, 1000);
+        }
+
+        gasCall('generateReport', { periodKey: periodKey, sppp: sppp, year: adminYear, format: fmt },
+            function(r) {
+                if (r && r.success && (r.file || r.pdf)) triggerDownload(r);
+                else alert("Gagal menjana laporan: " + (r ? r.error : "Unknown error"));
+                restoreButtons();
+            },
+            function(e) {
+                alert("Error: " + e.message);
+                restoreButtons();
+            });
+    }
+
+    
+    function downloadCSV() {
+        if (!adminData || !adminData.rows || !adminData.rows.length) { alert("Tiada data untuk dieksport."); return; }
+        var headers = ["Timestamp","Fakulti","Kategori","S1","S2","S3","S4","S5","S6","Purata","Peratus","Cadangan"];
+        var rows    = adminData.rows.map(function(r) {
+            return [r.timestamp,r.faculty,r.category,r.q1,r.q2,r.q3,r.q4,r.q5,r.q6,r.avg,r.pct,'"'+(r.comment||'').replace(/"/g,'""')+'"'].join(",");
+        });
+        var csv  = [headers.join(",")].concat(rows).join("\n");
+        var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement("a");
+        a.href   = url; a.download = "IMEN_Survey_Data_" + adminYear + ".csv"; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    
+    function demoData() {
+        return { success:true, total:56, overall:"95.8",
+            stats:[
+                {q:"S1 Kakitangan mengamalkan sikap mesra pelanggan",          s4:41,s3:12,s2:1,s1:2,total:56,score:94.64},
+                {q:"S2 Kakitangan berpengetahuan dan berkemahiran",             s4:47,s3:8, s2:1,s1:0,total:56,score:98.21},
+                {q:"S3 Kualiti perkhidmatan / produk yang disediakan",          s4:44,s3:10,s2:2,s1:0,total:56,score:96.43},
+                {q:"S4 Tempoh masa untuk mendapatkan perkhidmatan / produk",    s4:38,s3:15,s2:3,s1:0,total:56,score:94.64},
+                {q:"S5 Persekitaran tempat berurusan adalah selesa dan berinformatif",s4:45,s3:9,s2:2,s1:0,total:56,score:96.43},
+                {q:"S6 Persepsi umum anda terhadap Pusat Tanggungjawab (PTj)", s4:38,s3:15,s2:0,s1:3,total:56,score:94.64}
+            ], rows:[] };
+    }
+
+    
+    function showLoading(msg) { document.getElementById('loading-text').textContent = msg||"Please wait..."; document.getElementById('view-loading').classList.remove('hidden'); }
+    function hideLoading()    { document.getElementById('view-loading').classList.add('hidden'); }
+
+    function showOnly(id) {
+        ['view-intro','view-step-1','view-step-2','view-step-3','view-admin','view-success'].forEach(function(v) {
+            var el = document.getElementById(v);
+            if (v === id) { el.classList.remove('hidden'); setTimeout(function(){ el.classList.add('fade-enter-active'); },20); }
+            else { el.classList.add('hidden'); el.classList.remove('fade-enter-active'); }
+        });
+    }
+
+    function transition(fromId, toId) {
+        var f = document.getElementById(fromId), t = document.getElementById(toId);
+        f.classList.remove('fade-enter-active'); f.classList.add('fade-exit-active');
+        setTimeout(function() {
+            f.classList.add('hidden'); f.classList.remove('fade-exit-active');
+            t.classList.remove('hidden');
+            setTimeout(function(){ t.classList.add('fade-enter-active'); lucide.createIcons(); }, 20);
+        }, 400);
+    }
+    function backTransition(f, t) { transition(f, t); }
+    </script>
 </body>
 </html>
